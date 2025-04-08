@@ -5,7 +5,10 @@
 
 #include <openssl/evp.h> 
 
-int calculate_hash(char* path, char* algorithm, char* result) {
+#include <thread>
+#include "metrics-collector.hpp"
+
+int calculate_hash(char* path, char* algorithm) {
   std::ifstream stream(path, std::ios::in | std::ios::binary);
   
   if (!stream.good()) {
@@ -37,7 +40,7 @@ int calculate_hash(char* path, char* algorithm, char* result) {
   stream.close();
 
   std::cout << "Digest is: ";
-    for (int i = 0; i < md_len; ++i) {
+    for (int i = 0; i < (int)md_len; ++i) {
         std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(md_value[i]);
     }
   std::cout << std::endl;
@@ -46,10 +49,34 @@ int calculate_hash(char* path, char* algorithm, char* result) {
   return 0;
 }
 
-int main(int argc, char* argv[]) {
+int main_metrics(int argc, char* argv[]) {
+  if (argc != 5) {
+    std::cerr << "usage: " << argv[0] << ' ' << argv[1] 
+              << " ADDRESS PORT WORKER_NAME" << std::endl;
+    return 1;
+  }
+  
+  MetricsCollector metrics_collector(argv[2], argv[3], argv[4]);
 
-  if (argc < 3) {
-    std::cerr << "usage: " << argv[0] 
+  srand(time(NULL));
+  while (true) {
+    std::this_thread::sleep_for(std::chrono::seconds(rand() % 5 + 1));
+    metrics_collector.startTask();
+    
+    // some "work" that requires memory
+    void *data = malloc(rand() % (1024 * 1024 * 50)); // 0 - 50 megabytes
+    std::this_thread::sleep_for(std::chrono::seconds(rand() % 5 + 1));
+    free(data);
+    
+    metrics_collector.stopTask();
+  }
+
+  return 0;
+}
+
+int main_hash(int argc, char* argv[]) {
+  if (argc != 4) {
+    std::cerr << "usage: " << argv[0] << ' ' << argv[1] 
               << " PATH ALGORITHM" 
               << std::endl
               << "Supported algorithms are: "
@@ -60,11 +87,25 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  char* result;
   try {
-    calculate_hash(argv[1], argv[2], result);
+    calculate_hash(argv[2], argv[3]);
   } catch(const std::exception& e) {
     std::cerr << "Error: " << e.what() << std::endl;
   }
   return 0;
+}
+
+int main(int argc, char* argv[]) {
+  if (argc < 2) {
+    std::cerr << "usage: " << argv[0] << " hash/metrics" << std::endl;
+    return 1;
+  }
+
+  if (strcmp(argv[1], "hash") == 0)
+    return main_hash(argc, argv);
+  if (strcmp(argv[1], "metrics") == 0)
+    return main_metrics(argc, argv);
+  
+  std::cerr << "specify hash/metrics" << std::endl;
+  return 1;
 }
