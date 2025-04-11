@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+option go_package = "github.com/moevm/grpc_server/pkg/proto/file_service";
+
+service FileService {
+  rpc UploadFile(FileRequest) returns (FileResponse) {}
+}
+
+message FileRequest {
+  string filename = 1;
+  bytes content = 2;
+  string file_type = 3;
+}
+
+message FileResponse {
+  int64 size = 1;
+  bool is_valid = 2;
+  string message = 3;
+}
