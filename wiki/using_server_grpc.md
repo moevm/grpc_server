@@ -3,6 +3,7 @@
 - installing dependencies from the folder controller: ```go get -u google.golang.org/protobuf``` and ```go get -u google.golang.org/grpc```. It is also worth installing protoc-gen-go and protoc-gen-go-grpc ```go install google.golang.org/protobuf/cmd/protoc-gen-go@latest``` and ```go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest```
 - Make sure that $GOPATH/bin is added to the PATH ```export PATH="$PATH:$(go env GOPATH)/bin"```
 - Check the protocol version ```protoc --version``` and check for plugins ```which protoc-gen-go``` ```which protoc-gen-go-grpc```
+- To use env: ```go get github.com/joho/godotenv```. File .env should be in the same folder as go.mod.
 - Generate the code with explicit paths:
 ```bash
 protoc \

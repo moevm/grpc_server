@@ -9,19 +9,23 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const (
-	ValidChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 !?.,\n"
-)
-
 type Server struct {
 	pb.UnimplementedFileServiceServer
+	allowedChars string
+	charMap      map[rune]bool
 }
 
-var availableCharacters = initAvailableCharacters()
+func NewServer(allowedChars string) *Server {
+	s := &Server{
+		allowedChars: allowedChars,
+	}
+	s.charMap = s.initCharMap()
+	return s
+}
 
-func initAvailableCharacters() map[rune]bool {
+func (s *Server) initCharMap() map[rune]bool {
 	chars := make(map[rune]bool)
-	for _, c := range ValidChars {
+	for _, c := range s.allowedChars {
 		chars[c] = true
 	}
 	return chars
@@ -36,7 +40,7 @@ func (s *Server) UploadFile(ctx context.Context, req *pb.FileRequest) (*pb.FileR
 
 	switch fileType {
 	case "text":
-		isValid = validateText(content)
+		isValid = s.validateText(content)
 	case "binary":
 		isValid = validateBinary(content)
 	default:
@@ -55,14 +59,14 @@ func (s *Server) UploadFile(ctx context.Context, req *pb.FileRequest) (*pb.FileR
 	}, nil
 }
 
-func validateText(content []byte) bool {
+func (s *Server) validateText(content []byte) bool {
 	if !utf8.Valid(content) {
 		return false
 	}
 
 	str := string(content)
 	for _, r := range str {
-		if !availableCharacters[r] && !unicode.IsSpace(r) {
+		if !s.charMap[r] && !unicode.IsSpace(r) {
 			return false
 		}
 	}
