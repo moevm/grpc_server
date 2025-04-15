@@ -4,7 +4,7 @@
 // - protoc             v3.21.12
 // source: pkg/proto/worker/worker.proto
 
-package worker
+package file_service
 
 import (
 	context "context"

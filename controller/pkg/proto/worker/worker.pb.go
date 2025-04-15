@@ -4,7 +4,7 @@
 // 	protoc        v3.21.12
 // source: pkg/proto/worker/worker.proto
 
-package worker
+package file_service
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -24,6 +24,7 @@ const (
 type TaskData struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Data          []byte                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Algorithm     string                 `protobuf:"bytes,2,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -65,9 +66,18 @@ func (x *TaskData) GetData() []byte {
 	return nil
 }
 
+func (x *TaskData) GetAlgorithm() string {
+	if x != nil {
+		return x.Algorithm
+	}
+	return ""
+}
+
 type TaskResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Result        []byte                 `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	Success       bool                   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -109,18 +119,35 @@ func (x *TaskResult) GetResult() []byte {
 	return nil
 }
 
+func (x *TaskResult) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *TaskResult) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_pkg_proto_worker_worker_proto protoreflect.FileDescriptor
 
 const file_pkg_proto_worker_worker_proto_rawDesc = "" +
 	"\n" +
-	"\x1dpkg/proto/worker/worker.proto\"\x1e\n" +
+	"\x1dpkg/proto/worker/worker.proto\"<\n" +
 	"\bTaskData\x12\x12\n" +
-	"\x04data\x18\x01 \x01(\fR\x04data\"$\n" +
+	"\x04data\x18\x01 \x01(\fR\x04data\x12\x1c\n" +
+	"\talgorithm\x18\x02 \x01(\tR\talgorithm\"X\n" +
 	"\n" +
 	"TaskResult\x12\x16\n" +
-	"\x06result\x18\x01 \x01(\fR\x06result26\n" +
+	"\x06result\x18\x01 \x01(\fR\x06result\x12\x18\n" +
+	"\asuccess\x18\x02 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage26\n" +
 	"\rWorkerService\x12%\n" +
-	"\vProcessTask\x12\t.TaskData\x1a\v.TaskResultB/Z-github.com/moevm/grpc_server/pkg/proto/workerb\x06proto3"
+	"\vProcessTask\x12\t.TaskData\x1a\v.TaskResultB5Z3github.com/moevm/grpc_server/pkg/proto/file_serviceb\x06proto3"
 
 var (
 	file_pkg_proto_worker_worker_proto_rawDescOnce sync.Once

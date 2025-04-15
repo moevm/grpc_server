@@ -2,15 +2,25 @@ package main
 
 import (
 	"github.com/moevm/grpc_server/internal/manager"
+	"log"
+	"math/rand"
 )
 
 func main() {
-	tasks := make([][]byte, 5)
-	tasks[0] = make([]byte, 888)
-	tasks[1] = make([]byte, 1848588)
-	tasks[2] = make([]byte, 50138788)
-	tasks[3] = make([]byte, 170338664)
-	tasks[4] = make([]byte, 558777333)
+	const (
+		minSize = 5 * 1024 * 1024
+		maxSize = 100 * 1024 * 1024
+	)
+
+	tasks := make([][]byte, 20)
+
+	for i := range tasks {
+		size := minSize + rand.Intn(maxSize-minSize+1)
+		tasks[i] = make([]byte, size)
+		if _, err := rand.Read(tasks[i]); err != nil {
+			log.Fatalf("Failed to create task: %v", err)
+		}
+	}
 	
 	manager.ProcessTasks(tasks)
 }

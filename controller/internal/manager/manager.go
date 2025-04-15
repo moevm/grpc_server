@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
+	worker "github.com/moevm/grpc_server/pkg/proto/worker"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	worker "github.com/moevm/grpc_server/pkg/proto/worker"
 )
 
 const (
@@ -29,6 +29,7 @@ func ProcessTasks(inputs [][]byte) {
 		conn, err := grpc.Dial(
 			fmt.Sprintf("localhost:%d", workerPortStart+i),
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*1024)),
 		)
 		if err != nil {
 			log.Fatalf("Failed to connect to worker localhost:%d: %v", workerPortStart+i, err)
@@ -51,22 +52,23 @@ func ProcessTasks(inputs [][]byte) {
 			defer wg.Done()
 			for task := range taskChan {
 				workerID := <-workerPool
-				
+				fmt.Printf("Task %d assigned to worker %d!\n", task.ID, workerID)
+
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
-				
+
 				res, err := clients[workerID].ProcessTask(ctx, &worker.TaskData{
-					Data: task.Input,
+					Data:      task.Input,
+					Algorithm: "md5",
 				})
-				
+
 				if err != nil {
 					log.Printf("Worker %d failed task %d: %v", workerID, task.ID, err)
 				} else {
 					task.Output = res.Result
-					fmt.Printf("Task %d processed by worker %d: %s => %s\n",
-						task.ID, workerID, task.Input, task.Output)
+					fmt.Printf("Task %d processed by worker %d: %s\n", task.ID, workerID, res.Message)
 				}
-				
+
 				workerPool <- workerID
 			}
 		}()

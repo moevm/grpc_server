@@ -1,0 +1,15 @@
+{
+    "image": "qemu-riscv-cluster/worker",
+    "runArgs": [],
+    "customizations": {
+     "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "EditorConfig.EditorConfig",
+        "ms-vscode.cmake-tools"
+    ]
+     }
+    },
+    "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind",
+    "workspaceFolder": "/app"
+}
