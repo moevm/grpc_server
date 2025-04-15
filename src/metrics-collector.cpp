@@ -3,7 +3,7 @@
 #include <thread>
 #include <chrono>
 #include <unistd.h>
-#include <string.h>
+#include <fstream>
 
 MetricsCollector::MetricsCollector(const char *gateway_address, const char *gateway_port, const char *worker_name)
     : gateway(gateway_address, gateway_port, worker_name),
@@ -24,26 +24,25 @@ MetricsCollector::MetricsCollector(const char *gateway_address, const char *gate
         .Help("Task processing time (in seconds)")
         .Register(*registry);
 
-    FILE *file = fopen("/proc/stat", "r");
-    char cpu_name[32];
+    std::ifstream file("/proc/stat");
+    int ign;
+    std::string cpu_name;
     
     while (true) {
         CPUInfo cpu;
 
-        fscanf(file, "%s %lu %lu %lu %lu %*u %*u %*u %*u %*u %*u",
-            cpu_name,
-            &cpu.last_total_user, &cpu.last_total_user_low,
-            &cpu.last_total_sys, &cpu.last_total_idle
-        );
-
-        if (strstr(cpu_name, "cpu") != cpu_name)
+        file >> cpu_name >> cpu.last_total_user >> cpu.last_total_user_low
+             >> cpu.last_total_sys >> cpu.last_total_idle
+             >> ign >> ign >> ign >> ign >> ign >> ign;
+        
+        if (cpu_name.find("cpu") != 0)
             break;
 
         cpu.gauge = &cpu_usage_family.Add({{ "cpu", std::string(cpu_name) }});
         cpu_usage.insert({ std::string(cpu_name), cpu });
     }
 
-    fclose(file);
+    file.close();
 
     memory_used_gauge = &memory_used_family.Add({});
     task_processing_time_gauge = &task_processing_time_family.Add({});
@@ -84,37 +83,34 @@ MetricsCollector::~MetricsCollector()
 
 void MetricsCollector::getMemoryUsed()
 {
-    FILE *file = fopen("/proc/self/statm", "r");
-    if (file == NULL) {
+    std::ifstream file("/proc/self/statm");
+    if (!file.is_open()) {
         memory_used_gauge->Set(0);
         return;
     }
 
     long mem_pages = 0;
-    fscanf(file, "%ld", &mem_pages);
-    fclose(file);
+    file >> mem_pages;
+    file.close();
 
     memory_used_gauge->Set(mem_pages * (double)getpagesize());
 }
 
 void MetricsCollector::getCPUUsage()
 {
-    FILE *file = fopen("/proc/stat", "r");
+    std::ifstream file("/proc/stat");
     uint64_t total_user, total_user_low, total_sys, total_idle, total;
     double percent;
     
-    char cpu_name[32];
+    std::string cpu_name;
+    int ign;
     
     while (true) {
-        fscanf(file, "%s %lu %lu %lu %lu %*u %*u %*u %*u %*u %*u",
-            cpu_name,
-            &total_user, &total_user_low,
-            &total_sys, &total_idle
-        );
-
+        file >> cpu_name >> total_user >> total_user_low >> total_sys >> total_idle
+             >> ign >> ign >> ign >> ign >> ign >> ign;
         
-        if (strstr(cpu_name, "cpu") != cpu_name)
-        break;
+        if (cpu_name.find("cpu") != 0)
+            break;
         
         CPUInfo &cpu = cpu_usage[cpu_name];
         if (total_user < cpu.last_total_user || total_user_low < cpu.last_total_user_low ||
@@ -140,7 +136,7 @@ void MetricsCollector::getCPUUsage()
         cpu.gauge->Set(percent);
     }
 
-    fclose(file);
+    file.close();
 }
 
 void MetricsCollector::startTask()
