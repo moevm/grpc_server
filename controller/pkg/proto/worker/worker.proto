@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+option go_package = "github.com/moevm/grpc_server/pkg/proto/file_service";
+
+service WorkerService {
+  rpc ProcessTask (TaskData) returns (TaskResult);
+}
+
+message TaskData {
+  bytes data = 1;
+}
+
+message TaskResult {
+  bytes result = 1;
+}
