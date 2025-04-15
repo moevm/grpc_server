@@ -19,7 +19,8 @@ const (
 	TaskSolved           = 0
 	WorkerBusy           = 1
 	WorkerFree           = 0
-	WorkerInitSocketPath = "/tmp/socket/init.sock"
+	WorkerInitSocketPath = "/run/controller/init.sock"
+	WorkerSocketPath     = "/run/controller/"
 )
 
 type Task struct {
@@ -180,7 +181,7 @@ func (w *Worker) AddTask(task *Task) {
 
 func (w *Worker) Run() {
 	var socketPath strings.Builder
-	socketPath.WriteString("/tmp/socket/")
+	socketPath.WriteString(WorkerSocketPath)
 	socketPath.WriteString(fmt.Sprintf("%v.sock", w.id))
 	w.state = WorkerFree
 	for {

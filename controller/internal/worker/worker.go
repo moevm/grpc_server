@@ -13,6 +13,11 @@ import (
 	"syscall"
 )
 
+const (
+	InitSocketPath = "/run/controller/init.sock"
+	SocketDir      = "/run/controller/"
+)
+
 var SocketPath strings.Builder
 
 var Listener net.Listener
@@ -57,7 +62,7 @@ func DoTask(c net.Conn) {
 	fmt.Println("task complete")
 }
 
-func WorkerStart() {
+func Start() {
 	idBuff := make([]byte, 8)
 	respBuf := make([]byte, 8)
 	var err error
@@ -67,7 +72,7 @@ func WorkerStart() {
 		log.Fatalln(err)
 	}
 	id := converter.ByteSliceToInt(idBuff)
-	SocketPath.WriteString("/tmp/socket/")
+	SocketPath.WriteString(SocketDir)
 	SocketPath.WriteString(fmt.Sprintf("%v.sock", id))
 	if err = os.RemoveAll(SocketPath.String()); err != nil {
 		log.Fatalln(err)
@@ -76,7 +81,7 @@ func WorkerStart() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	conn, err = net.Dial("unix", "/tmp/socket/init.sock")
+	conn, err = net.Dial("unix", InitSocketPath)
 	if err != nil {
 		log.Fatalln(err)
 	}
