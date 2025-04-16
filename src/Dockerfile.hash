@@ -4,7 +4,7 @@ RUN apk update && apk add --no-cache g++ make openssl-dev
 
 WORKDIR /app
 
-COPY hash.cpp Makefile ./
+COPY main.cpp file.hpp file.cpp md_calculator.hpp md_calculator.cpp Makefile ./
 
 RUN make
 
