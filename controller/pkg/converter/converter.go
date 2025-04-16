@@ -1,20 +1,37 @@
+// TODO: add Doc comments
 package converter
 
-func ByteSliceToInt(slice []byte) int {
-	var num int
-	for i := 0; i < 8; i += 1 {
-		num += int(slice[7-i])
-		if i != 7 {
-			num = num << 8
+import (
+	"errors"
+)
+
+const (
+	intByteLen = 8
+)
+
+// TODO: use generic for return/parameter type
+func ByteSliceToInt(slice []byte) (num int, err error) {
+	if len(slice) != intByteLen {
+		return 0, errors.New("invalid slice len")
+	}
+
+	for i := range intByteLen {
+		num += int(slice[intByteLen-i-1])
+
+		if i != intByteLen-1 {
+			num = num << intByteLen
 		}
 	}
-	return num
+
+	return num, nil
 }
 
 func IntToByteSlice(num int) []byte {
 	slice := []byte{}
-	for i := 0; i < 8; i += 1 {
-		slice = append(slice, byte(num>>(i*8)))
+
+	for i := range intByteLen {
+		slice = append(slice, byte(num>>(i*intByteLen)))
 	}
+
 	return slice
 }
