@@ -1,6 +1,7 @@
 #include <prometheus/gauge.h>
 #include <prometheus/registry.h>
 #include <prometheus/gateway.h>
+#include <chrono>
 
 class MetricsCollector {
     prometheus::Gateway gateway;
@@ -8,29 +9,35 @@ class MetricsCollector {
 
     struct CPUInfo {
         prometheus::Gauge *gauge;
-        uint64_t last_total_user;
-        uint64_t last_total_user_low;
-        uint64_t last_total_sys;
-        uint64_t last_total_idle;
+        
+        struct Time {
+            uint64_t user;
+            uint64_t user_low;
+            uint64_t sys;
+            uint64_t idle;
+        };
+
+        Time time;
     };
 
-    prometheus::Gauge *memory_used_gauge;
     std::unordered_map<std::string, CPUInfo> cpu_usage;
+    
+    prometheus::Gauge *memory_used_gauge;
     prometheus::Gauge *task_processing_time_gauge;
-    bool is_running;
+    
+    std::atomic<bool> is_running {true};
     std::thread thread;
 
     bool is_task_running;
-    struct timespec task_start;
+    std::chrono::time_point<std::chrono::high_resolution_clock> task_start;
 
-    void getMemoryUsed();
-    void getCPUUsage();
-    void mainLoop();
+    void GetCPUUsage();
+    void MainLoop();
 
 public:
     MetricsCollector(const char *gateway_address, const char *gateway_port, const char *worker_name);
     ~MetricsCollector();
 
-    void startTask();
-    void stopTask();
+    void StartTask();
+    void StopTask();
 };

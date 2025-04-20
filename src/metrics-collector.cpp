@@ -4,6 +4,22 @@
 #include <chrono>
 #include <unistd.h>
 #include <fstream>
+#include <iostream>
+
+namespace {
+    double GetMemoryUsed()
+    {
+        std::ifstream file("/proc/self/statm");
+        if (!file.is_open()) {
+            return 0;
+        }
+
+        long mem_pages = 0;
+        file >> mem_pages;
+        file.close();
+        return mem_pages * (double)getpagesize();
+    }
+}
 
 MetricsCollector::MetricsCollector(const char *gateway_address, const char *gateway_port, const char *worker_name)
     : gateway(gateway_address, gateway_port, worker_name),
@@ -31,8 +47,8 @@ MetricsCollector::MetricsCollector(const char *gateway_address, const char *gate
     while (true) {
         CPUInfo cpu;
 
-        file >> cpu_name >> cpu.last_total_user >> cpu.last_total_user_low
-             >> cpu.last_total_sys >> cpu.last_total_idle
+        file >> cpu_name >> cpu.time.user >> cpu.time.user_low
+             >> cpu.time.sys >> cpu.time.idle
              >> ign >> ign >> ign >> ign >> ign >> ign;
         
         if (cpu_name.find("cpu") != 0)
@@ -48,30 +64,30 @@ MetricsCollector::MetricsCollector(const char *gateway_address, const char *gate
     task_processing_time_gauge = &task_processing_time_family.Add({});
 
     gateway.RegisterCollectable(registry);
-
-    is_running = true;
-    thread = std::thread(&MetricsCollector::mainLoop, this);
-
+    thread = std::thread(&MetricsCollector::MainLoop, this);
     is_task_running = false;
 }
 
-void MetricsCollector::mainLoop()
+void MetricsCollector::MainLoop()
 {
     while (is_running) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         
-        getMemoryUsed();
-        getCPUUsage();
+        memory_used_gauge->Set(::GetMemoryUsed());
+        GetCPUUsage();
         
         if (is_task_running) {
-            struct timespec time;
-            clock_gettime(CLOCK_MONOTONIC, &time);
-            task_processing_time_gauge->Set((time.tv_sec - task_start.tv_sec) + (time.tv_nsec - task_start.tv_nsec) * 1e-9);
+            auto cur_time = std::chrono::high_resolution_clock::now();
+            task_processing_time_gauge->Set(std::chrono::duration<double>(cur_time - task_start).count());
         }
-        else
+        else {
             task_processing_time_gauge->Set(0);
+        }
 
-        gateway.PushAdd();
+        int status = gateway.PushAdd();
+        if (status != 200) {
+            std::cerr << "[ERROR] Failed to push metrics. Status " << status << std::endl;
+        }
     }
 }
 
@@ -81,71 +97,51 @@ MetricsCollector::~MetricsCollector()
     thread.join();
 }
 
-void MetricsCollector::getMemoryUsed()
-{
-    std::ifstream file("/proc/self/statm");
-    if (!file.is_open()) {
-        memory_used_gauge->Set(0);
-        return;
-    }
-
-    long mem_pages = 0;
-    file >> mem_pages;
-    file.close();
-
-    memory_used_gauge->Set(mem_pages * (double)getpagesize());
-}
-
-void MetricsCollector::getCPUUsage()
+void MetricsCollector::GetCPUUsage()
 {
     std::ifstream file("/proc/stat");
-    uint64_t total_user, total_user_low, total_sys, total_idle, total;
+    CPUInfo::Time cur_time;
     double percent;
     
     std::string cpu_name;
     int ign;
     
     while (true) {
-        file >> cpu_name >> total_user >> total_user_low >> total_sys >> total_idle
+        file >> cpu_name >> cur_time.user >> cur_time.user_low >> cur_time.sys >> cur_time.idle
              >> ign >> ign >> ign >> ign >> ign >> ign;
         
         if (cpu_name.find("cpu") != 0)
             break;
         
         CPUInfo &cpu = cpu_usage[cpu_name];
-        if (total_user < cpu.last_total_user || total_user_low < cpu.last_total_user_low ||
-            total_sys < cpu.last_total_sys || total_idle < cpu.last_total_idle) {
+        if (cur_time.user < cpu.time.user || cur_time.user_low < cpu.time.user_low ||
+            cur_time.sys < cpu.time.sys || cur_time.idle < cpu.time.idle) {
             // overflow detection
             percent = -1.0;
         }
         else {
-            total = (total_user - cpu.last_total_user) + (total_user_low - cpu.last_total_user_low) +
-                (total_sys - cpu.last_total_sys);
+            uint64_t total = (cur_time.user - cpu.time.user) + (cur_time.user_low - cpu.time.user_low) +
+                (cur_time.sys - cpu.time.sys);
             
             percent = total;
-            total += (total_idle - cpu.last_total_idle);
-            percent /= total;
-            percent *= 100;
+            total += (cur_time.idle - cpu.time.idle);
+            percent = (total == 0) ? -1.0 : (percent / total) * 100.0;
         }
     
-        cpu.last_total_user = total_user;
-        cpu.last_total_user_low = total_user_low;
-        cpu.last_total_sys = total_sys;
-        cpu.last_total_idle = total_idle;
-
+        cpu.time = cur_time;
         cpu.gauge->Set(percent);
     }
 
     file.close();
 }
 
-void MetricsCollector::startTask()
+void MetricsCollector::StartTask()
 {
     is_task_running = true;
-    clock_gettime(CLOCK_MONOTONIC, &task_start);
+    task_start = std::chrono::high_resolution_clock::now();
 }
 
-void MetricsCollector::stopTask()
+void MetricsCollector::StopTask()
 {
     is_task_running = false;
     task_processing_time_gauge->Set(0);
