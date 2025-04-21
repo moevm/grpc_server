@@ -162,6 +162,9 @@ func (w *Worker) AddTask(task *Task) {
 		}
 	}
 	_, err = w.conn.Write(converter.IntToByteSlice(0))
+	if err != nil {
+		log.Fatalln(err)
+	}	
 	buf := make([]byte, 8)
 	_, err = w.conn.Read(buf)
 	if err != nil {

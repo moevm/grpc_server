@@ -2,11 +2,11 @@ package grpcserver
 
 import (
 	"context"
-	"unicode"
-	"unicode/utf8"
 	pb "github.com/moevm/grpc_server/pkg/proto/file_service"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"unicode"
+	"unicode/utf8"
 )
 
 type Server struct {

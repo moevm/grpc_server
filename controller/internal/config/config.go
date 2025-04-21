@@ -1,17 +1,17 @@
 package config
 
 import (
+	"github.com/joho/godotenv"
 	"log"
 	"os"
 	"strconv"
-	"github.com/joho/godotenv"
 )
 
 type ServerConfig struct {
-	Host            string
-	Port            string
-	MaxMessageSize  int
-	AllowedChars    string
+	Host           string
+	Port           string
+	MaxMessageSize int
+	AllowedChars   string
 }
 
 func Load() *ServerConfig {
@@ -20,10 +20,10 @@ func Load() *ServerConfig {
 	}
 
 	return &ServerConfig{
-		Host:            getEnv("SERVER_HOST", "localhost"),
-		Port:            getEnv("SERVER_PORT", "50051"),
-		MaxMessageSize:  getEnvAsInt("MAX_MESSAGE_SIZE", 4*1024*1024), // 4MB
-		AllowedChars:    getEnv("ALLOWED_CHARS", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 !?.,\n"),
+		Host:           getEnv("SERVER_HOST", "localhost"),
+		Port:           getEnv("SERVER_PORT", "50051"),
+		MaxMessageSize: getEnvAsInt("MAX_MESSAGE_SIZE", 4*1024*1024), // 4MB
+		AllowedChars:   getEnv("ALLOWED_CHARS", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 !?.,\n"),
 	}
 }
 
