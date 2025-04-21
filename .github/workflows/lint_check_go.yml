@@ -1,4 +1,4 @@
-name: Code Style Checks
+name: Lint check go
 
 on: [push]
 
