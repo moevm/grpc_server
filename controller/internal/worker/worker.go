@@ -18,7 +18,7 @@ const (
 	workerInitSocketPath = "/run/controller/init.sock"
 	workerSocketPath     = "/run/controller/"
 
-	intByteLen = 8
+	intByteLen = 8 // default for x86_64
 
 	successfulResp = 1
 )

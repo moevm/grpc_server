@@ -22,8 +22,6 @@ type Unix struct {
 	net.Conn
 }
 
-// TODO: add a detailed Doc comments for Unix.Read and Unix.Write
-
 // Read reads all the contents from channel into the buffer
 // if the buffer size is too small it will return an error
 // (that's why you need to pass the message size first,
@@ -90,27 +88,31 @@ func (c *Unix) Read(b []byte) (n int, err error) {
 	}
 }
 
+// Write writes all contents from the buffer into the channel.
 func (c *Unix) Write(b []byte) (n int, err error) {
 	messageLen := len(b)
 	messageLenBuf := converter.IntToByteSlice(messageLen)
 
+	// Send full message len.
 	_, err = c.Conn.Write(messageLenBuf)
 	if err != nil {
 		return 0, fmt.Errorf("Unix.Write - c.Conn.Write: %v", err)
 	}
-
+	// Maximum frame length is 1024 bytes.
 	const fullFrameLen = 1024
 	fullFrameLenBuf := converter.IntToByteSlice(fullFrameLen)
+	//Offset from the top of the message buffer.
 	offset := 0
 
 	for {
 		switch {
 		case messageLen-offset >= fullFrameLen:
+			// Send max frame len.
 			_, err = c.Conn.Write(fullFrameLenBuf)
 			if err != nil {
 				return 0, fmt.Errorf("Unix.Write - c.Conn.Write: %v", err)
 			}
-
+			// Send frame.
 			_, err = c.Conn.Write(b[offset : offset+fullFrameLen])
 			if err != nil {
 				return 0, fmt.Errorf("Unix.Write - c.Conn.Write: %v", err)
@@ -122,11 +124,12 @@ func (c *Unix) Write(b []byte) (n int, err error) {
 			frameLen := messageLen - offset
 			frameLenBuf := converter.IntToByteSlice(frameLen)
 
+			// Send frame len.
 			_, err = c.Conn.Write(frameLenBuf)
 			if err != nil {
 				return 0, fmt.Errorf("Unix.Write - c.Conn.Write: %v", err)
 			}
-
+			// Send frame.
 			_, err = c.Conn.Write(b[offset : offset+frameLen])
 			if err != nil {
 				return 0, fmt.Errorf("Unix.Write - c.Conn.Write: %v", err)
@@ -135,6 +138,7 @@ func (c *Unix) Write(b []byte) (n int, err error) {
 			offset += frameLen
 
 		case messageLen == offset:
+			// Zero frame len means the message was successfully transmitted.
 			_, err := c.Conn.Write(converter.IntToByteSlice(0))
 			if err != nil {
 				return 0, fmt.Errorf("Unix.Write - c.Conn.Write: %v", err)

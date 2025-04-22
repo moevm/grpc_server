@@ -32,7 +32,7 @@ const (
 	workerInitSocketPath = "/run/controller/init.sock"
 	workerSocketPath     = "/run/controller/"
 
-	intByteLen = 8
+	intByteLen = 8 // default for x86_64
 
 	successfulResp = 1
 )
@@ -69,6 +69,7 @@ type Worker struct {
 	conn     conn.Unix
 }
 
+// Constructor for Task.
 func NewTask(taskId int, taskBody []byte) *Task {
 	return &Task{
 		id:    taskId,
@@ -78,6 +79,7 @@ func NewTask(taskId int, taskBody []byte) *Task {
 	}
 }
 
+// Constructor for Worker.
 func NewWorker(workerId int) *Worker {
 	return &Worker{
 		id:       workerId,
@@ -154,6 +156,8 @@ func (w *Worker) SetWorkerConn(workerConn conn.Unix) {
 	w.conn = workerConn
 }
 
+// Run new Worker.
+// Worker will wait for the task from the channel.
 func (w *Worker) Run() {
 	var socketPath strings.Builder
 	socketPath.WriteString(workerSocketPath)
@@ -181,6 +185,7 @@ func (w *Worker) Run() {
 	}
 }
 
+// Sends Task.body to a worker and receive a Task.solution.
 func (w *Worker) AddTask(task *Task) {
 	if w.taskChan == nil || w.state != workerFree {
 		errorChan <- fmt.Errorf("worker is broken")
@@ -320,6 +325,7 @@ func workerInit() {
 	}
 }
 
+// Basic implementation of the load balancer.
 func loadBalancer(task *Task) {
 	for i := 0; i <= workerId; i++ {
 		worker, exist := workers.Load(i)
