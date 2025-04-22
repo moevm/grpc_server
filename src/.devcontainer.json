@@ -1,5 +1,5 @@
 {
-    "image": "qemu-riscv-cluster/worker",
+    "image": "qemu-riscv-cluster/worker-builder",
     "runArgs": [],
     "customizations": {
      "vscode": {
