@@ -1,5 +1,5 @@
 {
-    "image": "qemu-riscv-cluster/worker-builder",
+    "image": "grpc_server-",
     "runArgs": [],
     "customizations": {
      "vscode": {

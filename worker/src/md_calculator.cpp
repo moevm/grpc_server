@@ -2,7 +2,7 @@
 #include <sstream>
 #include <iomanip>
 
-#include "md_calculator.hpp"
+#include "../include/md_calculator.hpp"
 
 MDCalculator::MDCalculator(const std::string& algorithm) 
     : md_(nullptr), ctx_(nullptr, EVP_MD_CTX_free) {
