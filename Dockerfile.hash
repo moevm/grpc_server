@@ -1,0 +1,23 @@
+FROM alpine:latest AS builder
+
+RUN apk update && apk add --no-cache g++ openssl-dev
+RUN apk add bazel --repository=http://dl-cdn.alpinelinux.org/alpine/edge/testing/
+
+WORKDIR /app
+
+COPY worker/src/ ./src/
+COPY worker/include/ ./include/
+COPY worker/BUILD ./
+COPY worker/MODULE.bazel ./
+
+RUN bazel build //:worker
+
+FROM alpine:latest
+
+RUN apk update &&  apk add --no-cache libstdc++ libgcc libssl3
+
+COPY --from=builder /app/bazel-bin/worker /usr/local/bin/worker
+
+WORKDIR /data
+
+ENTRYPOINT ["/usr/local/bin/worker", "/data/test.txt", "sha256"]
