@@ -1,0 +1,7 @@
+run:
+  modules-dir: controller
+
+linters:
+  enable:
+    - gofmt
+    - govet
