@@ -163,7 +163,10 @@ func (w *Worker) Run() {
 	socketPath.WriteString(workerSocketPath)
 	socketPath.WriteString(fmt.Sprintf("%v.sock", w.id))
 
-	w.SetWorkerState(workerFree)
+	if err := w.SetWorkerState(workerFree); err != nil {
+		errorChan <- fmt.Errorf("Worker.Run - SetWorkerState: %v", err)
+		return
+	}
 
 	for {
 		task := <-w.taskChan
@@ -171,8 +174,13 @@ func (w *Worker) Run() {
 		netConn, err := net.Dial("unix", socketPath.String())
 		if err != nil {
 			errorChan <- fmt.Errorf("Worker.Run - net.Dial: %v", err)
-			w.SetWorkerState(workerDown)
-			task.SetTaskState(taskFree)
+			if err := w.SetWorkerState(workerDown); err != nil {
+				errorChan <- fmt.Errorf("Worker.Run - SetWorkerState: %v", err)
+			}
+			if err := task.SetTaskState(taskFree); err != nil {
+				errorChan <- fmt.Errorf("Worker.Run - SetTaskState: %v", err)
+			}
+			continue
 		}
 
 		connection := conn.Unix{Conn: netConn}
@@ -189,73 +197,111 @@ func (w *Worker) Run() {
 func (w *Worker) AddTask(task *Task) {
 	if w.taskChan == nil || w.state != workerFree {
 		errorChan <- fmt.Errorf("worker is broken")
-		w.SetWorkerState(workerDown)
-		task.SetTaskState(taskFree)
+		if err := w.SetWorkerState(workerDown); err != nil {
+			errorChan <- fmt.Errorf("Worker.AddTask - SetWorkerState: %v", err)
+		}
+		if err := task.SetTaskState(taskFree); err != nil {
+			errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
+		}
 		return
 	}
 
 	if task.body == nil {
 		errorChan <- fmt.Errorf("task %v is empty", task.id)
-		task.SetTaskState(taskSolved)
-		task.SetTaskSolve(nil)
+		if err := task.SetTaskState(taskSolved); err != nil {
+			errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
+		}
+		if err := task.SetTaskSolve(nil); err != nil {
+			errorChan <- fmt.Errorf("Worker.AddTask - SetTaskSolve: %v", err)
+		}
+		return
 	}
 
-	w.SetWorkerState(workerBusy)
-	task.SetTaskState(taskWip)
+	if err := w.SetWorkerState(workerBusy); err != nil {
+		errorChan <- fmt.Errorf("Worker.AddTask - SetWorkerState: %v", err)
+		return
+	}
+	if err := task.SetTaskState(taskWip); err != nil {
+		errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
+		return
+	}
 
 	defer func() {
-		w.SetWorkerState(workerFree)
+		if err := w.SetWorkerState(workerFree); err != nil {
+			errorChan <- fmt.Errorf("Worker.AddTask - SetWorkerState: %v", err)
+		}
 	}()
 
 	taskLen := len(task.body)
 	var err error
-	// Send task len to worker.
 	_, err = w.conn.Write(converter.IntToByteSlice(taskLen))
 	if err != nil {
 		errorChan <- fmt.Errorf("Worker.AddTask - w.conn.Write: %v", err)
-		w.SetWorkerState(workerDown)
-		task.SetTaskState(taskFree)
+		if err := w.SetWorkerState(workerDown); err != nil {
+			errorChan <- fmt.Errorf("Worker.AddTask - SetWorkerState: %v", err)
+		}
+		if err := task.SetTaskState(taskFree); err != nil {
+			errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
+		}
 		return
 	}
-	// Send task.body to worker.
+
 	_, err = w.conn.Write(task.body)
 	if err != nil {
 		errorChan <- fmt.Errorf("Worker.AddTask - w.conn.Write: %v", err)
-		w.SetWorkerState(workerDown)
-		task.SetTaskState(taskFree)
+		if err := w.SetWorkerState(workerDown); err != nil {
+			errorChan <- fmt.Errorf("Worker.AddTask - SetWorkerState: %v", err)
+		}
+		if err := task.SetTaskState(taskFree); err != nil {
+			errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
+		}
 		return
 	}
 
 	responseLenBuf := make([]byte, intByteLen)
-	// Receive response len.
 	_, err = w.conn.Read(responseLenBuf)
 	if err != nil {
 		errorChan <- fmt.Errorf("Worker.AddTask - w.conn.Read: %v", err)
-		w.SetWorkerState(workerDown)
-		task.SetTaskState(taskFree)
+		if err := w.SetWorkerState(workerDown); err != nil {
+			errorChan <- fmt.Errorf("Worker.AddTask - SetWorkerState: %v", err)
+		}
+		if err := task.SetTaskState(taskFree); err != nil {
+			errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
+		}
 		return
 	}
 
 	responseLen, err := converter.ByteSliceToInt(responseLenBuf)
 	if err != nil {
 		errorChan <- fmt.Errorf("Worker.AddTask - converter.ByteSliceToInt: %v", err)
-		w.SetWorkerState(workerDown)
-		task.SetTaskState(taskFree)
+		if err := w.SetWorkerState(workerDown); err != nil {
+			errorChan <- fmt.Errorf("Worker.AddTask - SetWorkerState: %v", err)
+		}
+		if err := task.SetTaskState(taskFree); err != nil {
+			errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
+		}
 		return
 	}
 
 	response := make([]byte, responseLen)
-	// Receive response (solution for task).
 	_, err = w.conn.Read(response)
 	if err != nil {
 		errorChan <- fmt.Errorf("Worker.AddTask - w.conn.Read: %v", err)
-		w.SetWorkerState(workerDown)
-		task.SetTaskState(taskFree)
+		if err := w.SetWorkerState(workerDown); err != nil {
+			errorChan <- fmt.Errorf("Worker.AddTask - SetWorkerState: %v", err)
+		}
+		if err := task.SetTaskState(taskFree); err != nil {
+			errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
+		}
 		return
 	}
 
-	task.SetTaskSolve(response)
-	task.SetTaskState(taskSolved)
+	if err := task.SetTaskSolve(response); err != nil {
+		errorChan <- fmt.Errorf("Worker.AddTask - SetTaskSolve: %v", err)
+	}
+	if err := task.SetTaskState(taskSolved); err != nil {
+		errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
+	}
 
 	fmt.Printf("Task solved: %v", task)
 }
@@ -282,42 +328,45 @@ func workerInit() {
 
 		connection := conn.Unix{Conn: netConn}
 
-		// Create new worker.
 		worker := NewWorker(genWorkerId())
 		workers.Store(worker.id, worker)
 
-		// Send worker his id.
 		idBuf := converter.IntToByteSlice(worker.id)
 		_, err = connection.Write(idBuf)
 		if err != nil {
 			errorChan <- fmt.Errorf("workerInit - connection.Write: %v", err)
-			worker.SetWorkerState(workerDown)
+			if err := worker.SetWorkerState(workerDown); err != nil {
+				errorChan <- fmt.Errorf("workerInit - SetWorkerState: %v", err)
+			}
 			break
 		}
 
 		responseBuf := make([]byte, intByteLen)
-		// Get an response.
 		_, err = connection.Read(responseBuf)
 		if err != nil {
 			errorChan <- fmt.Errorf("workerInit - conn.Read: %v", err)
-			worker.SetWorkerState(workerDown)
+			if err := worker.SetWorkerState(workerDown); err != nil {
+				errorChan <- fmt.Errorf("workerInit - SetWorkerState: %v", err)
+			}
 			break
 		}
 
 		response, err := converter.ByteSliceToInt(responseBuf)
 		if err != nil {
 			errorChan <- fmt.Errorf("workerInit - converter.ByteSliceToInt: %v", err)
-			worker.SetWorkerState(workerDown)
+			if err := worker.SetWorkerState(workerDown); err != nil {
+				errorChan <- fmt.Errorf("workerInit - SetWorkerState: %v", err)
+			}
 			break
 		}
-		// Check the response.
 		if response != successfulResp {
 			errorChan <- fmt.Errorf("wrong response from worker")
-			worker.SetWorkerState(workerDown)
+			if err := worker.SetWorkerState(workerDown); err != nil {
+				errorChan <- fmt.Errorf("workerInit - SetWorkerState: %v", err)
+			}
 			break
 		}
-		// If everything is Ok
-		// start worker.
+
 		go worker.Run()
 
 		fmt.Printf("Worker %v started\n", worker.id)
