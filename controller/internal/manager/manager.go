@@ -383,7 +383,9 @@ func loadBalancer(task *Task) {
 			if w.state == workerFree {
 				w.taskChan <- task
 
-				task.SetTaskState(taskRedirected)
+				if err := task.SetTaskState(taskRedirected); err != nil {
+					errorChan <- fmt.Errorf("loadBalancer - SetTaskState: %v", err)
+				}
 				fmt.Printf("Task %v send to worker %v\n", task.id, i)
 
 				break
