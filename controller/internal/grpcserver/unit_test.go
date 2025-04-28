@@ -2,39 +2,39 @@ package grpcserver_test
 
 import (
 	"context"
-	"testing"
 	"github.com/moevm/grpc_server/internal/grpcserver"
 	pb "github.com/moevm/grpc_server/pkg/proto/file_service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"testing"
 )
 
 func TestUploadFile_TextValidation(t *testing.T) {
 	testCases := []struct {
-		name        string
-		content     string
+		name         string
+		content      string
 		allowedChars string
-		isValid     bool
+		isValid      bool
 	}{
 		{
-			name:        "valid content",
-			content:     "Hello 123!",
+			name:         "valid content",
+			content:      "Hello 123!",
 			allowedChars: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789! ",
-			isValid:     true,
+			isValid:      true,
 		},
 		{
-			name:        "invalid character",
-			content:     "Hello@123",
+			name:         "invalid character",
+			content:      "Hello@123",
 			allowedChars: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789! ",
-			isValid:     false,
+			isValid:      false,
 		},
 		{
-			name:        "invalid utf8",
-			content:     string([]byte{0xff, 0xfe, 0xfd}),
+			name:         "invalid utf8",
+			content:      string([]byte{0xff, 0xfe, 0xfd}),
 			allowedChars: "abc",
-			isValid:     false,
+			isValid:      false,
 		},
 	}
 

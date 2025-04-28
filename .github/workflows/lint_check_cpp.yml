@@ -1,0 +1,11 @@
+name: Lint Check cpp
+on: [push]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install clang-format
+      run: sudo apt-get install -y clang-format-14
+    - name: Check code style
+      run: bash scripts/check_style_cpp.sh

@@ -2,15 +2,15 @@ package grpcserver_test
 
 import (
 	"context"
-	"net"
-	"testing"
-	"time"
 	"github.com/moevm/grpc_server/internal/config"
 	"github.com/moevm/grpc_server/internal/grpcserver"
 	pb "github.com/moevm/grpc_server/pkg/proto/file_service"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"net"
+	"testing"
+	"time"
 )
 
 func startTestServer(t *testing.T) (string, func()) {
@@ -38,41 +38,41 @@ func startTestServer(t *testing.T) (string, func()) {
 }
 
 func TestIntegration_ServerClientCommunication(t *testing.T) {
-    addr, stop := startTestServer(t)
-    defer stop()
+	addr, stop := startTestServer(t)
+	defer stop()
 
-    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-    defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 
-    conn, err := grpc.NewClient(
-        addr,
-        grpc.WithTransportCredentials(insecure.NewCredentials()),
-        grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-            d := net.Dialer{Timeout: 2 * time.Second}
-            return d.DialContext(ctx, "tcp", addr)
-        }),
-    )
-	
-    require.NoError(t, err)
-    defer conn.Close()
+	conn, err := grpc.NewClient(
+		addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			d := net.Dialer{Timeout: 2 * time.Second}
+			return d.DialContext(ctx, "tcp", addr)
+		}),
+	)
 
-    client := pb.NewFileServiceClient(conn)
+	require.NoError(t, err)
+	defer conn.Close()
 
-    t.Run("valid text file", func(t *testing.T) {
-        resp, err := client.UploadFile(ctx, &pb.FileRequest{
-            Content:  []byte("Valid content"),
-            FileType: "text",
-        })
-        require.NoError(t, err)
-        require.True(t, resp.IsValid)
-    })
+	client := pb.NewFileServiceClient(conn)
 
-    t.Run("invalid binary file", func(t *testing.T) {
-        resp, err := client.UploadFile(ctx, &pb.FileRequest{
-            Content:  make([]byte, 1024),
-            FileType: "binary",
-        })
-        require.NoError(t, err)
-        require.True(t, resp.IsValid)
-    })
+	t.Run("valid text file", func(t *testing.T) {
+		resp, err := client.UploadFile(ctx, &pb.FileRequest{
+			Content:  []byte("Valid content"),
+			FileType: "text",
+		})
+		require.NoError(t, err)
+		require.True(t, resp.IsValid)
+	})
+
+	t.Run("invalid binary file", func(t *testing.T) {
+		resp, err := client.UploadFile(ctx, &pb.FileRequest{
+			Content:  make([]byte, 1024),
+			FileType: "binary",
+		})
+		require.NoError(t, err)
+		require.True(t, resp.IsValid)
+	})
 }
