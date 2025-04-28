@@ -17,6 +17,13 @@ import (
 	"github.com/moevm/grpc_server/pkg/converter"
 )
 
+const maxAttempts = 3
+
+var (
+    lastWorkerIndex int
+    mu              sync.Mutex
+)
+
 const (
 	// Task states.
 	taskFree       = 3
@@ -325,22 +332,42 @@ func workerInit() {
 	}
 }
 
-// Basic implementation of the load balancer.
+
 func loadBalancer(task *Task) {
-	for i := 0; i <= workerId; i++ {
-		worker, exist := workers.Load(i)
-		if exist {
-			w := worker.(*Worker)
-			if w.state == workerFree {
-				w.taskChan <- task
+    mu.Lock()
+    defer mu.Unlock()
+    
+    startIndex := lastWorkerIndex
+    attempts := 0
+    
+    for attempts < maxAttempts {
+        for i := 0; i <= workerId; i++ {
+            currentIndex := (startIndex + i) % (workerId + 1)
+            
+            worker, exist := workers.Load(currentIndex)
+            if !exist {
+                continue
+            }
 
-				task.SetTaskState(taskRedirected)
-				fmt.Printf("Task %v send to worker %v\n", task.id, i)
-
-				break
-			}
-		}
-	}
+            w := worker.(*Worker)
+            if w.state == workerFree {
+                select {
+                case w.taskChan <- task:
+                    task.SetTaskState(taskRedirected)
+                    fmt.Printf("Task %v sent to worker %v\n", task.id, currentIndex)
+                    lastWorkerIndex = (currentIndex + 1) % (workerId + 1)
+                    return
+                default:
+                    continue
+                }
+            }
+        }
+        attempts++
+        time.Sleep(100 * time.Millisecond)
+    }
+    
+    errorChan <- fmt.Errorf("no available workers for task %d", task.id)
+    task.SetTaskState(taskFree)
 }
 
 func taskManager() {
@@ -390,18 +417,40 @@ func init() {
 	}()
 }
 
+func hasActiveWorkers() bool {
+    hasWorkers := false
+    workers.Range(func(key, value interface{}) bool {
+        worker := value.(*Worker)
+        if worker.state != workerDown {
+            hasWorkers = true
+            return false
+        }
+        return true
+    })
+    return hasWorkers
+}
+
 // taskData is a stub for input data.
 func ClusterInit(taskData [][]byte) {
-	go workerInit()
-	go taskManager()
-	go errorHandler()
+    go workerInit()
+    go errorHandler()
 
-	for i := range taskData {
-		task := NewTask(genTaskId(), taskData[i])
-		tasks.Store(i, task)
-	}
+    fmt.Println("Waiting for at least one worker to connect...")
+    for {
+        if hasActiveWorkers() {
+            break
+        }
+        time.Sleep(1 * time.Second)
+    }
 
-	for {
-		time.Sleep(1 * time.Second)
-	}
+    for i := range taskData {
+        task := NewTask(genTaskId(), taskData[i])
+        tasks.Store(i, task)
+    }
+
+    go taskManager()
+
+    for {
+        time.Sleep(1 * time.Second)
+    }
 }
