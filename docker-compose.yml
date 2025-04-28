@@ -1,4 +1,4 @@
-version: '3.8'
+version: '3.3'
 
 services:
   hash:
@@ -17,3 +17,8 @@ services:
           loki-external-labels: "container_name={{.Name}}"
           labels: "container_name, host"
           loki-url:  "http://${LOKI_IP}:${LOG_PORT}/loki/api/v1/push"
+    healthcheck:
+      test: ["CMD", "worker", "--status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

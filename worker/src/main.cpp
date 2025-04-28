@@ -11,11 +11,16 @@ void print_usage(const std::string& program_name) {
 }
 
 int main(int argc, char* argv[]) {
+    if (argc == 2 && std::string(argv[1]) == "--status") {
+        std::cout << "Worker status: OK" << std::endl;
+        return 0;
+    }
+
     if (argc < 3) {
         print_usage(argv[0]);
         return 1;
     }
-
+    
     try {
         std::string hash = File::calculate_hash(argv[1], argv[2]);
         std::cout << "Digest is: " << hash << std::endl;
