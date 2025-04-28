@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile.hash
     container_name: worker
     volumes:
-      - ./data:/data 
+      - ./worker/data:/data 
     working_dir: /data
     logging:
       driver: loki 

@@ -2,8 +2,8 @@
 #include <stdexcept>
 #include <vector>
 
-#include "file.hpp"
-#include "md_calculator.hpp"
+#include "../include/file.hpp"
+#include "../include/md_calculator.hpp"
 
 std::string File::calculate_hash(const std::string &file_path,
                                  const std::string &algorithm) {
