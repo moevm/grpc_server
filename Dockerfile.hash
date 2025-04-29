@@ -1,6 +1,6 @@
 FROM alpine:latest AS builder
 
-RUN apk update && apk add --no-cache g++ openssl-dev asio-dev
+RUN apk update && apk add --no-cache g++ openssl-dev
 RUN apk add bazel --repository=http://dl-cdn.alpinelinux.org/alpine/edge/testing/
 
 WORKDIR /app

@@ -2,7 +2,10 @@
 #define WORKER_HPP
 
 #include <string>
-#include <asio.hpp>
+#include <cstdint>
+
+#define SOCKET_DIR "/run/controller/"
+#define INIT_SOCKET_NAME "init.sock"
 
 class WorkerException {
     std::string msg;
@@ -12,23 +15,24 @@ public:
 };
 
 class Worker {
-    static constexpr char SOCKET_DIR[] = "/run/controller/";
-    static constexpr char INIT_SOCKET_PATH[] = "/run/controller/init.sock";
-
     std::string socket_path;
+    int listener_fd;
 
-    asio::io_context io_context;
-    asio::local::stream_protocol::acceptor acceptor;
+    enum class InitResponse : uint64_t {
+        OK = 1
+    };
 
 protected:
-    static void ReadExact(int fd, void *buf, size_t n);
-    static void WriteExact(int fd, void *buf, size_t n);
+    static ssize_t ReadExact(int fd, void *buf, size_t n);
+    static ssize_t WriteExact(int fd, const void *buf, size_t n);
+    static int UnixRead(int fd, void *buf, size_t n);
+    static int UnixWrite(int fd, const void *buf, size_t n);
 
 public:
     Worker();
     ~Worker();
 
-    virtual void DoTask(asio::local::stream_protocol::socket& io) = 0;
+    virtual void DoTask(int client_fd) = 0;
     void MainLoop();
 };
 

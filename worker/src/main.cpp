@@ -1,34 +1,24 @@
-#include "worker.hpp"
-#include "md_calculator.hpp"
+#include "../include/worker.hpp"
+#include "../include/md_calculator.hpp"
 #include <iostream>
 #include <vector>
 
 class HashWorker : public Worker {
 protected:
-    void DoTask(asio::local::stream_protocol::socket& io) {
+    void DoTask(int client_fd) {
         uint64_t task_size;
-        asio::read(io, asio::buffer(&task_size, sizeof(task_size)));
-        
+        UnixRead(client_fd, &task_size, sizeof(task_size));
         MDCalculator md_calculator("md5");
 
-        while (true) {
-            uint64_t frame_len;
-            asio::read(io, asio::buffer(&frame_len, sizeof(frame_len)));
-            
-            if (frame_len == 0) {
-                break;
-            }
+        std::vector<uint8_t> task(task_size);
+        UnixRead(client_fd, task.data(), task_size);
 
-            std::vector<uint8_t> frame(frame_len);
-            asio::read(io, asio::buffer(frame.data(), frame_len));
-            md_calculator.update(frame.data(), frame_len);
-        }
-        
+        md_calculator.update(task.data(), task_size);        
         std::string hash = md_calculator.finalize();
 
         uint64_t hash_size = hash.size();
-        asio::write(io, asio::buffer(&hash_size, sizeof(hash_size)));
-        asio::write(io, asio::buffer(hash.data(), hash_size));
+        UnixWrite(client_fd, &hash_size, sizeof(hash_size));
+        UnixWrite(client_fd, hash.data(), hash_size);
     }
 };
 

@@ -2,36 +2,23 @@
 package converter
 
 import (
-	"errors"
+	"errors";
+	"encoding/binary";
 )
 
 const (
 	intByteLen = 8
 )
 
-// TODO: use generic for return/parameter type
-func ByteSliceToInt(slice []byte) (num int, err error) {
-	if len(slice) != intByteLen {
-		return 0, errors.New("invalid slice len")
-	}
-
-	for i := range intByteLen {
-		num += int(slice[intByteLen-i-1])
-
-		if i != intByteLen-1 {
-			num = num << intByteLen
-		}
-	}
-
-	return num, nil
+func IntToByteSlice(num int) []byte {
+    buf := make([]byte, 8)
+    binary.LittleEndian.PutUint64(buf, uint64(num))
+    return buf
 }
 
-func IntToByteSlice(num int) []byte {
-	slice := []byte{}
-
-	for i := range intByteLen {
-		slice = append(slice, byte(num>>(i*intByteLen)))
-	}
-
-	return slice
+func ByteSliceToInt(slice []byte) (int, error) {
+    if len(slice) != 8 {
+        return 0, errors.New("invalid slice length")
+    }
+    return int(binary.LittleEndian.Uint64(slice)), nil
 }

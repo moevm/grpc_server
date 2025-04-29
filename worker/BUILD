@@ -9,6 +9,5 @@ cc_binary(
     "include/md_calculator.hpp",
     "include/worker.hpp"
   ],
-  copts = ["-Iinclude"],
   linkopts = ["-lssl", "-lcrypto"],
 )
