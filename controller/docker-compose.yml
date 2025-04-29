@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  controller:
+    build:
+      context: .
+      dockerfile: Dockerfile.controller
+    volumes:
+      - /run/controller:/run/controller
+    restart: always
+
+  replicated_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    volumes:
+      - /run/controller:/run/controller
+    depends_on:
+      - controller
+    restart: always
+    deploy:
+      mode: replicated
+      replicas: 3
