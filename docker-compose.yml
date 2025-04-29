@@ -1,8 +1,31 @@
 version: '3.8'
 
 services:
-  hash:
-    build: 
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - logging-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - logging-net
+    depends_on:
+      - loki
+
+  worker:
+    build:
       context: .
       dockerfile: Dockerfile.hash
     container_name: worker
@@ -12,8 +35,17 @@ services:
     logging:
       driver: loki 
       options:
-          loki-timeout: 10s
-          no-file: "true"
-          loki-external-labels: "container_name={{.Name}}"
-          labels: "container_name, host"
-          loki-url:  "http://${LOKI_IP}:${LOG_PORT}/loki/api/v1/push"
+        loki-timeout: "10s"
+        no-file: "true"
+        loki-external-labels: "container_name={{.Name}}"
+        labels: "container_name,host"
+        loki-url: "http://${LOKI_IP}:${LOG_PORT}/loki/api/v1/push"
+    networks:
+      - logging-net
+
+volumes:
+  loki_data:
+  grafana_data:
+
+networks:
+  logging-net:
