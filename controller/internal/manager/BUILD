@@ -5,6 +5,7 @@ go_library(
   srcs = ["manager.go"],
   deps = [
     "//pkg/converter",
+    "//internal/conn"
   ],
   importpath = "github.com/moevm/grpc_server/internal/manager",
   visibility = ["//visibility:public"],
