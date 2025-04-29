@@ -474,39 +474,39 @@ func init() {
 }
 
 func hasActiveWorkers() bool {
-    hasWorkers := false
-    workers.Range(func(key, value interface{}) bool {
-        worker := value.(*Worker)
-        if worker.state != workerDown {
-            hasWorkers = true
-            return false
-        }
-        return true
-    })
-    return hasWorkers
+	hasWorkers := false
+	workers.Range(func(key, value interface{}) bool {
+		worker := value.(*Worker)
+		if worker.state != workerDown {
+			hasWorkers = true
+			return false
+		}
+		return true
+	})
+	return hasWorkers
 }
 
 // taskData is a stub for input data.
 func ClusterInit(taskData [][]byte) {
-    go workerInit()
-    go errorHandler()
+	go workerInit()
+	go errorHandler()
 
-    fmt.Println("Waiting for at least one worker to connect...")
-    for {
-        if hasActiveWorkers() {
-            break
-        }
-        time.Sleep(1 * time.Second)
-    }
+	fmt.Println("Waiting for at least one worker to connect...")
+	for {
+		if hasActiveWorkers() {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
 
-    for i := range taskData {
-        task := NewTask(genTaskId(), taskData[i])
-        tasks.Store(i, task)
-    }
+	for i := range taskData {
+		task := NewTask(genTaskId(), taskData[i])
+		tasks.Store(i, task)
+	}
 
-    go taskManager()
+	go taskManager()
 
-    for {
-        time.Sleep(1 * time.Second)
-    }
+	for {
+		time.Sleep(1 * time.Second)
+	}
 }
