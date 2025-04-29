@@ -20,8 +20,8 @@ import (
 const maxAttempts = 3
 
 var (
-    lastWorkerIndex int
-    mu              sync.Mutex
+	lastWorkerIndex int
+	mu              sync.Mutex
 )
 
 const (
@@ -381,42 +381,49 @@ func workerInit() {
 	}
 }
 
-
 func loadBalancer(task *Task) {
-    mu.Lock()
-    defer mu.Unlock()
-    
-    startIndex := lastWorkerIndex
-    attempts := 0
-    
-    for attempts < maxAttempts {
-        for i := 0; i <= workerId; i++ {
-            currentIndex := (startIndex + i) % (workerId + 1)
-            
-            worker, exist := workers.Load(currentIndex)
-            if !exist {
-                continue
-            }
+	mu.Lock()
+	defer mu.Unlock()
 
-            w := worker.(*Worker)
-            if w.state == workerFree {
-                select {
-                case w.taskChan <- task:
-                    task.SetTaskState(taskRedirected)
-                    fmt.Printf("Task %v sent to worker %v\n", task.id, currentIndex)
-                    lastWorkerIndex = (currentIndex + 1) % (workerId + 1)
-                    return
-                default:
-                    continue
-                }
-            }
-        }
-        attempts++
-        time.Sleep(100 * time.Millisecond)
-    }
-    
-    errorChan <- fmt.Errorf("no available workers for task %d", task.id)
-    task.SetTaskState(taskFree)
+	startIndex := lastWorkerIndex
+	attempts := 0
+
+	for attempts < maxAttempts {
+		for i := 0; i <= workerId; i++ {
+			currentIndex := (startIndex + i) % (workerId + 1)
+
+			worker, exist := workers.Load(currentIndex)
+			if !exist {
+				continue
+			}
+
+			w := worker.(*Worker)
+			if w.state == workerFree {
+				select {
+				case w.taskChan <- task:
+					if err := task.SetTaskState(taskRedirected); err != nil {
+						errorChan <- fmt.Errorf("loadBalancer: task %d: %v", task.id, err)
+						if err := task.SetTaskState(taskFree); err != nil {
+							errorChan <- fmt.Errorf("loadBalancer: failed to revert task %d to free: %v", task.id, err)
+						}
+						continue
+					}
+					fmt.Printf("Task %v sent to worker %v\n", task.id, currentIndex)
+					lastWorkerIndex = (currentIndex + 1) % (workerId + 1)
+					return
+				default:
+					continue
+				}
+			}
+		}
+		attempts++
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	errorChan <- fmt.Errorf("no available workers for task %d", task.id)
+	if err := task.SetTaskState(taskFree); err != nil {
+		errorChan <- fmt.Errorf("loadBalancer: failed to set task %d to free: %v", task.id, err)
+	}
 }
 
 func taskManager() {
