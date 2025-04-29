@@ -27,8 +27,6 @@ var (
 	socketPath strings.Builder
 
 	listener net.Listener
-
-	id int
 )
 
 func doTask(connection conn.Unix) {

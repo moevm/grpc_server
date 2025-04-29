@@ -1,13 +1,11 @@
-#include <iostream>
 #include "../include/file.hpp"
+#include <iostream>
 
-void print_usage(const std::string& program_name) {
-    std::cerr << "Usage: " << program_name 
-              << " PATH ALGORITHM" << std::endl
-              << "Supported algorithms are: "
-              << "md2, md5, sha, " 
-              << "sha1, sha224, sha256, sha384, sha512, "
-              << "mdc2 and ripemd160" << std::endl;
+void print_usage(const std::string &program_name) {
+  std::cerr << "Usage: " << program_name << " PATH ALGORITHM" << std::endl
+            << "Supported algorithms are: " << "md2, md5, sha, "
+            << "sha1, sha224, sha256, sha384, sha512, " << "mdc2 and ripemd160"
+            << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -29,5 +27,5 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    return 0;
+  return 0;
 }

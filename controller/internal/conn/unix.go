@@ -77,10 +77,11 @@ func (c *Unix) Read(b []byte) (n int, err error) {
 		case frameLen == 0:
 			// Write message into buffer
 			// (without re-allocate).
-			b = b[:0]
-			b = append(b, message...)
-
-			return len(message), nil
+			if len(b) < len(message) {
+				return 0, errors.New("buffer too small")
+			}
+			n = copy(b, message)
+			return n, nil
 
 		case frameLen < 0:
 			return 0, errors.New("invalid frame len")
