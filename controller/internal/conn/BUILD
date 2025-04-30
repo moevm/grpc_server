@@ -1,12 +1,11 @@
 load("@rules_go//go:def.bzl", "go_library")
 
 go_library(
-  name = "worker",
-  srcs = ["worker.go"],
+  name = "conn",
+  srcs = ["unix.go"],
   deps = [
     "//pkg/converter",
-    "//internal/conn"
   ],
-  importpath = "github.com/moevm/grpc_server/internal/worker",
+  importpath = "github.com/moevm/grpc_server/internal/conn",
   visibility = ["//visibility:public"],
 )

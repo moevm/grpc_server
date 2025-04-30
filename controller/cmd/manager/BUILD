@@ -5,6 +5,5 @@ go_binary(
   srcs = ["main.go"],
   deps = [
     "//internal/manager",
-    "//pkg/binary",
   ],
 )
