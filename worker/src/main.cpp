@@ -1,24 +1,36 @@
-#include "../include/file.hpp"
+#include "../include/md_calculator.hpp"
+#include "../include/worker.hpp"
 #include <iostream>
+#include <vector>
 
-void print_usage(const std::string &program_name) {
-  std::cerr << "Usage: " << program_name << " PATH ALGORITHM" << std::endl
-            << "Supported algorithms are: " << "md2, md5, sha, "
-            << "sha1, sha224, sha256, sha384, sha512, " << "mdc2 and ripemd160"
-            << std::endl;
-}
+class HashWorker : public Worker {
+protected:
+  void DoTask(int client_fd) {
+    uint64_t task_size;
+    UnixRead(client_fd, &task_size, sizeof(task_size));
+    MDCalculator md_calculator("md5");
 
-int main(int argc, char *argv[]) {
-  if (argc < 3) {
-    print_usage(argv[0]);
-    return 1;
+    std::vector<uint8_t> task(task_size);
+    UnixRead(client_fd, task.data(), task_size);
+
+    md_calculator.update(task.data(), task_size);
+    std::string hash = md_calculator.finalize();
+
+    uint64_t hash_size = hash.size();
+    UnixWrite(client_fd, &hash_size, sizeof(hash_size));
+    UnixWrite(client_fd, hash.data(), hash_size);
   }
+};
 
+int main() {
   try {
-    std::string hash = File::calculate_hash(argv[1], argv[2]);
-    std::cout << "Digest is: " << hash << std::endl;
-  } catch (const std::exception &e) {
-    std::cerr << "Error: " << e.what() << std::endl;
+    HashWorker().MainLoop();
+  } catch (WorkerException &e) {
+    std::cerr << "[ERROR] " << e.what() << std::endl;
+    return 1;
+  } catch (std::exception &e) {
+    std::cerr << "[ERROR] Unhandled exception " << typeid(e).name() << ": "
+              << e.what() << std::endl;
     return 1;
   }
 
