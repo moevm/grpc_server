@@ -28,7 +28,7 @@ class MetricsCollector {
   std::atomic<bool> is_running{true};
   std::thread thread;
 
-  bool is_task_running;
+  std::atomic<bool> is_task_running;
   std::chrono::time_point<std::chrono::high_resolution_clock> task_start;
 
   void GetCPUUsage();
