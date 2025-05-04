@@ -8,12 +8,12 @@
 #define INIT_SOCKET_NAME "init.sock"
 
 enum class WorkerState {
-    BOOTING,        // Инициализация
-    CONNECTING,     // Подключение к контроллеру
-    READY,          // Ожидает задачи
-    PROCESSING,     // Выполняет задачу
-    SHUTTING_DOWN,  // Завершение работы
-    ERROR           // Ошибка
+  BOOTING,       // Инициализация
+  CONNECTING,    // Подключение к контроллеру
+  READY,         // Ожидает задачи
+  PROCESSING,    // Выполняет задачу
+  SHUTTING_DOWN, // Завершение работы
+  ERROR          // Ошибка
 };
 
 class WorkerException {

@@ -8,20 +8,17 @@
 #include <unistd.h>
 
 void Worker::LogStateChange(WorkerState new_state) {
-    const char* state_names[] = {
-        "BOOTING", "CONNECTING", "READY", 
-        "PROCESSING", "SHUTTING_DOWN", "ERROR"
-    };
-    std::cerr << "[STATE] " << state_names[static_cast<int>(state)]
-              << " -> " << state_names[static_cast<int>(new_state)]
-              << std::endl;
+  const char *state_names[] = {"BOOTING",    "CONNECTING",    "READY",
+                               "PROCESSING", "SHUTTING_DOWN", "ERROR"};
+  std::cerr << "[STATE] " << state_names[static_cast<int>(state)] << " -> "
+            << state_names[static_cast<int>(new_state)] << std::endl;
 }
 
 void Worker::SetState(WorkerState new_state) {
-    if (state != new_state) {
-        LogStateChange(new_state);
-        state = new_state;
-    }
+  if (state != new_state) {
+    LogStateChange(new_state);
+    state = new_state;
+  }
 }
 
 ssize_t Worker::ReadExact(int fd, void *buf, size_t n) {
@@ -192,8 +189,9 @@ Worker::Worker() : state(WorkerState::BOOTING) {
       throw WorkerException("Failed to write InitResponse");
     }
 
-    std::cerr << "[INFO] Worker registered successfully. Ready to receive tasks."
-              << std::endl;
+    std::cerr
+        << "[INFO] Worker registered successfully. Ready to receive tasks."
+        << std::endl;
     SetState(WorkerState::READY);
   } catch (...) {
     SetState(WorkerState::ERROR);
@@ -201,9 +199,9 @@ Worker::Worker() : state(WorkerState::BOOTING) {
   }
 }
 
-Worker::~Worker() { 
+Worker::~Worker() {
   SetState(WorkerState::SHUTTING_DOWN);
-  unlink(socket_path.c_str()); 
+  unlink(socket_path.c_str());
 }
 
 void Worker::MainLoop() {
