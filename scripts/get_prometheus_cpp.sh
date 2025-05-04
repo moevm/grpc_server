@@ -8,7 +8,7 @@ cd prometheus-cpp-with-submodules
 mkdir build 
 cd build 
 
-cmake .. -DBUILD_SHARED_LIBS=ON -DENABLE_COMPRESSION=OFF
+cmake .. -DCMAKE_INSTALL_PREFIX:PATH=/usr -DBUILD_SHARED_LIBS=ON -DENABLE_COMPRESSION=OFF
 
 cmake --build . --parallel 4
 

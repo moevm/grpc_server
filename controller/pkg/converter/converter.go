@@ -1,20 +1,20 @@
+// TODO: add Doc comments
 package converter
 
-func ByteSliceToInt(slice []byte) int {
-	var num int
-	for i := 0; i < 8; i += 1 {
-		num += int(slice[7-i])
-		if i != 7 {
-			num = num << 8
-		}
-	}
-	return num
-}
+import (
+	"encoding/binary"
+	"errors"
+)
 
 func IntToByteSlice(num int) []byte {
-	slice := []byte{}
-	for i := 0; i < 8; i += 1 {
-		slice = append(slice, byte(num>>(i*8)))
+	buf := make([]byte, 8)
+	binary.LittleEndian.PutUint64(buf, uint64(num))
+	return buf
+}
+
+func ByteSliceToInt(slice []byte) (int, error) {
+	if len(slice) != 8 {
+		return 0, errors.New("invalid slice length")
 	}
-	return slice
+	return int(binary.LittleEndian.Uint64(slice)), nil
 }

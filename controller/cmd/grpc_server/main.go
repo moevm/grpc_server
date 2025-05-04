@@ -1,13 +1,13 @@
 package main
 
 import (
-	"log"
-	"net"
 	"github.com/moevm/grpc_server/internal/config"
 	"github.com/moevm/grpc_server/internal/grpcserver"
 	pb "github.com/moevm/grpc_server/pkg/proto/file_service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	"log"
+	"net"
 )
 
 func main() {
