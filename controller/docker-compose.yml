@@ -8,6 +8,17 @@ services:
     volumes:
       - /run/controller:/run/controller
     restart: always
+    logging:
+        driver: loki
+        options:
+          loki-timeout: 10s
+          no-file: "true"
+          loki-url:  "http://172.29.0.2:3100/loki/api/v1/push"
+          loki-pipeline-stages: |
+            - regex:
+                expression: '(level|lvl|severity)=(?P<level>\w+)'
+            - labels:
+                level: level
 
   replicated_worker:
     build:
@@ -21,3 +32,14 @@ services:
     deploy:
       mode: replicated
       replicas: 3
+    logging:
+        driver: loki
+        options:
+          loki-timeout: 10s
+          no-file: "true"
+          loki-url:  "http://172.29.0.2:3100/loki/api/v1/push"
+          loki-pipeline-stages: |
+            - regex:
+                expression: '(level|lvl|severity)=(?P<level>\w+)'
+            - labels:
+                level: level
