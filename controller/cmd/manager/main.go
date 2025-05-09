@@ -20,5 +20,11 @@ func main() {
 			log.Panic(err)
 		}
 	}
-	manager.ClusterInit(tasks)
+
+	taskChan, _ := manager.InitManager(100)
+	for _, task := range tasks {
+		taskChan <- task
+	}
+
+	select {}
 }
