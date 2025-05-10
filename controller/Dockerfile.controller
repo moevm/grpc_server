@@ -1,0 +1,10 @@
+FROM gcr.io/bazel-public/bazel:latest
+
+WORKDIR /app
+COPY . .
+
+RUN bazel build //cmd/manager:manager
+
+VOLUME ["/run/controller"]
+
+ENTRYPOINT ["./bazel-bin/cmd/manager/manager_/manager"]
