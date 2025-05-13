@@ -512,7 +512,7 @@ func InitManager(taskChanSize int) (chan<- []byte, error) {
 }
 
 // taskData is a stub for input data.
-func ClusterInit(taskData [][]byte) {
+func ClusterInit(taskData [][]byte, taskChan <-chan []byte) {
 	log.Println("=== The controller is running ===")
 	log.Printf("Received tasks: %d\n", len(taskData))
 
