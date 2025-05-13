@@ -1,0 +1,11 @@
+FROM gcr.io/bazel-public/bazel:latest
+
+WORKDIR /app
+COPY . .
+   
+RUN bazel build //cmd/worker:worker
+   
+VOLUME ["/run/controller"]
+    
+ENTRYPOINT ["./bazel-bin/cmd/worker/worker_/worker"]
+    

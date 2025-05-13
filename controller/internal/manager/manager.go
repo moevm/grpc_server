@@ -166,6 +166,7 @@ func (w *Worker) SetWorkerConn(workerConn conn.Unix) {
 // Run new Worker.
 // Worker will wait for the task from the channel.
 func (w *Worker) Run() {
+	log.Printf("Worker [ID=%d] running and awaiting a task\n", w.id)
 	var socketPath strings.Builder
 	socketPath.WriteString(workerSocketPath)
 	socketPath.WriteString(fmt.Sprintf("%v.sock", w.id))
@@ -193,10 +194,13 @@ func (w *Worker) Run() {
 		connection := conn.Unix{Conn: netConn}
 		w.SetWorkerConn(connection)
 
-		fmt.Printf("Task %v accepted by worker %v\n", task.id, w.id)
-
 		w.AddTask(task)
 		connection.Close()
+
+		log.Printf(
+			"Worker [ID=%d] completed the task [TaskID=%d, SolutionSize=%d bytes]\n",
+			w.id, task.id, len(task.solve),
+		)
 	}
 }
 
@@ -324,7 +328,7 @@ func genWorkerId() int {
 }
 
 func workerInit() {
-	fmt.Println("Ready for initialization Workers...")
+	log.Println("The worker initialization server is running. Waiting for connections...")
 
 	for {
 		netConn, err := listener.Accept()
@@ -376,12 +380,16 @@ func workerInit() {
 
 		go worker.Run()
 
-		fmt.Printf("Worker %v started\n", worker.id)
+		log.Printf("The worker is connected [ID=%d, Status=%d]\n", worker.id, worker.state)
 		connection.Close()
 	}
 }
 
 func loadBalancer(task *Task) {
+	log.Printf(
+		"Finding a worker for a task [TaskID=%d, Size=%d bytes, State=%d]\n",
+		task.id, len(task.body), task.state,
+	)
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -408,7 +416,7 @@ func loadBalancer(task *Task) {
 						}
 						continue
 					}
-					fmt.Printf("Task %v sent to worker %v\n", task.id, currentIndex)
+					log.Printf("The task is distributed: ID=%d -> Worker ID=%d\n", task.id, currentIndex)
 					lastWorkerIndex = (currentIndex + 1) % (workerId + 1)
 					return
 				default:
@@ -418,6 +426,7 @@ func loadBalancer(task *Task) {
 		}
 		attempts++
 		time.Sleep(100 * time.Millisecond)
+		log.Printf("There are no available workers for the task [TaskID=%d]\n", task.id)
 	}
 
 	errorChan <- fmt.Errorf("no available workers for task %d", task.id)
@@ -503,14 +512,18 @@ func InitManager(taskChanSize int) (chan<- []byte, error) {
 }
 
 // taskData is a stub for input data.
-func ClusterInit(taskData [][]byte, taskChan <-chan []byte) {
+func ClusterInit(taskData [][]byte) {
+	log.Println("=== The controller is running ===")
+	log.Printf("Received tasks: %d\n", len(taskData))
+
 	go workerInit()
 	go errorHandler()
 	go taskReceiver(taskChan)
 
-	fmt.Println("Waiting for at least one worker to connect...")
+	log.Println("Waiting for at least one worker to connect...")
 	for {
 		if hasActiveWorkers() {
+			log.Println("Active workers have been found. I'm starting the assignment of tasks.")
 			break
 		}
 		time.Sleep(1 * time.Second)
@@ -519,6 +532,7 @@ func ClusterInit(taskData [][]byte, taskChan <-chan []byte) {
 	for i := range taskData {
 		task := NewTask(genTaskId(), taskData[i])
 		tasks.Store(i, task)
+		log.Printf("Task added [ID=%d, Size=%d bytes, State=%d]\n", task.id, len(task.body), task.state)
 	}
 
 	go taskManager()

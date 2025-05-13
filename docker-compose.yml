@@ -1,11 +1,10 @@
 version: '3.8'
 
 services:
-  hash:
+  worker:
     build: 
       context: .
       dockerfile: Dockerfile.hash
-    container_name: worker
     volumes:
       - ./worker/data:/data 
     working_dir: /data
