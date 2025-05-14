@@ -495,13 +495,30 @@ func hasActiveWorkers() bool {
 	return hasWorkers
 }
 
+func taskReceiver(taskChan <-chan []byte) {
+	for content := range taskChan {
+		task := NewTask(genTaskId(), content)
+		tasks.Store(task.id, task)
+		log.Printf("New task received from gRPC: %d", task.id)
+	}
+}
+
+func InitManager(taskChanSize int) (chan<- []byte, error) {
+	taskChan := make(chan []byte, taskChanSize)
+	go func() {
+		ClusterInit([][]byte{}, taskChan)
+	}()
+	return taskChan, nil
+}
+
 // taskData is a stub for input data.
-func ClusterInit(taskData [][]byte) {
+func ClusterInit(taskData [][]byte, taskChan <-chan []byte) {
 	log.Println("=== The controller is running ===")
 	log.Printf("Received tasks: %d\n", len(taskData))
 
 	go workerInit()
 	go errorHandler()
+	go taskReceiver(taskChan)
 
 	log.Println("Waiting for at least one worker to connect...")
 	for {
