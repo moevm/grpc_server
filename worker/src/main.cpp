@@ -8,23 +8,14 @@ class HashWorker : public Worker {
   MetricsCollector &metrics_collector;
 
 protected:
-  void DoTask(int client_fd) {
+  void ProcessTask(const std::vector<char> &data) {
     metrics_collector.StartTask();
 
-    uint64_t task_size;
-    UnixRead(client_fd, &task_size, sizeof(task_size));
     MDCalculator md_calculator("md5");
-
-    std::vector<uint8_t> task(task_size);
-    UnixRead(client_fd, task.data(), task_size);
-
-    md_calculator.update(task.data(), task_size);
+    md_calculator.update((const unsigned char*)data.data(), data.size());
     std::string hash = md_calculator.finalize();
 
-    uint64_t hash_size = hash.size();
-    UnixWrite(client_fd, &hash_size, sizeof(hash_size));
-    UnixWrite(client_fd, hash.data(), hash_size);
-
+    SetFetchData(hash);
     metrics_collector.StopTask();
   }
 
