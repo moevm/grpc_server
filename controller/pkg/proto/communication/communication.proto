@@ -1,0 +1,55 @@
+syntax = "proto3";
+option go_package = "github.com/moevm/grpc_server/pkg/proto/communication";
+
+enum PulseType {
+  PULSE_REGISTER = 0;
+  PULSE_OK = 1;
+  PULSE_FETCH_ME = 2;
+  PULSE_SHUTDOWN = 3;
+}
+
+enum ControllerError {
+    CTRL_ERR_OK = 0;
+    CTRL_ERR_UNKNOWN_TYPE = 1;
+    CTRL_ERR_UNKNOWN_ID = 2;
+    CTRL_ERR_FAILED = 3;
+}
+
+message WorkerPulse {
+    PulseType type = 1;
+    uint64 worker_id = 2;
+    uint64 task_id = 3;
+    uint64 next_pulse = 4;
+}
+
+message PulseResponse {
+    ControllerError error = 1;
+    uint64 worker_id = 2;
+}
+
+enum ControlType {
+    CTRL_RESTART = 0;
+    CTRL_FETCH = 1;
+    CTRL_SET_TASK = 2;
+    CTRL_GET_STATUS = 3;
+}
+
+message ControlMsg {
+    ControlType type = 1;
+    uint64 extra_size = 2;
+    uint64 task_id = 3;
+}
+
+enum WorkerError {
+    WORKER_ERR_OK = 0;
+    WORKER_ERR_NO_FETCH = 1;
+    WORKER_ERR_BUSY = 2;
+    WORKER_ERR_TASK_FAILED = 3;
+    WORKER_ERR_FAILED = 4;
+}
+
+message WorkerResponse {
+    WorkerError error = 1;
+    uint64 task_id = 2;
+    uint64 extra_size = 3;
+}
