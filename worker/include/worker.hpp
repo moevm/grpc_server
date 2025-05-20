@@ -14,9 +14,8 @@
 
 enum class WorkerState {
   BOOTING,       // Инициализация
-  CONNECTING,    // Подключение к контроллеру
-  READY,         // Ожидает задачи
-  PROCESSING,    // Выполняет задачу
+  FREE,          // Ожидает задачи
+  BUSY,          // Выполняет задачу
   SHUTTING_DOWN, // Завершение работы
   ERROR          // Ошибка
 };
@@ -40,6 +39,7 @@ class Worker {
   uint64_t pulse_interval = MIN_PULSE_TIME;
 
   std::string fetch_data;
+  std::string extra_data;
 
   enum class InitResponse : uint64_t { OK = 1 };
   WorkerState state;
@@ -48,6 +48,13 @@ class Worker {
   void SendPulse(PulseType type);
   int GetPulseTimeout();
   void HandleControlMessage(int client_fd);
+
+  void HandleRestartControlMessage(WorkerResponse &resp);
+  void HandleFetchControlMessage(WorkerResponse &resp);
+  void HandleSetTaskControlMessage(const ControlMsg &msg, WorkerResponse &resp, const std::vector<char> &extra);
+  void HandleGetStatusControlMessage(WorkerResponse &resp);
+
+  static void ProcessTask_Static(Worker *worker, const std::vector<char> &data);
 
 protected:
   static void ReadMessage(int fd, std::string &msg);

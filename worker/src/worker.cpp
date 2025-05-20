@@ -5,13 +5,14 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <thread>
 #include <unistd.h>
 #include <poll.h>
 #include <endian.h>
 
 void Worker::LogStateChange(WorkerState new_state) {
-  const char *state_names[] = {"BOOTING",    "CONNECTING",    "READY",
-                               "PROCESSING", "SHUTTING_DOWN", "ERROR"};
+  const char *state_names[] = {"BOOTING",    "FREE",    "BUSY",
+                               "SHUTTING_DOWN", "ERROR" };
   std::cerr << "[STATE] " << state_names[static_cast<int>(state)] << " -> "
             << state_names[static_cast<int>(new_state)] << std::endl;
 }
@@ -105,7 +106,7 @@ void Worker::SendPulse(PulseType type) {
       worker_id = response.worker_id();
     }
 
-    std::cerr << "[INFO]  " << PulseType_Name(type) << ". Got " << ControllerError_Name(response.error()) << ' ' << response.worker_id() << '\n';
+    std::cerr << "[INFO] Sent {" << pulse.ShortDebugString() << "}. Recieved {" << response.ShortDebugString() << "}\n";
   }
   catch (const std::exception& e) {
     close(main_fd);
@@ -115,7 +116,6 @@ void Worker::SendPulse(PulseType type) {
 }
 
 Worker::Worker() : listener_fd(-1), state(WorkerState::BOOTING) {
-  SetState(WorkerState::CONNECTING);
   SendPulse(PULSE_REGISTER);
 
   socket_path = std::string(SOCKET_DIR) + std::to_string(worker_id) + ".sock";
@@ -139,13 +139,14 @@ Worker::Worker() : listener_fd(-1), state(WorkerState::BOOTING) {
     throw WorkerException("bind() failed");
   }
   
-  if (listen(listener_fd, 5) < 0) {
+  if (listen(listener_fd, 100) < 0) {
     close(listener_fd);
     listener_fd = -1;
     throw WorkerException("listen() failed");
   }
   
-  SetState(WorkerState::READY);
+  SendPulse(PULSE_OK);
+  SetState(WorkerState::FREE);
 }
 
 Worker::~Worker() {
@@ -167,67 +168,76 @@ int Worker::GetPulseTimeout() {
   return (pulse_interval - duration_cast<seconds>(steady_clock::now() - last_pulse_time).count()) * 1000;
 }
 
+void Worker::HandleRestartControlMessage(WorkerResponse &resp) {
+  SetState(WorkerState::SHUTTING_DOWN);
+  resp.set_error(WORKER_ERR_OK);
+}
+
+void Worker::HandleFetchControlMessage(WorkerResponse &resp) {
+  if (fetch_data.size() == 0) {
+    resp.set_error(WORKER_ERR_NO_FETCH);
+    return;
+  }
+  
+  extra_data = std::move(fetch_data);
+  SetState(WorkerState::FREE);
+}
+
+void Worker::ProcessTask_Static(Worker *worker, const std::vector<char> &data) {
+  worker->SetState(WorkerState::BUSY);
+  worker->ProcessTask(data);
+  worker->SetState(WorkerState::FREE);
+  worker->current_task_id = 0;
+}
+
+void Worker::HandleSetTaskControlMessage(const ControlMsg &msg, WorkerResponse &resp, const std::vector<char> &extra) {
+  if (GetState() != WorkerState::FREE) {
+    resp.set_error(WORKER_ERR_BUSY);
+    return;
+  }
+  
+  current_task_id = msg.task_id();
+  std::thread(ProcessTask_Static, this, extra).detach();
+}
+
+void Worker::HandleGetStatusControlMessage(WorkerResponse &resp) {}
+
 void Worker::HandleControlMessage(int client_fd) {
+  WorkerResponse response;
+  response.set_task_id(current_task_id);
+  response.set_error(WORKER_ERR_OK);
+
   try {
     ControlMsg msg;
     ReadProtoMessage(client_fd, msg);
 
+    std::cerr << "[INFO] Recieved {" << msg.ShortDebugString() << "}\n";
+
     std::vector<char> extra(msg.extra_size());
     ReadExact(client_fd, extra.data(), extra.size());
-    
-    WorkerResponse response;
-    response.set_task_id(current_task_id);
 
     switch (msg.type()) {
-      case CTRL_RESTART:
-        SetState(WorkerState::SHUTTING_DOWN);
-        response.set_error(WORKER_ERR_OK);
-        break;
-
-      case CTRL_FETCH: {
-        if (fetch_data.size() == 0) {
-          response.set_error(WORKER_ERR_NO_FETCH);
-          break;
-        }
-        
-        response.set_error(WORKER_ERR_OK);
-        response.set_extra_size(fetch_data.size());
-        
-        WriteProtoMessage(client_fd, response);
-        WriteExact(client_fd, fetch_data.data(), fetch_data.size());
-        return;
-      }
-
-      case CTRL_SET_TASK: {
-        if (GetState() == WorkerState::PROCESSING) {
-          response.set_error(WORKER_ERR_BUSY);
-          break;
-        }
-        
-        current_task_id = msg.task_id();
-        SetState(WorkerState::PROCESSING);
-        ProcessTask(extra);
-        response.set_error(WORKER_ERR_OK);
-        break;
-      }
-
-      case CTRL_GET_STATUS:
-        response.set_error(WORKER_ERR_OK);
-        break;
-
+      case CTRL_RESTART: HandleRestartControlMessage(response); break;
+      case CTRL_FETCH: HandleFetchControlMessage(response); break;
+      case CTRL_SET_TASK: HandleSetTaskControlMessage(msg, response, extra); break;
+      case CTRL_GET_STATUS: HandleGetStatusControlMessage(response); break;
       default:
         response.set_error(WORKER_ERR_FAILED);
         break;
     }
-
-    response.set_extra_size(0);
-    WriteProtoMessage(client_fd, response);
-  } catch (const std::exception& e) {
-    WorkerResponse resp;
-    resp.set_error(WORKER_ERR_FAILED);
-    resp.set_extra_size(0);
-    WriteProtoMessage(client_fd, resp);
   }
+  catch (const std::exception& e) {
+    response.set_error(WORKER_ERR_FAILED);
+  }
+
+  response.set_extra_size(extra_data.size());
+  WriteProtoMessage(client_fd, response);
+  
+  if (extra_data.size() != 0) {
+    WriteExact(client_fd, extra_data.data(), extra_data.size());
+    extra_data.clear();
+  }
+  std::cerr << "[INFO] Sent {" << response.ShortDebugString() << "}\n";
 }
 
 void Worker::MainLoop() {

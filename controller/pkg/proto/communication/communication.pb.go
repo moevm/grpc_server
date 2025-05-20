@@ -24,25 +24,28 @@ const (
 type PulseType int32
 
 const (
-	PulseType_PULSE_REGISTER PulseType = 0
+	PulseType_PULSE_INVALD   PulseType = 0
 	PulseType_PULSE_OK       PulseType = 1
-	PulseType_PULSE_FETCH_ME PulseType = 2
-	PulseType_PULSE_SHUTDOWN PulseType = 3
+	PulseType_PULSE_REGISTER PulseType = 2
+	PulseType_PULSE_FETCH_ME PulseType = 3
+	PulseType_PULSE_SHUTDOWN PulseType = 4
 )
 
 // Enum value maps for PulseType.
 var (
 	PulseType_name = map[int32]string{
-		0: "PULSE_REGISTER",
+		0: "PULSE_INVALD",
 		1: "PULSE_OK",
-		2: "PULSE_FETCH_ME",
-		3: "PULSE_SHUTDOWN",
+		2: "PULSE_REGISTER",
+		3: "PULSE_FETCH_ME",
+		4: "PULSE_SHUTDOWN",
 	}
 	PulseType_value = map[string]int32{
-		"PULSE_REGISTER": 0,
+		"PULSE_INVALD":   0,
 		"PULSE_OK":       1,
-		"PULSE_FETCH_ME": 2,
-		"PULSE_SHUTDOWN": 3,
+		"PULSE_REGISTER": 2,
+		"PULSE_FETCH_ME": 3,
+		"PULSE_SHUTDOWN": 4,
 	}
 )
 
@@ -76,25 +79,28 @@ func (PulseType) EnumDescriptor() ([]byte, []int) {
 type ControllerError int32
 
 const (
-	ControllerError_CTRL_ERR_OK           ControllerError = 0
-	ControllerError_CTRL_ERR_UNKNOWN_TYPE ControllerError = 1
-	ControllerError_CTRL_ERR_UNKNOWN_ID   ControllerError = 2
-	ControllerError_CTRL_ERR_FAILED       ControllerError = 3
+	ControllerError_CTRL_ERR_INVALID      ControllerError = 0
+	ControllerError_CTRL_ERR_OK           ControllerError = 1
+	ControllerError_CTRL_ERR_UNKNOWN_TYPE ControllerError = 2
+	ControllerError_CTRL_ERR_UNKNOWN_ID   ControllerError = 3
+	ControllerError_CTRL_ERR_FAILED       ControllerError = 4
 )
 
 // Enum value maps for ControllerError.
 var (
 	ControllerError_name = map[int32]string{
-		0: "CTRL_ERR_OK",
-		1: "CTRL_ERR_UNKNOWN_TYPE",
-		2: "CTRL_ERR_UNKNOWN_ID",
-		3: "CTRL_ERR_FAILED",
+		0: "CTRL_ERR_INVALID",
+		1: "CTRL_ERR_OK",
+		2: "CTRL_ERR_UNKNOWN_TYPE",
+		3: "CTRL_ERR_UNKNOWN_ID",
+		4: "CTRL_ERR_FAILED",
 	}
 	ControllerError_value = map[string]int32{
-		"CTRL_ERR_OK":           0,
-		"CTRL_ERR_UNKNOWN_TYPE": 1,
-		"CTRL_ERR_UNKNOWN_ID":   2,
-		"CTRL_ERR_FAILED":       3,
+		"CTRL_ERR_INVALID":      0,
+		"CTRL_ERR_OK":           1,
+		"CTRL_ERR_UNKNOWN_TYPE": 2,
+		"CTRL_ERR_UNKNOWN_ID":   3,
+		"CTRL_ERR_FAILED":       4,
 	}
 )
 
@@ -128,25 +134,28 @@ func (ControllerError) EnumDescriptor() ([]byte, []int) {
 type ControlType int32
 
 const (
-	ControlType_CTRL_RESTART    ControlType = 0
-	ControlType_CTRL_FETCH      ControlType = 1
-	ControlType_CTRL_SET_TASK   ControlType = 2
-	ControlType_CTRL_GET_STATUS ControlType = 3
+	ControlType_CTRL_INVALID    ControlType = 0
+	ControlType_CTRL_RESTART    ControlType = 1
+	ControlType_CTRL_FETCH      ControlType = 2
+	ControlType_CTRL_SET_TASK   ControlType = 3
+	ControlType_CTRL_GET_STATUS ControlType = 4
 )
 
 // Enum value maps for ControlType.
 var (
 	ControlType_name = map[int32]string{
-		0: "CTRL_RESTART",
-		1: "CTRL_FETCH",
-		2: "CTRL_SET_TASK",
-		3: "CTRL_GET_STATUS",
+		0: "CTRL_INVALID",
+		1: "CTRL_RESTART",
+		2: "CTRL_FETCH",
+		3: "CTRL_SET_TASK",
+		4: "CTRL_GET_STATUS",
 	}
 	ControlType_value = map[string]int32{
-		"CTRL_RESTART":    0,
-		"CTRL_FETCH":      1,
-		"CTRL_SET_TASK":   2,
-		"CTRL_GET_STATUS": 3,
+		"CTRL_INVALID":    0,
+		"CTRL_RESTART":    1,
+		"CTRL_FETCH":      2,
+		"CTRL_SET_TASK":   3,
+		"CTRL_GET_STATUS": 4,
 	}
 )
 
@@ -180,28 +189,31 @@ func (ControlType) EnumDescriptor() ([]byte, []int) {
 type WorkerError int32
 
 const (
-	WorkerError_WORKER_ERR_OK          WorkerError = 0
-	WorkerError_WORKER_ERR_NO_FETCH    WorkerError = 1
-	WorkerError_WORKER_ERR_BUSY        WorkerError = 2
-	WorkerError_WORKER_ERR_TASK_FAILED WorkerError = 3
-	WorkerError_WORKER_ERR_FAILED      WorkerError = 4
+	WorkerError_WORKER_ERROR_INVALID   WorkerError = 0
+	WorkerError_WORKER_ERR_OK          WorkerError = 1
+	WorkerError_WORKER_ERR_NO_FETCH    WorkerError = 2
+	WorkerError_WORKER_ERR_BUSY        WorkerError = 3
+	WorkerError_WORKER_ERR_TASK_FAILED WorkerError = 4
+	WorkerError_WORKER_ERR_FAILED      WorkerError = 5
 )
 
 // Enum value maps for WorkerError.
 var (
 	WorkerError_name = map[int32]string{
-		0: "WORKER_ERR_OK",
-		1: "WORKER_ERR_NO_FETCH",
-		2: "WORKER_ERR_BUSY",
-		3: "WORKER_ERR_TASK_FAILED",
-		4: "WORKER_ERR_FAILED",
+		0: "WORKER_ERROR_INVALID",
+		1: "WORKER_ERR_OK",
+		2: "WORKER_ERR_NO_FETCH",
+		3: "WORKER_ERR_BUSY",
+		4: "WORKER_ERR_TASK_FAILED",
+		5: "WORKER_ERR_FAILED",
 	}
 	WorkerError_value = map[string]int32{
-		"WORKER_ERR_OK":          0,
-		"WORKER_ERR_NO_FETCH":    1,
-		"WORKER_ERR_BUSY":        2,
-		"WORKER_ERR_TASK_FAILED": 3,
-		"WORKER_ERR_FAILED":      4,
+		"WORKER_ERROR_INVALID":   0,
+		"WORKER_ERR_OK":          1,
+		"WORKER_ERR_NO_FETCH":    2,
+		"WORKER_ERR_BUSY":        3,
+		"WORKER_ERR_TASK_FAILED": 4,
+		"WORKER_ERR_FAILED":      5,
 	}
 )
 
@@ -276,7 +288,7 @@ func (x *WorkerPulse) GetType() PulseType {
 	if x != nil {
 		return x.Type
 	}
-	return PulseType_PULSE_REGISTER
+	return PulseType_PULSE_INVALD
 }
 
 func (x *WorkerPulse) GetWorkerId() uint64 {
@@ -342,7 +354,7 @@ func (x *PulseResponse) GetError() ControllerError {
 	if x != nil {
 		return x.Error
 	}
-	return ControllerError_CTRL_ERR_OK
+	return ControllerError_CTRL_ERR_INVALID
 }
 
 func (x *PulseResponse) GetWorkerId() uint64 {
@@ -395,7 +407,7 @@ func (x *ControlMsg) GetType() ControlType {
 	if x != nil {
 		return x.Type
 	}
-	return ControlType_CTRL_RESTART
+	return ControlType_CTRL_INVALID
 }
 
 func (x *ControlMsg) GetExtraSize() uint64 {
@@ -455,7 +467,7 @@ func (x *WorkerResponse) GetError() WorkerError {
 	if x != nil {
 		return x.Error
 	}
-	return WorkerError_WORKER_ERR_OK
+	return WorkerError_WORKER_ERROR_INVALID
 }
 
 func (x *WorkerResponse) GetTaskId() uint64 {
@@ -497,29 +509,33 @@ const file_pkg_proto_communication_communication_proto_rawDesc = "" +
 	"\x05error\x18\x01 \x01(\x0e2\f.WorkerErrorR\x05error\x12\x17\n" +
 	"\atask_id\x18\x02 \x01(\x04R\x06taskId\x12\x1d\n" +
 	"\n" +
-	"extra_size\x18\x03 \x01(\x04R\textraSize*U\n" +
-	"\tPulseType\x12\x12\n" +
-	"\x0ePULSE_REGISTER\x10\x00\x12\f\n" +
+	"extra_size\x18\x03 \x01(\x04R\textraSize*g\n" +
+	"\tPulseType\x12\x10\n" +
+	"\fPULSE_INVALD\x10\x00\x12\f\n" +
 	"\bPULSE_OK\x10\x01\x12\x12\n" +
-	"\x0ePULSE_FETCH_ME\x10\x02\x12\x12\n" +
-	"\x0ePULSE_SHUTDOWN\x10\x03*k\n" +
-	"\x0fControllerError\x12\x0f\n" +
-	"\vCTRL_ERR_OK\x10\x00\x12\x19\n" +
-	"\x15CTRL_ERR_UNKNOWN_TYPE\x10\x01\x12\x17\n" +
-	"\x13CTRL_ERR_UNKNOWN_ID\x10\x02\x12\x13\n" +
-	"\x0fCTRL_ERR_FAILED\x10\x03*W\n" +
+	"\x0ePULSE_REGISTER\x10\x02\x12\x12\n" +
+	"\x0ePULSE_FETCH_ME\x10\x03\x12\x12\n" +
+	"\x0ePULSE_SHUTDOWN\x10\x04*\x81\x01\n" +
+	"\x0fControllerError\x12\x14\n" +
+	"\x10CTRL_ERR_INVALID\x10\x00\x12\x0f\n" +
+	"\vCTRL_ERR_OK\x10\x01\x12\x19\n" +
+	"\x15CTRL_ERR_UNKNOWN_TYPE\x10\x02\x12\x17\n" +
+	"\x13CTRL_ERR_UNKNOWN_ID\x10\x03\x12\x13\n" +
+	"\x0fCTRL_ERR_FAILED\x10\x04*i\n" +
 	"\vControlType\x12\x10\n" +
-	"\fCTRL_RESTART\x10\x00\x12\x0e\n" +
+	"\fCTRL_INVALID\x10\x00\x12\x10\n" +
+	"\fCTRL_RESTART\x10\x01\x12\x0e\n" +
 	"\n" +
-	"CTRL_FETCH\x10\x01\x12\x11\n" +
-	"\rCTRL_SET_TASK\x10\x02\x12\x13\n" +
-	"\x0fCTRL_GET_STATUS\x10\x03*\x81\x01\n" +
-	"\vWorkerError\x12\x11\n" +
-	"\rWORKER_ERR_OK\x10\x00\x12\x17\n" +
-	"\x13WORKER_ERR_NO_FETCH\x10\x01\x12\x13\n" +
-	"\x0fWORKER_ERR_BUSY\x10\x02\x12\x1a\n" +
-	"\x16WORKER_ERR_TASK_FAILED\x10\x03\x12\x15\n" +
-	"\x11WORKER_ERR_FAILED\x10\x04B6Z4github.com/moevm/grpc_server/pkg/proto/communicationb\x06proto3"
+	"CTRL_FETCH\x10\x02\x12\x11\n" +
+	"\rCTRL_SET_TASK\x10\x03\x12\x13\n" +
+	"\x0fCTRL_GET_STATUS\x10\x04*\x9b\x01\n" +
+	"\vWorkerError\x12\x18\n" +
+	"\x14WORKER_ERROR_INVALID\x10\x00\x12\x11\n" +
+	"\rWORKER_ERR_OK\x10\x01\x12\x17\n" +
+	"\x13WORKER_ERR_NO_FETCH\x10\x02\x12\x13\n" +
+	"\x0fWORKER_ERR_BUSY\x10\x03\x12\x1a\n" +
+	"\x16WORKER_ERR_TASK_FAILED\x10\x04\x12\x15\n" +
+	"\x11WORKER_ERR_FAILED\x10\x05B6Z4github.com/moevm/grpc_server/pkg/proto/communicationb\x06proto3"
 
 var (
 	file_pkg_proto_communication_communication_proto_rawDescOnce sync.Once

@@ -18,8 +18,9 @@ import (
 
 const (
 	// Worker states.
-	workerBusy = 1
-	workerFree = 0
+	WORKER_BUSY    = 0
+	WORKER_FREE    = 1
+	WORKER_BOOTING = 2
 
 	workerMainSocketPath = "/run/controller/main.sock"
 	workerSocketPath     = "/run/controller/"
@@ -76,7 +77,7 @@ func NewTask(taskId uint64, taskBody []byte) *Task {
 // Constructor for Worker.
 func NewWorker() *Worker {
 	return &Worker{
-		state:      workerFree,
+		state:      WORKER_BOOTING,
 		last_pulse: time.Now(),
 		task_id:    0, // no task
 	}
@@ -97,6 +98,10 @@ func (t *Task) String() string {
 }
 
 func sendControlMessage(workerID uint64, msg *communication.ControlMsg, extraData []byte) (*communication.WorkerResponse, []byte, error) {
+	msg.ExtraSize = uint64(len(extraData))
+	log.Printf("Send control message to worker %v: {%v}\n",
+		workerID, msg.String())
+
 	socketPath := fmt.Sprintf("%s%d.sock", workerSocketPath, workerID)
 	netConn, err := net.Dial("unix", socketPath)
 	if err != nil {
@@ -143,6 +148,9 @@ func sendControlMessage(workerID uint64, msg *communication.ControlMsg, extraDat
 		}
 	}
 
+	log.Printf("Recieved control response from worker %v: {%v} + %v\n",
+		workerID, resp.String(), respExtra)
+
 	return resp, respExtra, nil
 }
 
@@ -176,7 +184,7 @@ func markWorkerFree(workerID uint64) {
 		return
 	}
 
-	worker.state = workerFree
+	worker.state = WORKER_FREE
 	worker.task_id = 0
 	freeWorkers <- workerID
 }
@@ -187,11 +195,9 @@ func requeueTask(taskID uint64) {
 	}
 }
 
-func handleRegisterPulse(pulse *communication.WorkerPulse, resp *communication.PulseResponse) {
+func handleRegisterPulse(_ *communication.WorkerPulse, resp *communication.PulseResponse) {
 	workerID := genWorkerId()
 	workers[workerID] = NewWorker()
-	time.Sleep(time.Second)
-	markWorkerFree(workerID)
 	*resp = communication.PulseResponse{
 		Error:    communication.ControllerError_CTRL_ERR_OK,
 		WorkerId: workerID,
@@ -210,13 +216,16 @@ func handleOkPulse(pulse *communication.WorkerPulse, resp *communication.PulseRe
 	}
 
 	if pulse.TaskId != worker.task_id {
-		go func() {
-			msg := &communication.ControlMsg{
-				Type: communication.ControlType_CTRL_RESTART,
-			}
-			sendControlMessage(pulse.WorkerId, msg, nil)
-			handleWorkerFailure(pulse.WorkerId)
-		}()
+		log.Printf("pulse.TaskId and worker.task_id mismatch (%v and %v)\n", pulse.TaskId, worker.task_id)
+		msg := &communication.ControlMsg{
+			Type: communication.ControlType_CTRL_RESTART,
+		}
+		sendControlMessage(pulse.WorkerId, msg, nil)
+		handleWorkerFailure(pulse.WorkerId)
+	}
+
+	if worker.state == WORKER_BOOTING {
+		markWorkerFree(pulse.WorkerId)
 	}
 
 	worker.last_pulse = time.Now()
@@ -252,6 +261,7 @@ func handleShutdownPulse(pulse *communication.WorkerPulse, resp *communication.P
 	delete(workers, workerID)
 	resp.Error = communication.ControllerError_CTRL_ERR_OK
 }
+
 func handleConnection(conn conn.Unix) {
 	msg_data, err := conn.ReadMessage()
 	if err != nil {
@@ -294,11 +304,11 @@ func handleConnection(conn conn.Unix) {
 		log.Printf("Failed to write response: %v", err)
 	}
 
+	log.Printf("Recieved pulse: {%v}. Sent response: {%v}\n", pulse.String(), resp.String())
+
 	if err := conn.Close(); err != nil {
 		log.Printf("Error closing connection: %v", err)
 	}
-
-	log.Printf("Recieved %v from worker %v. Sent %v %v", pulse.Type, pulse.WorkerId, resp.Error, resp.WorkerId)
 }
 
 func mainLoop() {
@@ -336,7 +346,7 @@ func assignTaskToWorker(taskID uint64, workerID uint64) {
 		return
 	}
 
-	if worker.state != workerFree {
+	if worker.state != WORKER_FREE {
 		log.Printf("Worker %d is not free", workerID)
 		queuedTasks <- taskID
 		freeWorkers <- workerID
@@ -368,7 +378,7 @@ func assignTaskToWorker(taskID uint64, workerID uint64) {
 		return
 	}
 
-	worker.state = workerBusy
+	worker.state = WORKER_BUSY
 	worker.task_id = taskID
 }
 
@@ -420,6 +430,7 @@ func fetchTaskResult(workerID uint64) {
 	}
 }
 
+// very bad
 func checkHealth() {
 	for {
 		time.Sleep(30 * time.Second)
