@@ -16,7 +16,7 @@ jobs:
 
       - name: Install protoc
         run: |
-          sudo apt-get update && sudo apt-get install -y protobuf-compiler
+          sudo apt-get update && sudo apt-get install -y protobuf-compiler bazel
           protoc --version
 
       - name: Install protobuf dependencies
@@ -41,3 +41,7 @@ jobs:
       - name: Run tests
         working-directory: ./controller
         run: go test -v ./internal/grpcserver/...
+
+      - name: Run Bazel test
+        working-directory: ./controller
+        run: bazel test --sandbox_writable_path=/run/controller //internal/manager:manager_test
