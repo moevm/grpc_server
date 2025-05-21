@@ -1,4 +1,14 @@
-// TODO: add Doc comments
+// Package manager implements a client-server model application
+// for solving various tasks (currently hash counting) and managing a cluster of workers.
+//
+// To start the server, simply run the ClusterInit() function.
+//
+// Before starting, you need to make sure that directory /run/controller/ exists
+// and has the correct owner and write/read permissions (this is necessary to create sockets).
+//
+// All output and errors are logged by [log] package.
+//
+// [log]: https://pkg.go.dev/log#Logger
 package manager
 
 import (
@@ -59,20 +69,21 @@ var (
 	taskId = 0
 )
 
-// Can be changed if it is necessary
-// to add new info for the Task
+// Task is a general representation of tasks coming to the controller.
+// Can be changed if it is necessary to add new info for the Task
 // for example: hashType.
 type Task struct {
 	id    int
 	state int
-	body  []byte
-	solve []byte
+	body  []byte // some data with which something needs to be done (a task needs to be solved)
+	solve []byte // solution for the task (in general)
 }
 
+// Worker contains everything necessary for communication with the worker and his current state.
 type Worker struct {
 	id       int
 	state    int
-	taskChan chan *Task
+	taskChan chan *Task // channel for transferring tasks to the worker
 	conn     conn.Unix
 }
 
@@ -163,8 +174,9 @@ func (w *Worker) SetWorkerConn(workerConn conn.Unix) {
 	w.conn = workerConn
 }
 
-// Run new Worker.
+// Run includes the initialized worker in the work.
 // Worker will wait for the task from the channel.
+// This function should always be run in a goroutine.
 func (w *Worker) Run() {
 	log.Printf("Worker [ID=%d] running and awaiting a task\n", w.id)
 	var socketPath strings.Builder
@@ -204,7 +216,13 @@ func (w *Worker) Run() {
 	}
 }
 
-// Sends Task.body to a worker and receive a Task.solution.
+// AddTask function assigns a task to a worker
+// (the task and worker states change to taskWip and workerBusy until the task is completed).
+// This function sends task.body length and task.body to the worker
+// and receives task.solve length and task.solve from him in case of success,
+// in case of failure it logs the error through a special channel: errorChan
+// and set worker state to workerDown.
+// If successful, the worker and task will set the status to workerFree and taskSolved.
 func (w *Worker) AddTask(task *Task) {
 	if w.taskChan == nil || w.state != workerFree {
 		errorChan <- fmt.Errorf("worker is broken")
@@ -327,6 +345,13 @@ func genWorkerId() int {
 	return workerId
 }
 
+// workerInit initializes a new worker that has already been created and is ready to be connected.
+// To connect, the worker must do net.Dial("unix", "/run/controller/init.sock"),
+// receives his ID and send successfulResp (1).
+// In case of failure it logs the error through a special channel: errorChan
+// and set worker state to workerDown.
+// If successful, it run worker ( worker.Run() ).
+// This function should always be run in a goroutine.
 func workerInit() {
 	log.Println("The worker initialization server is running. Waiting for connections...")
 
@@ -385,6 +410,9 @@ func workerInit() {
 	}
 }
 
+// loadBalancer is an implementation of round-robin algorithm for evenly distributing tasks among workers.
+// The maximum number of attempts to submit one task is 3.
+// In case of failure it logs the error through a special channel: errorChan.
 func loadBalancer(task *Task) {
 	log.Printf(
 		"Finding a worker for a task [TaskID=%d, Size=%d bytes, State=%d]\n",
@@ -435,6 +463,8 @@ func loadBalancer(task *Task) {
 	}
 }
 
+// taskManager checking new tasks ans send it to loadBalancer.
+// This function should always be run in a goroutine.
 func taskManager() {
 	for {
 		for i := 0; i <= taskId; i++ {
@@ -449,6 +479,8 @@ func taskManager() {
 	}
 }
 
+// errorHandler catches the errors from goroutines and logs them.
+// This function should always be run in a goroutine.
 func errorHandler() {
 	for {
 		err := <-errorChan
@@ -456,7 +488,7 @@ func errorHandler() {
 	}
 }
 
-// Maybe it's worth getting rid of this...
+// TODO: Maybe it's worth getting rid of this...
 func init() {
 	err := os.RemoveAll(workerInitSocketPath)
 	if err != nil {
@@ -482,6 +514,7 @@ func init() {
 	}()
 }
 
+// TODO: add doc.
 func hasActiveWorkers() bool {
 	hasWorkers := false
 	workers.Range(func(key, value interface{}) bool {
@@ -495,7 +528,9 @@ func hasActiveWorkers() bool {
 	return hasWorkers
 }
 
-// taskData is a stub for input data.
+// ClusterInit is the main function that starts the controller (all necessary goroutines)
+// and receives data from the server (needs to be implemented in the future,
+// currently a stub in the form of taskData is used).
 func ClusterInit(taskData [][]byte) {
 	log.Println("=== The controller is running ===")
 	log.Printf("Received tasks: %d\n", len(taskData))
