@@ -1,18 +1,18 @@
 #include "../include/worker.hpp"
 
 #include <arpa/inet.h>
+#include <endian.h>
 #include <iostream>
+#include <poll.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <thread>
 #include <unistd.h>
-#include <poll.h>
-#include <endian.h>
 
 void Worker::LogStateChange(WorkerState new_state) {
-  const char *state_names[] = {"BOOTING",    "FREE",    "BUSY",
-                               "SHUTTING_DOWN", "ERROR" };
+  const char *state_names[] = {"BOOTING", "FREE", "BUSY", "SHUTTING_DOWN",
+                               "ERROR"};
   std::cerr << "[STATE] " << state_names[static_cast<int>(state)] << " -> "
             << state_names[static_cast<int>(new_state)] << std::endl;
 }
@@ -29,12 +29,13 @@ void Worker::ReadExact(int fd, void *buf, size_t n) {
   ssize_t r;
 
   while (total < n) {
-    r = read(fd, (char*)buf + total, n - total);
+    r = read(fd, (char *)buf + total, n - total);
     if (r < 0) {
       if (errno == EINTR) {
         continue;
       }
-      throw WorkerException(std::string("ReadExact failed with error ") + strerror(errno));
+      throw WorkerException(std::string("ReadExact failed with error ") +
+                            strerror(errno));
     } else if (r == 0) {
       throw WorkerException("ReadExact failed with Premature EOF");
     }
@@ -46,12 +47,13 @@ void Worker::WriteExact(int fd, const void *buf, size_t n) {
   size_t total = 0;
   ssize_t w;
   while (total < n) {
-    w = write(fd, (const char*)buf + total, n - total);
+    w = write(fd, (const char *)buf + total, n - total);
     if (w < 0) {
       if (errno == EINTR) {
         continue;
       }
-      throw WorkerException(std::string("WriteExact failed with error ") + strerror(errno));
+      throw WorkerException(std::string("WriteExact failed with error ") +
+                            strerror(errno));
     }
     total += w;
   }
@@ -62,7 +64,7 @@ void Worker::ReadMessage(int fd, std::string &msg) {
   Worker::ReadExact(fd, length_le64);
   uint64_t length = le64toh(length_le64);
   msg.resize(length);
-  Worker::ReadExact(fd, (void*)msg.data(), length);
+  Worker::ReadExact(fd, (void *)msg.data(), length);
 }
 
 void Worker::WriteMessage(int fd, const std::string &msg) {
@@ -75,12 +77,14 @@ void Worker::SendPulse(PulseType type) {
   int main_fd = 0;
   try {
     main_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (main_fd < 0) throw WorkerException("socket() failed");
+    if (main_fd < 0)
+      throw WorkerException("socket() failed");
 
     sockaddr_un addr{.sun_family = AF_UNIX};
-    strncpy(addr.sun_path, SOCKET_DIR MAIN_SOCKET_NAME, sizeof(addr.sun_path) - 1);
+    strncpy(addr.sun_path, SOCKET_DIR MAIN_SOCKET_NAME,
+            sizeof(addr.sun_path) - 1);
 
-    if (connect(main_fd, (sockaddr*)&addr, sizeof(addr))) {
+    if (connect(main_fd, (sockaddr *)&addr, sizeof(addr))) {
       throw WorkerException("connect() failed");
     }
 
@@ -91,7 +95,8 @@ void Worker::SendPulse(PulseType type) {
     pulse.set_next_pulse(EXPECTED_PULSE_TIME);
     WriteProtoMessage(main_fd, pulse);
 
-    pulse_interval = MIN_PULSE_TIME + (rand() % (MAX_PULSE_TIME - MIN_PULSE_TIME + 1));
+    pulse_interval =
+        MIN_PULSE_TIME + (rand() % (MAX_PULSE_TIME - MIN_PULSE_TIME + 1));
     last_pulse_time = std::chrono::steady_clock::now();
 
     PulseResponse response;
@@ -106,9 +111,9 @@ void Worker::SendPulse(PulseType type) {
       worker_id = response.worker_id();
     }
 
-    std::cerr << "[INFO] Sent {" << pulse.ShortDebugString() << "}. Recieved {" << response.ShortDebugString() << "}\n";
-  }
-  catch (const std::exception& e) {
+    std::cerr << "[INFO] Sent {" << pulse.ShortDebugString() << "}. Recieved {"
+              << response.ShortDebugString() << "}\n";
+  } catch (const std::exception &e) {
     close(main_fd);
     SetState(WorkerState::ERROR);
     throw WorkerException(std::string("Pulse failed: ") + e.what());
@@ -124,48 +129,51 @@ Worker::Worker() : listener_fd(-1), state(WorkerState::BOOTING) {
   std::cerr << "[INFO] worker_id = " << worker_id << '\n';
   std::cerr << "[INFO] socket_path = " << socket_path << '\n';
   srand(worker_id); // for random pulse time generation
-  
+
   listener_fd = socket(AF_UNIX, SOCK_STREAM, 0);
   if (listener_fd < 0) {
     throw WorkerException("socket() failed");
   }
-  
+
   sockaddr_un addr{.sun_family = AF_UNIX};
   strncpy(addr.sun_path, socket_path.c_str(), sizeof(addr.sun_path) - 1);
-  
-  if (bind(listener_fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
+
+  if (bind(listener_fd, (sockaddr *)&addr, sizeof(addr)) < 0) {
     close(listener_fd);
     listener_fd = -1;
     throw WorkerException("bind() failed");
   }
-  
+
   if (listen(listener_fd, 100) < 0) {
     close(listener_fd);
     listener_fd = -1;
     throw WorkerException("listen() failed");
   }
-  
+
   SendPulse(PULSE_OK);
   SetState(WorkerState::FREE);
 }
 
 Worker::~Worker() {
   SetState(WorkerState::SHUTTING_DOWN);
-  
+
   try {
     SendPulse(PULSE_SHUTDOWN);
-  }
-  catch (...) {} // ignore errors cuz we don't care
+  } catch (...) {
+  } // ignore errors cuz we don't care
 
   if (listener_fd != -1)
     close(listener_fd);
-  
+
   unlink(socket_path.c_str());
 }
 
 int Worker::GetPulseTimeout() {
   using namespace std::chrono;
-  return (pulse_interval - duration_cast<seconds>(steady_clock::now() - last_pulse_time).count()) * 1000;
+  return (pulse_interval -
+          duration_cast<seconds>(steady_clock::now() - last_pulse_time)
+              .count()) *
+         1000;
 }
 
 void Worker::HandleRestartControlMessage(WorkerResponse &resp) {
@@ -178,7 +186,7 @@ void Worker::HandleFetchControlMessage(WorkerResponse &resp) {
     resp.set_error(WORKER_ERR_NO_FETCH);
     return;
   }
-  
+
   extra_data = std::move(fetch_data);
   SetState(WorkerState::FREE);
 }
@@ -190,12 +198,14 @@ void Worker::ProcessTask_Static(Worker *worker, const std::vector<char> &data) {
   worker->current_task_id = 0;
 }
 
-void Worker::HandleSetTaskControlMessage(const ControlMsg &msg, WorkerResponse &resp, const std::vector<char> &extra) {
+void Worker::HandleSetTaskControlMessage(const ControlMsg &msg,
+                                         WorkerResponse &resp,
+                                         const std::vector<char> &extra) {
   if (GetState() != WorkerState::FREE) {
     resp.set_error(WORKER_ERR_BUSY);
     return;
   }
-  
+
   current_task_id = msg.task_id();
   std::thread(ProcessTask_Static, this, extra).detach();
 }
@@ -217,22 +227,29 @@ void Worker::HandleControlMessage(int client_fd) {
     ReadExact(client_fd, extra.data(), extra.size());
 
     switch (msg.type()) {
-      case CTRL_RESTART: HandleRestartControlMessage(response); break;
-      case CTRL_FETCH: HandleFetchControlMessage(response); break;
-      case CTRL_SET_TASK: HandleSetTaskControlMessage(msg, response, extra); break;
-      case CTRL_GET_STATUS: HandleGetStatusControlMessage(response); break;
-      default:
-        response.set_error(WORKER_ERR_FAILED);
-        break;
+    case CTRL_RESTART:
+      HandleRestartControlMessage(response);
+      break;
+    case CTRL_FETCH:
+      HandleFetchControlMessage(response);
+      break;
+    case CTRL_SET_TASK:
+      HandleSetTaskControlMessage(msg, response, extra);
+      break;
+    case CTRL_GET_STATUS:
+      HandleGetStatusControlMessage(response);
+      break;
+    default:
+      response.set_error(WORKER_ERR_FAILED);
+      break;
     }
-  }
-  catch (const std::exception& e) {
+  } catch (const std::exception &e) {
     response.set_error(WORKER_ERR_FAILED);
   }
 
   response.set_extra_size(extra_data.size());
   WriteProtoMessage(client_fd, response);
-  
+
   if (extra_data.size() != 0) {
     WriteExact(client_fd, extra_data.data(), extra_data.size());
     extra_data.clear();

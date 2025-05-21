@@ -12,7 +12,7 @@ protected:
     metrics_collector.StartTask();
 
     MDCalculator md_calculator("md5");
-    md_calculator.update((const unsigned char*)data.data(), data.size());
+    md_calculator.update((const unsigned char *)data.data(), data.size());
     std::string hash = md_calculator.finalize();
 
     SetFetchData(hash);

@@ -21,11 +21,10 @@ const (
 	WORKER_BUSY    = 0
 	WORKER_FREE    = 1
 	WORKER_BOOTING = 2
+	WORKER_FETCH   = 3
 
 	workerMainSocketPath = "/run/controller/main.sock"
 	workerSocketPath     = "/run/controller/"
-
-	maxAttempts = 3
 )
 
 var (
@@ -213,15 +212,6 @@ func handleOkPulse(pulse *communication.WorkerPulse, resp *communication.PulseRe
 			WorkerId: 0,
 		}
 		return
-	}
-
-	if pulse.TaskId != worker.task_id {
-		log.Printf("pulse.TaskId and worker.task_id mismatch (%v and %v)\n", pulse.TaskId, worker.task_id)
-		msg := &communication.ControlMsg{
-			Type: communication.ControlType_CTRL_RESTART,
-		}
-		sendControlMessage(pulse.WorkerId, msg, nil)
-		handleWorkerFailure(pulse.WorkerId)
 	}
 
 	if worker.state == WORKER_BOOTING {
