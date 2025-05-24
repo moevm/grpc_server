@@ -528,15 +528,32 @@ func hasActiveWorkers() bool {
 	return hasWorkers
 }
 
+func taskReceiver(taskChan <-chan []byte) {
+	for content := range taskChan {
+		task := NewTask(genTaskId(), content)
+		tasks.Store(task.id, task)
+		log.Printf("New task received from gRPC: %d", task.id)
+	}
+}
+
+func InitManager(taskChanSize int) (chan<- []byte, error) {
+	taskChan := make(chan []byte, taskChanSize)
+	go func() {
+		ClusterInit([][]byte{}, taskChan)
+	}()
+	return taskChan, nil
+}
+
 // ClusterInit is the main function that starts the controller (all necessary goroutines)
 // and receives data from the server (needs to be implemented in the future,
 // currently a stub in the form of taskData is used).
-func ClusterInit(taskData [][]byte) {
+func ClusterInit(taskData [][]byte, taskChan <-chan []byte) {
 	log.Println("=== The controller is running ===")
 	log.Printf("Received tasks: %d\n", len(taskData))
 
 	go workerInit()
 	go errorHandler()
+	go taskReceiver(taskChan)
 
 	log.Println("Waiting for at least one worker to connect...")
 	for {

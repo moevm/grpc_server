@@ -13,11 +13,13 @@ type Server struct {
 	pb.UnimplementedFileServiceServer
 	allowedChars string
 	charMap      map[rune]bool
+	taskChan     chan<- []byte
 }
 
-func NewServer(allowedChars string) *Server {
+func NewServer(allowedChars string, taskChan chan<- []byte) *Server {
 	s := &Server{
 		allowedChars: allowedChars,
+		taskChan:     taskChan,
 	}
 	s.charMap = s.initCharMap()
 	return s
@@ -45,6 +47,18 @@ func (s *Server) UploadFile(ctx context.Context, req *pb.FileRequest) (*pb.FileR
 		isValid = validateBinary(content)
 	default:
 		return nil, status.Errorf(codes.InvalidArgument, "invalid file type: %s", fileType)
+	}
+
+	if isValid {
+		select {
+		case s.taskChan <- content:
+		default:
+			return &pb.FileResponse{
+				Size:    size,
+				IsValid: false,
+				Message: "Task queue is full",
+			}, nil
+		}
 	}
 
 	msg := "Validation successful"

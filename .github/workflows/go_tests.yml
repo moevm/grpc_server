@@ -38,6 +38,13 @@ jobs:
         working-directory: ./controller
         run: go mod download
 
+      - name: Prepare socket directory
+        run: sudo mkdir -p /run/controller/ && sudo chown runner:runner /run/controller/ && sudo chmod 755 /run/controller/
+
       - name: Run tests
         working-directory: ./controller
         run: go test -v ./internal/grpcserver/...
+
+      - name: Run manager tests
+        working-directory: ./controller
+        run: go test -v ./internal/manager/...
