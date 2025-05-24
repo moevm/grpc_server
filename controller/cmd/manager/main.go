@@ -21,10 +21,6 @@ func main() {
 		}
 	}
 
-	taskChan, _ := manager.InitManager(100)
-	for _, task := range tasks {
-		taskChan <- task
-	}
-
+	manager.ClusterInit(tasks)
 	select {}
 }
