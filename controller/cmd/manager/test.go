@@ -34,7 +34,7 @@ func main() {
 
 	go manager.Init()
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	ids := make(map[uint64]int, 5)
 	for i, task := range tasks {

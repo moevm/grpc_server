@@ -10,8 +10,9 @@ mkdir -p /run/controller
 docker compose build
 
 cd controller
+go build cmd/manager/test.go
 set +e
-timeout 10 go run cmd/manager/test.go &
+timeout 20 ./test &
 manager_pid=$!
 cd ..
 
@@ -25,17 +26,15 @@ wait $manager_pid
 manager_exit_code=$?
 fail=
 
-sleep 2
-
 if [ ! -z "$(docker logs worker1 | grep -E '\[error\]' )" ]; then
-    echo -e "${COL_RED}* worker1: Error${COL_RESET}"
+    echo -e "${COL_RED}* worker1: bad logs${COL_RESET}"
     fail=1
 else
     echo -e "${COL_GREEN}* worker1: OK${COL_RESET}"
 fi
 
 if [ ! -z "$(docker logs worker2 | grep -E '\[error\]' )" ]; then
-    echo -e "${COL_RED}* worker2: Error${COL_RESET}"
+    echo -e "${COL_RED}* worker2: bad logs${COL_RESET}"
     fail=1
 else
     echo -e "${COL_GREEN}* worker2: OK${COL_RESET}"
@@ -57,5 +56,6 @@ if [ ! -z ${fail} ]; then
     docker logs worker2
 fi
 
+rm -f  controller/test
 docker container rm -f worker1 worker2 > /dev/null
 exit ${fail}
