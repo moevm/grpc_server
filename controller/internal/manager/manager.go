@@ -1,4 +1,14 @@
-// TODO: add Doc comments
+// Package manager implements a client-server model application
+// for solving various tasks (currently hash counting) and managing a cluster of workers.
+//
+// To start the server, simply run the ClusterInit() function.
+//
+// Before starting, you need to make sure that directory /run/controller/ exists
+// and has the correct owner and write/read permissions (this is necessary to create sockets).
+//
+// All output and errors are logged by [log] package.
+//
+// [log]: https://pkg.go.dev/log#Logger
 package manager
 
 import (
@@ -48,8 +58,8 @@ var (
 	solved_tasks sync.Map
 )
 
-// Can be changed if it is necessary
-// to add new info for the Task
+// Task is a general representation of tasks coming to the controller.
+// Can be changed if it is necessary to add new info for the Task
 // for example: hashType.
 type Task struct {
 	id    uint64
@@ -57,6 +67,7 @@ type Task struct {
 	solve []byte
 }
 
+// Worker contains everything necessary for communication with the worker and his current state.
 type Worker struct {
 	state      int
 	last_pulse time.Time
@@ -315,6 +326,8 @@ func mainLoop() {
 	}
 }
 
+// errorHandler catches the errors from goroutines and logs them.
+// This function should always be run in a goroutine.
 func errorHandler() {
 	for err := range errorChan {
 		log.Println("ERROR:", err)

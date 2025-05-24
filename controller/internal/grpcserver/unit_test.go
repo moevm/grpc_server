@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"testing"
+	"time"
 )
 
 func TestUploadFile_TextValidation(t *testing.T) {
@@ -40,7 +41,8 @@ func TestUploadFile_TextValidation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			server := grpcserver.NewServer(tc.allowedChars)
+			taskChan := make(chan []byte, 1)
+			server := grpcserver.NewServer(tc.allowedChars, taskChan)
 			resp, err := server.UploadFile(context.Background(), &pb.FileRequest{
 				Content:  []byte(tc.content),
 				FileType: "text",
@@ -48,12 +50,27 @@ func TestUploadFile_TextValidation(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tc.isValid, resp.IsValid)
+
+			if tc.isValid {
+				select {
+				case <-taskChan:
+				case <-time.After(100 * time.Millisecond):
+					t.Error("Task was not sent to channel")
+				}
+			} else {
+				select {
+				case <-taskChan:
+					t.Error("Task should not be sent to channel")
+				default:
+				}
+			}
 		})
 	}
 }
 
 func TestUploadFile_BinaryValidation(t *testing.T) {
-	server := grpcserver.NewServer("")
+	taskChan := make(chan []byte, 1)
+	server := grpcserver.NewServer("", taskChan)
 	resp, err := server.UploadFile(context.Background(), &pb.FileRequest{
 		Content:  []byte{0x00, 0x01, 0x02},
 		FileType: "binary",
@@ -61,10 +78,17 @@ func TestUploadFile_BinaryValidation(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, resp.IsValid)
+
+	select {
+	case <-taskChan:
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Binary task was not sent to channel")
+	}
 }
 
 func TestUploadFile_InvalidFileType(t *testing.T) {
-	server := grpcserver.NewServer("")
+	taskChan := make(chan []byte, 1)
+	server := grpcserver.NewServer("", taskChan)
 	_, err := server.UploadFile(context.Background(), &pb.FileRequest{
 		Content:  []byte("test"),
 		FileType: "invalid",
@@ -74,4 +98,10 @@ func TestUploadFile_InvalidFileType(t *testing.T) {
 	st, ok := status.FromError(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, st.Code())
+
+	select {
+	case <-taskChan:
+		t.Error("Task should not be sent for invalid file type")
+	default:
+	}
 }

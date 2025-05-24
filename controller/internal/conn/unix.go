@@ -1,4 +1,9 @@
-// Wrapper for [net.Conn] with Unix socket type
+// The package implements an interface for working with Unix sockets.
+//
+// The conn package is wrapper for [net.Conn] interface
+// it should only be used for reading and writing from socket.
+// The package fully preserves all net.Conn functions,
+// so you should control writing to and reading from the socket manually.
 //
 // [net.Conn]: https://pkg.go.dev/net#Conn
 package conn
@@ -13,13 +18,17 @@ import (
 
 // TODO: add constructor for Unix
 
-// conn.Unix embeds net.Conn
+// conn.Unix embeds [net.Conn]
 type Unix struct {
+	// You can see all interface methods here:
+	//
+	// [net.Conn]: https://pkg.go.dev/net#Conn
 	net.Conn
 }
 
 // ReadMessage reads a complete length-prefixed message from the connection,
 // allocating and returning the buffer automatically.
+// See "ABI" section in wiki/worker_communication_protocol.md
 func (c *Unix) ReadMessage() ([]byte, error) {
 	var lenBuf [8]byte
 
@@ -41,6 +50,7 @@ func (c *Unix) ReadMessage() ([]byte, error) {
 }
 
 // WriteMessage writes a complete length-prefixed message to the connection.
+// See "ABI" section in wiki/worker_communication_protocol.md
 func (c *Unix) WriteMessage(b []byte) error {
 	var lenBuf [8]byte
 	messageLen := uint64(len(b))
@@ -57,7 +67,8 @@ func (c *Unix) WriteMessage(b []byte) error {
 	return nil
 }
 
-// readExact reads exactly len(buf) bytes from the connection
+// readExact reads exactly len(buf) bytes from the connection.
+// If data is not fully transmitted yet, it reads what is availible and waits for the next chunk.
 func (c *Unix) readExact(buf []byte) error {
 	totalRead := 0
 	for totalRead < len(buf) {
@@ -71,6 +82,7 @@ func (c *Unix) readExact(buf []byte) error {
 }
 
 // writeExact writes exactly len(buf) bytes to the connection
+// If data cannot be written in one chunk, it writes it in several chunks.
 func (c *Unix) writeExact(buf []byte) error {
 	totalWritten := 0
 	for totalWritten < len(buf) {
