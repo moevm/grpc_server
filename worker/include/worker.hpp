@@ -51,7 +51,8 @@ class Worker {
 
   void HandleRestartControlMessage(WorkerResponse &resp);
   void HandleFetchControlMessage(WorkerResponse &resp);
-  void HandleSetTaskControlMessage(const ControlMsg &msg, WorkerResponse &resp, const std::vector<char> &extra);
+  void HandleSetTaskControlMessage(const ControlMsg &msg, WorkerResponse &resp,
+                                   const std::vector<char> &extra);
   void HandleGetStatusControlMessage(WorkerResponse &resp);
 
   static void ProcessTask_Static(Worker *worker, const std::vector<char> &data);
@@ -63,18 +64,15 @@ protected:
   static void ReadExact(int fd, void *buf, size_t n);
   static void WriteExact(int fd, const void *buf, size_t n);
 
-  template<class T>
-  static inline void ReadExact(int fd, T &data) {
-    ReadExact(fd, &data, sizeof(data));    
+  template <class T> static inline void ReadExact(int fd, T &data) {
+    ReadExact(fd, &data, sizeof(data));
   }
 
-  template<class T>
-  static inline void WriteExact(int fd, const T &data) {
+  template <class T> static inline void WriteExact(int fd, const T &data) {
     WriteExact(fd, &data, sizeof(data));
   }
 
-  template<class T>
-  static inline void ReadProtoMessage(int fd, T &msg) {
+  template <class T> static inline void ReadProtoMessage(int fd, T &msg) {
     std::string buf;
     ReadMessage(fd, buf);
     if (!msg.ParseFromArray(buf.data(), buf.size())) {
@@ -82,8 +80,7 @@ protected:
     }
   }
 
-  template<class T>
-  static inline void WriteProtoMessage(int fd, T &msg) {
+  template <class T> static inline void WriteProtoMessage(int fd, T &msg) {
     std::string buf;
     if (!msg.SerializeToString(&buf)) {
       throw WorkerException("serialization failed");
