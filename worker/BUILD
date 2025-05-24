@@ -35,6 +35,6 @@ cc_binary(
     "include/metrics_collector.hpp",
     "include/communication.pb.hh",
   ],
-  deps = ["protobuf"],
+  deps = ["protobuf", "@spdlog//:spdlog"],
   linkopts = ["-lssl", "-lcrypto", "-lprometheus-cpp-push", "-lprometheus-cpp-core", "-lcurl"],
 )

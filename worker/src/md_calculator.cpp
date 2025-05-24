@@ -1,8 +1,6 @@
-#include <iomanip>
-#include <sstream>
-#include <stdexcept>
-
 #include "../include/md_calculator.hpp"
+
+#include <stdexcept>
 
 MDCalculator::MDCalculator(const std::string &algorithm)
     : md_(nullptr), ctx_(nullptr, EVP_MD_CTX_free) {
@@ -37,11 +35,5 @@ std::string MDCalculator::finalize() {
     throw std::runtime_error("Failed to finalize digest");
   }
 
-  std::ostringstream oss;
-  for (int i = 0; i < md_len; ++i) {
-    oss << std::hex << std::setw(2) << std::setfill('0')
-        << static_cast<int>(md_value[i]);
-  }
-
-  return oss.str();
+  return std::string((char*)md_value, md_len);
 }

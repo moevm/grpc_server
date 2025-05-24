@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MD_CALCULATOR_HPP
+#define MD_CALCULATOR_HPP
 
 #include <memory>
 #include <openssl/evp.h>
@@ -18,3 +19,5 @@ private:
   const EVP_MD *md_;
   std::unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)> ctx_;
 };
+
+#endif

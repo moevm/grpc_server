@@ -1,8 +1,8 @@
 #include "../include/md_calculator.hpp"
 #include "../include/metrics_collector.hpp"
 #include "../include/worker.hpp"
-#include <iostream>
-#include <vector>
+
+#include <spdlog/spdlog.h>
 
 class HashWorker : public Worker {
   MetricsCollector &metrics_collector;
@@ -31,9 +31,9 @@ int main() {
 
   if (gateway_address == nullptr || gateway_port == nullptr ||
       worker_name == nullptr) {
-    std::cerr << "[ERROR] Environment variables are not fully specified\n"
-                 "[INFO] Specify METRICS_GATEWAY_ADDRESS METRICS_GATEWAY_PORT "
-                 "METRICS_WORKER_NAME\n";
+    spdlog::error("Environment variables are not fully specified\n"
+                  "[INFO] Specify METRICS_GATEWAY_ADDRESS METRICS_GATEWAY_PORT "
+                  "METRICS_WORKER_NAME\n");
     return 1;
   }
 
@@ -42,11 +42,10 @@ int main() {
                                        worker_name);
     HashWorker(metrics_collector).MainLoop();
   } catch (WorkerException &e) {
-    std::cerr << "[ERROR] " << e.what() << std::endl;
+    spdlog::error(e.what());
     return 1;
   } catch (std::exception &e) {
-    std::cerr << "[ERROR] Unhandled exception " << typeid(e).name() << ": "
-              << e.what() << std::endl;
+    spdlog::error("unhandled exception {}: {}", typeid(e).name(), e.what());
     return 1;
   }
 

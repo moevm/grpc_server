@@ -1,4 +1,5 @@
-#pragma once
+#ifndef FILE_HPP
+#define FILE_HPP
 
 #include <string>
 
@@ -7,3 +8,5 @@ public:
   static std::string calculate_hash(const std::string &file_path,
                                     const std::string &algorithm);
 };
+
+#endif

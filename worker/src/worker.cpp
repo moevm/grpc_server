@@ -1,8 +1,9 @@
 #include "../include/worker.hpp"
 
+#include <spdlog/spdlog.h>
 #include <arpa/inet.h>
+#include <cerrno>
 #include <endian.h>
-#include <iostream>
 #include <poll.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -13,8 +14,8 @@
 void Worker::LogStateChange(WorkerState new_state) {
   const char *state_names[] = {"BOOTING", "FREE", "BUSY", "SHUTTING_DOWN",
                                "ERROR"};
-  std::cerr << "[STATE] " << state_names[static_cast<int>(state)] << " -> "
-            << state_names[static_cast<int>(new_state)] << std::endl;
+
+  spdlog::info("Switch states: {} -> {}", state_names[static_cast<int>(state)], state_names[static_cast<int>(new_state)]);
 }
 
 void Worker::SetState(WorkerState new_state) {
@@ -78,14 +79,14 @@ void Worker::SendPulse(PulseType type) {
   try {
     main_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (main_fd < 0)
-      throw WorkerException("socket() failed");
+      throw WorkerException(std::string("socket: ") + strerror(errno));
 
     sockaddr_un addr{.sun_family = AF_UNIX};
     strncpy(addr.sun_path, SOCKET_DIR MAIN_SOCKET_NAME,
             sizeof(addr.sun_path) - 1);
 
     if (connect(main_fd, (sockaddr *)&addr, sizeof(addr))) {
-      throw WorkerException("connect() failed");
+      throw WorkerException(std::string("connect: ") + strerror(errno));
     }
 
     WorkerPulse pulse;
@@ -111,12 +112,11 @@ void Worker::SendPulse(PulseType type) {
       worker_id = response.worker_id();
     }
 
-    std::cerr << "[INFO] Sent {" << pulse.ShortDebugString() << "}. Recieved {"
-              << response.ShortDebugString() << "}\n";
+    spdlog::info("Sent pulse {{{}}}. Received {{{}}}", pulse.ShortDebugString(), response.ShortDebugString());
   } catch (const std::exception &e) {
     close(main_fd);
     SetState(WorkerState::ERROR);
-    throw WorkerException(std::string("Pulse failed: ") + e.what());
+    throw WorkerException(std::string("SendPulse: ") + e.what());
   }
 }
 
@@ -126,8 +126,8 @@ Worker::Worker() : listener_fd(-1), state(WorkerState::BOOTING) {
   socket_path = std::string(SOCKET_DIR) + std::to_string(worker_id) + ".sock";
   unlink(socket_path.c_str());
 
-  std::cerr << "[INFO] worker_id = " << worker_id << '\n';
-  std::cerr << "[INFO] socket_path = " << socket_path << '\n';
+  spdlog::info("worker_id: {}", worker_id);
+  spdlog::info("socket_path: {}", socket_path);
   srand(worker_id); // for random pulse time generation
 
   listener_fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -221,8 +221,8 @@ void Worker::HandleControlMessage(int client_fd) {
     ControlMsg msg;
     ReadProtoMessage(client_fd, msg);
 
-    std::cerr << "[INFO] Recieved {" << msg.ShortDebugString() << "}\n";
-
+    spdlog::info("Recieved {{{}}}", msg.ShortDebugString());
+    
     std::vector<char> extra(msg.extra_size());
     ReadExact(client_fd, extra.data(), extra.size());
 
@@ -254,7 +254,7 @@ void Worker::HandleControlMessage(int client_fd) {
     WriteExact(client_fd, extra_data.data(), extra_data.size());
     extra_data.clear();
   }
-  std::cerr << "[INFO] Sent {" << response.ShortDebugString() << "}\n";
+  spdlog::info("Sent {{{}}}", response.ShortDebugString());
 }
 
 void Worker::MainLoop() {

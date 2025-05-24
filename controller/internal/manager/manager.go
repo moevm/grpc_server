@@ -12,12 +12,10 @@
 package manager
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/moevm/grpc_server/internal/conn"
@@ -51,20 +49,23 @@ var (
 	tasks         = make(map[uint64]*Task)
 	taskId uint64 = 0
 
-	freeWorkers  = make(chan uint64)
-	fetchWorkers = make(chan uint64)
-	queuedTasks  = make(chan uint64)
-
-	solved_tasks sync.Map
+	freeWorkers   = make(chan uint64)
+	fetchWorkers  = make(chan uint64)
+	queuedTasks   = make(chan uint64)
+	taskSolutions = make(chan TaskSolution, 100)
 )
 
 // Task is a general representation of tasks coming to the controller.
 // Can be changed if it is necessary to add new info for the Task
 // for example: hashType.
 type Task struct {
-	id    uint64
-	body  []byte
-	solve []byte
+	id   uint64
+	body []byte
+}
+
+type TaskSolution struct {
+	Id   uint64
+	Body []byte
 }
 
 // Worker contains everything necessary for communication with the worker and his current state.
@@ -78,9 +79,8 @@ type Worker struct {
 // Constructor for Task.
 func NewTask(taskId uint64, taskBody []byte) *Task {
 	return &Task{
-		id:    taskId,
-		body:  taskBody,
-		solve: []byte{},
+		id:   taskId,
+		body: taskBody,
 	}
 }
 
@@ -91,20 +91,6 @@ func NewWorker() *Worker {
 		last_pulse: time.Now(),
 		task_id:    0, // no task
 	}
-}
-
-func (t *Task) SetTaskSolve(taskSolve []byte) error {
-	if len(t.solve) > 0 {
-		return errors.New("can't set task solve: task already solved")
-	}
-
-	t.solve = append(t.solve, taskSolve...)
-
-	return nil
-}
-
-func (t *Task) String() string {
-	return fmt.Sprintf("id:%v, solution:%v\n", t.id, t.solve)
 }
 
 func sendControlMessage(workerID uint64, msg *communication.ControlMsg, extraData []byte) (*communication.WorkerResponse, []byte, error) {
@@ -413,19 +399,9 @@ func fetchTaskResult(workerID uint64) {
 		requeueTask(resp.TaskId)
 		markWorkerFree(workerID)
 	case communication.WorkerError_WORKER_ERR_OK:
-		task, ok := tasks[resp.TaskId]
-		if !ok {
-			log.Printf("Task %d not found", resp.TaskId)
-			markWorkerFree(workerID)
-			return
-		}
-		if err := task.SetTaskSolve(extra); err != nil {
-			log.Printf("Failed to set task solution: %v", err)
-			requeueTask(resp.TaskId)
-		} else {
-			solved_tasks.Store(resp.TaskId, task)
-			delete(tasks, resp.TaskId)
-		}
+		taskSolutions <- TaskSolution{Id: resp.TaskId, Body: extra}
+		delete(tasks, resp.TaskId)
+		log.Printf("Task %v solved", resp.TaskId)
 		markWorkerFree(workerID)
 	default:
 		log.Printf("Worker %d FETCH error: %v", workerID, resp.Error)
@@ -448,7 +424,18 @@ func checkHealth() {
 	}
 }
 
-func ClusterInit(taskData [][]byte) {
+func AddTask(taskData []byte) uint64 {
+	taskId = genTaskId()
+	tasks[taskId] = NewTask(taskId, taskData)
+	queuedTasks <- taskId
+	return taskId
+}
+
+func GetTaskSolution() TaskSolution {
+	return <-taskSolutions
+}
+
+func Init() {
 	err := os.RemoveAll(workerMainSocketPath)
 	if err != nil {
 		log.Panic(err)
@@ -478,12 +465,6 @@ func ClusterInit(taskData [][]byte) {
 		close(queuedTasks)
 		close(fetchWorkers)
 	}()
-
-	for _, task := range taskData {
-		taskId = genTaskId()
-		tasks[taskId] = NewTask(taskId, task)
-		queuedTasks <- taskId
-	}
 
 	for {
 		time.Sleep(1 * time.Second)

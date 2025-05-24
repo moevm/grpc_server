@@ -1,9 +1,9 @@
-name: go tests
+name: manager integration test
 
 on: [push]
 
 jobs:
-  test:
+  manager_integration_test:
     name: Run Tests
     runs-on: ubuntu-latest
     steps:
@@ -42,5 +42,5 @@ jobs:
         run: sudo mkdir -p /run/controller/ && sudo chown runner:runner /run/controller/ && sudo chmod 755 /run/controller/
 
       - name: Run tests
-        working-directory: ./controller
-        run: go test -v ./internal/grpcserver/...
+        working-directory: ./
+        run: ./scripts/manager_integration_test.sh
