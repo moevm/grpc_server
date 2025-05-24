@@ -18,8 +18,8 @@ cd ..
 sleep 2
 
 # Run 2 workers
-docker run -d -v /run/controller:/run/controller --network example-network -e "METRICS_GATEWAY_ADDRESS=metrics" -e "METRICS_GATEWAY_PORT=9091" -e "METRICS_WORKER_NAME=worker1" --name worker1 grpc_server-worker:latest
-docker run -d -v /run/controller:/run/controller --network example-network -e "METRICS_GATEWAY_ADDRESS=metrics" -e "METRICS_GATEWAY_PORT=9091" -e "METRICS_WORKER_NAME=worker2" --name worker2 grpc_server-worker:latest
+docker run -d -v /run/controller:/run/controller -e "METRICS_GATEWAY_ADDRESS=metrics" -e "METRICS_GATEWAY_PORT=9091" -e "METRICS_WORKER_NAME=worker1" --name worker1 grpc_server-worker:latest
+docker run -d -v /run/controller:/run/controller -e "METRICS_GATEWAY_ADDRESS=metrics" -e "METRICS_GATEWAY_PORT=9091" -e "METRICS_WORKER_NAME=worker2" --name worker2 grpc_server-worker:latest
 
 wait $manager_pid
 manager_exit_code=$?
