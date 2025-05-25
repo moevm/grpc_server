@@ -16,6 +16,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/moevm/grpc_server/internal/conn"
@@ -435,15 +436,34 @@ func GetTaskSolution() TaskSolution {
 	return <-taskSolutions
 }
 
-func Init() {
-	err := os.RemoveAll(workerMainSocketPath)
+func removeContents(dir string) error {
+	d, err := os.Open(dir)
 	if err != nil {
-		log.Panic(err)
+		return err
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func Init() {
+	err := removeContents(workerSocketPath)
+	if err != nil {
+		log.Panicf("removeContents: %v", err)
 	}
 
 	listener, err = net.Listen("unix", workerMainSocketPath)
 	if err != nil {
-		log.Panic(err)
+		log.Panicf("net.Listen: %v", err)
 	}
 
 	go mainLoop()
@@ -459,14 +479,11 @@ func Init() {
 
 	defer func() {
 		listener.Close()
-		os.RemoveAll(workerMainSocketPath)
 		close(errorChan)
 		close(freeWorkers)
 		close(queuedTasks)
 		close(fetchWorkers)
 	}()
 
-	for {
-		time.Sleep(1 * time.Second)
-	}
+	select {}
 }

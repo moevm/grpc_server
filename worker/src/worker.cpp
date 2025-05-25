@@ -1,10 +1,10 @@
 #include "../include/worker.hpp"
 
-#include <spdlog/spdlog.h>
 #include <arpa/inet.h>
 #include <cerrno>
 #include <endian.h>
 #include <poll.h>
+#include <spdlog/spdlog.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -15,7 +15,8 @@ void Worker::LogStateChange(WorkerState new_state) {
   const char *state_names[] = {"BOOTING", "FREE", "BUSY", "SHUTTING_DOWN",
                                "ERROR"};
 
-  spdlog::info("Switch states: {} -> {}", state_names[static_cast<int>(state)], state_names[static_cast<int>(new_state)]);
+  spdlog::info("Switch states: {} -> {}", state_names[static_cast<int>(state)],
+               state_names[static_cast<int>(new_state)]);
 }
 
 void Worker::SetState(WorkerState new_state) {
@@ -112,7 +113,8 @@ void Worker::SendPulse(PulseType type) {
       worker_id = response.worker_id();
     }
 
-    spdlog::info("Sent pulse {{{}}}. Received {{{}}}", pulse.ShortDebugString(), response.ShortDebugString());
+    spdlog::info("Sent pulse {{{}}}. Received {{{}}}", pulse.ShortDebugString(),
+                 response.ShortDebugString());
   } catch (const std::exception &e) {
     close(main_fd);
     SetState(WorkerState::ERROR);
@@ -222,7 +224,7 @@ void Worker::HandleControlMessage(int client_fd) {
     ReadProtoMessage(client_fd, msg);
 
     spdlog::info("Recieved {{{}}}", msg.ShortDebugString());
-    
+
     std::vector<char> extra(msg.extra_size());
     ReadExact(client_fd, extra.data(), extra.size());
 

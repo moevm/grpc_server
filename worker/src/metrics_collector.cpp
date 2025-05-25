@@ -1,8 +1,8 @@
 #include "../include/metrics_collector.hpp"
 
-#include <spdlog/spdlog.h>
 #include <chrono>
 #include <fstream>
+#include <spdlog/spdlog.h>
 #include <thread>
 #include <unistd.h>
 

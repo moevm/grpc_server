@@ -35,5 +35,5 @@ std::string MDCalculator::finalize() {
     throw std::runtime_error("Failed to finalize digest");
   }
 
-  return std::string((char*)md_value, md_len);
+  return std::string((char *)md_value, md_len);
 }
