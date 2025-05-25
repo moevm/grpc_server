@@ -12,46 +12,28 @@
 package manager
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net"
 	"os"
-	"os/signal"
-	"strings"
-	"sync"
-	"syscall"
+	"path/filepath"
 	"time"
 
 	"github.com/moevm/grpc_server/internal/conn"
-	"github.com/moevm/grpc_server/pkg/converter"
-)
+	"google.golang.org/protobuf/proto"
 
-const maxAttempts = 3
-
-var (
-	lastWorkerIndex int
-	mu              sync.Mutex
+	communication "github.com/moevm/grpc_server/pkg/proto/communication"
 )
 
 const (
-	// Task states.
-	taskFree       = 3
-	taskRedirected = 2
-	taskWip        = 1
-	taskSolved     = 0
-
 	// Worker states.
-	workerBusy = 1
-	workerFree = 0
-	workerDown = -1
+	WORKER_BUSY    = 0
+	WORKER_FREE    = 1
+	WORKER_BOOTING = 2
+	WORKER_FETCH   = 3
 
-	workerInitSocketPath = "/run/controller/init.sock"
+	workerMainSocketPath = "/run/controller/main.sock"
 	workerSocketPath     = "/run/controller/"
-
-	intByteLen = 8 // default for x86_64
-
-	successfulResp = 1
 )
 
 var (
@@ -61,518 +43,447 @@ var (
 	listener net.Listener
 
 	// Workers map.
-	workers  sync.Map
-	workerId = 0
+	workers         = make(map[uint64]*Worker)
+	workerId uint64 = 0
 
 	// Tasks map.
-	tasks  sync.Map
-	taskId = 0
+	tasks         = make(map[uint64]*Task)
+	taskId uint64 = 0
+
+	freeWorkers   = make(chan uint64)
+	fetchWorkers  = make(chan uint64)
+	queuedTasks   = make(chan uint64)
+	taskSolutions = make(chan TaskSolution, 100)
 )
 
 // Task is a general representation of tasks coming to the controller.
 // Can be changed if it is necessary to add new info for the Task
 // for example: hashType.
 type Task struct {
-	id    int
-	state int
-	body  []byte // some data with which something needs to be done (a task needs to be solved)
-	solve []byte // solution for the task (in general)
+	id   uint64
+	body []byte
+}
+
+type TaskSolution struct {
+	Id   uint64
+	Body []byte
 }
 
 // Worker contains everything necessary for communication with the worker and his current state.
 type Worker struct {
-	id       int
-	state    int
-	taskChan chan *Task // channel for transferring tasks to the worker
-	conn     conn.Unix
+	state      int
+	last_pulse time.Time
+	next_pulse time.Duration
+	task_id    uint64
 }
 
 // Constructor for Task.
-func NewTask(taskId int, taskBody []byte) *Task {
+func NewTask(taskId uint64, taskBody []byte) *Task {
 	return &Task{
-		id:    taskId,
-		state: taskFree,
-		body:  taskBody,
-		solve: []byte{},
+		id:   taskId,
+		body: taskBody,
 	}
 }
 
 // Constructor for Worker.
-func NewWorker(workerId int) *Worker {
+func NewWorker() *Worker {
 	return &Worker{
-		id:       workerId,
-		state:    workerBusy,
-		taskChan: make(chan *Task, 10),
+		state:      WORKER_BOOTING,
+		last_pulse: time.Now(),
+		task_id:    0, // no task
 	}
 }
 
-func (t *Task) SetTaskState(state int) error {
-	if t.state == taskSolved {
-		return errors.New("can't set task state: task solved")
+func sendControlMessage(workerID uint64, msg *communication.ControlMsg, extraData []byte) (*communication.WorkerResponse, []byte, error) {
+	msg.ExtraSize = uint64(len(extraData))
+	log.Printf("Send control message to worker %v: {%v}\n",
+		workerID, msg.String())
+
+	socketPath := fmt.Sprintf("%s%d.sock", workerSocketPath, workerID)
+	netConn, err := net.Dial("unix", socketPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("dial worker socket: %v", err)
+	}
+	defer netConn.Close()
+
+	conn := conn.Unix{Conn: netConn}
+
+	msgData, err := proto.Marshal(msg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("marshal ControlMsg: %v", err)
 	}
 
-	switch state {
-	case taskFree:
-		t.state = taskFree
-		return nil
-
-	case taskRedirected:
-		t.state = taskRedirected
-		return nil
-
-	case taskWip:
-		t.state = taskWip
-		return nil
-
-	case taskSolved:
-		t.state = taskSolved
-		return nil
-
-	default:
-		return errors.New("invalid task state")
-	}
-}
-
-func (t *Task) SetTaskSolve(taskSolve []byte) error {
-	if len(t.solve) > 0 {
-		return errors.New("can't set task solve: task already solved")
+	if err := conn.WriteMessage(msgData); err != nil {
+		return nil, nil, fmt.Errorf("write ControlMsg: %v", err)
 	}
 
-	t.solve = append(t.solve, taskSolve...)
-
-	return nil
-}
-
-func (t *Task) String() string {
-	return fmt.Sprintf("id:%v, solution:%v\n", t.id, t.solve)
-}
-
-func (w *Worker) SetWorkerState(state int) error {
-	if w.state == workerDown {
-		return errors.New("can't set worker state: worker down")
+	if msg.ExtraSize > 0 {
+		if _, err := conn.Conn.Write(extraData); err != nil {
+			return nil, nil, fmt.Errorf("write extra data: %v", err)
+		}
 	}
 
-	switch state {
-	case workerBusy:
-		w.state = workerBusy
-		return nil
-
-	case workerFree:
-		w.state = workerFree
-		return nil
-
-	case workerDown:
-		w.state = workerDown
-		return nil
-
-	default:
-		return errors.New("invalid worker state")
-	}
-}
-
-func (w *Worker) SetWorkerConn(workerConn conn.Unix) {
-	w.conn = workerConn
-}
-
-// Run includes the initialized worker in the work.
-// Worker will wait for the task from the channel.
-// This function should always be run in a goroutine.
-func (w *Worker) Run() {
-	log.Printf("Worker [ID=%d] running and awaiting a task\n", w.id)
-	var socketPath strings.Builder
-	socketPath.WriteString(workerSocketPath)
-	socketPath.WriteString(fmt.Sprintf("%v.sock", w.id))
-
-	if err := w.SetWorkerState(workerFree); err != nil {
-		errorChan <- fmt.Errorf("Worker.Run - SetWorkerState: %v", err)
-		return
+	respData, err := conn.ReadMessage()
+	if err != nil {
+		return nil, nil, fmt.Errorf("read WorkerResponse: %v", err)
 	}
 
-	for {
-		task := <-w.taskChan
+	resp := &communication.WorkerResponse{}
+	if err := proto.Unmarshal(respData, resp); err != nil {
+		return nil, nil, fmt.Errorf("unmarshal WorkerResponse: %v", err)
+	}
 
-		netConn, err := net.Dial("unix", socketPath.String())
+	var respExtra []byte
+	if resp.ExtraSize > 0 {
+		respExtra = make([]byte, resp.ExtraSize)
+		n, err := conn.Conn.Read(respExtra)
 		if err != nil {
-			errorChan <- fmt.Errorf("Worker.Run - net.Dial: %v", err)
-			if err := w.SetWorkerState(workerDown); err != nil {
-				errorChan <- fmt.Errorf("Worker.Run - SetWorkerState: %v", err)
-			}
-			if err := task.SetTaskState(taskFree); err != nil {
-				errorChan <- fmt.Errorf("Worker.Run - SetTaskState: %v", err)
-			}
-			continue
+			return resp, respExtra[:n], fmt.Errorf("read response extra data: %v", err)
 		}
-
-		connection := conn.Unix{Conn: netConn}
-		w.SetWorkerConn(connection)
-
-		w.AddTask(task)
-		connection.Close()
-
-		log.Printf(
-			"Worker [ID=%d] completed the task [TaskID=%d, SolutionSize=%d bytes]\n",
-			w.id, task.id, len(task.solve),
-		)
+		if n != int(resp.ExtraSize) {
+			return resp, respExtra[:n], fmt.Errorf("short read on response extra data: expected %d, got %d", resp.ExtraSize, n)
+		}
 	}
+
+	log.Printf("Recieved control response from worker %v: {%v} + %v\n",
+		workerID, resp.String(), respExtra)
+
+	return resp, respExtra, nil
 }
 
-// AddTask function assigns a task to a worker
-// (the task and worker states change to taskWip and workerBusy until the task is completed).
-// This function sends task.body length and task.body to the worker
-// and receives task.solve length and task.solve from him in case of success,
-// in case of failure it logs the error through a special channel: errorChan
-// and set worker state to workerDown.
-// If successful, the worker and task will set the status to workerFree and taskSolved.
-func (w *Worker) AddTask(task *Task) {
-	if w.taskChan == nil || w.state != workerFree {
-		errorChan <- fmt.Errorf("worker is broken")
-		if err := w.SetWorkerState(workerDown); err != nil {
-			errorChan <- fmt.Errorf("Worker.AddTask - SetWorkerState: %v", err)
-		}
-		if err := task.SetTaskState(taskFree); err != nil {
-			errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
-		}
-		return
-	}
-
-	if task.body == nil {
-		errorChan <- fmt.Errorf("task %v is empty", task.id)
-		if err := task.SetTaskState(taskSolved); err != nil {
-			errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
-		}
-		if err := task.SetTaskSolve(nil); err != nil {
-			errorChan <- fmt.Errorf("Worker.AddTask - SetTaskSolve: %v", err)
-		}
-		return
-	}
-
-	if err := w.SetWorkerState(workerBusy); err != nil {
-		errorChan <- fmt.Errorf("Worker.AddTask - SetWorkerState: %v", err)
-		return
-	}
-	if err := task.SetTaskState(taskWip); err != nil {
-		errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
-		return
-	}
-
-	defer func() {
-		if err := w.SetWorkerState(workerFree); err != nil {
-			errorChan <- fmt.Errorf("Worker.AddTask - SetWorkerState: %v", err)
-		}
-	}()
-
-	taskLen := len(task.body)
-	var err error
-	_, err = w.conn.Write(converter.IntToByteSlice(taskLen))
-	if err != nil {
-		errorChan <- fmt.Errorf("Worker.AddTask - w.conn.Write: %v", err)
-		if err := w.SetWorkerState(workerDown); err != nil {
-			errorChan <- fmt.Errorf("Worker.AddTask - SetWorkerState: %v", err)
-		}
-		if err := task.SetTaskState(taskFree); err != nil {
-			errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
-		}
-		return
-	}
-
-	_, err = w.conn.Write(task.body)
-	if err != nil {
-		errorChan <- fmt.Errorf("Worker.AddTask - w.conn.Write: %v", err)
-		if err := w.SetWorkerState(workerDown); err != nil {
-			errorChan <- fmt.Errorf("Worker.AddTask - SetWorkerState: %v", err)
-		}
-		if err := task.SetTaskState(taskFree); err != nil {
-			errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
-		}
-		return
-	}
-
-	responseLenBuf := make([]byte, intByteLen)
-	_, err = w.conn.Read(responseLenBuf)
-	if err != nil {
-		errorChan <- fmt.Errorf("Worker.AddTask - w.conn.Read: %v", err)
-		if err := w.SetWorkerState(workerDown); err != nil {
-			errorChan <- fmt.Errorf("Worker.AddTask - SetWorkerState: %v", err)
-		}
-		if err := task.SetTaskState(taskFree); err != nil {
-			errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
-		}
-		return
-	}
-
-	responseLen, err := converter.ByteSliceToInt(responseLenBuf)
-	if err != nil {
-		errorChan <- fmt.Errorf("Worker.AddTask - converter.ByteSliceToInt: %v", err)
-		if err := w.SetWorkerState(workerDown); err != nil {
-			errorChan <- fmt.Errorf("Worker.AddTask - SetWorkerState: %v", err)
-		}
-		if err := task.SetTaskState(taskFree); err != nil {
-			errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
-		}
-		return
-	}
-
-	response := make([]byte, responseLen)
-	_, err = w.conn.Read(response)
-	if err != nil {
-		errorChan <- fmt.Errorf("Worker.AddTask - w.conn.Read: %v", err)
-		if err := w.SetWorkerState(workerDown); err != nil {
-			errorChan <- fmt.Errorf("Worker.AddTask - SetWorkerState: %v", err)
-		}
-		if err := task.SetTaskState(taskFree); err != nil {
-			errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
-		}
-		return
-	}
-
-	if err := task.SetTaskSolve(response); err != nil {
-		errorChan <- fmt.Errorf("Worker.AddTask - SetTaskSolve: %v", err)
-	}
-	if err := task.SetTaskState(taskSolved); err != nil {
-		errorChan <- fmt.Errorf("Worker.AddTask - SetTaskState: %v", err)
-	}
-
-	fmt.Printf("Task solved: %v", task)
-}
-
-func genTaskId() int {
+func genTaskId() uint64 {
 	taskId += 1
 	return taskId
 }
 
-func genWorkerId() int {
+func genWorkerId() uint64 {
 	workerId += 1
 	return workerId
 }
 
-// workerInit initializes a new worker that has already been created and is ready to be connected.
-// To connect, the worker must do net.Dial("unix", "/run/controller/init.sock"),
-// receives his ID and send successfulResp (1).
-// In case of failure it logs the error through a special channel: errorChan
-// and set worker state to workerDown.
-// If successful, it run worker ( worker.Run() ).
-// This function should always be run in a goroutine.
-func workerInit() {
-	log.Println("The worker initialization server is running. Waiting for connections...")
+func handleWorkerFailure(workerID uint64) {
+	log.Printf("Terminating worker %v session", workerID)
+	worker, ok := workers[workerID]
+	if !ok {
+		return
+	}
 
+	if worker.task_id != 0 {
+		requeueTask(worker.task_id)
+	}
+
+	delete(workers, workerID)
+}
+
+func markWorkerFree(workerID uint64) {
+	worker, ok := workers[workerID]
+	if !ok {
+		return
+	}
+
+	worker.state = WORKER_FREE
+	worker.task_id = 0
+	freeWorkers <- workerID
+}
+
+func requeueTask(taskID uint64) {
+	if _, ok := tasks[taskID]; ok {
+		queuedTasks <- taskID
+	}
+}
+
+func handleRegisterPulse(_ *communication.WorkerPulse, resp *communication.PulseResponse) {
+	workerID := genWorkerId()
+	workers[workerID] = NewWorker()
+	*resp = communication.PulseResponse{
+		Error:    communication.ControllerError_CTRL_ERR_OK,
+		WorkerId: workerID,
+	}
+}
+
+func handleOkPulse(pulse *communication.WorkerPulse, resp *communication.PulseResponse) {
+	worker, ok := workers[pulse.WorkerId]
+
+	if !ok {
+		*resp = communication.PulseResponse{
+			Error:    communication.ControllerError_CTRL_ERR_UNKNOWN_ID,
+			WorkerId: 0,
+		}
+		return
+	}
+
+	if worker.state == WORKER_BOOTING {
+		markWorkerFree(pulse.WorkerId)
+	}
+
+	worker.last_pulse = time.Now()
+	worker.next_pulse = time.Duration(pulse.NextPulse) * time.Second
+
+	*resp = communication.PulseResponse{
+		Error:    communication.ControllerError_CTRL_ERR_OK,
+		WorkerId: 0,
+	}
+}
+
+func handleFetchMePulse(pulse *communication.WorkerPulse, resp *communication.PulseResponse) {
+	handleOkPulse(pulse, resp)
+	if resp.Error != communication.ControllerError_CTRL_ERR_OK {
+		return
+	}
+
+	fetchWorkers <- pulse.WorkerId
+}
+
+func handleShutdownPulse(pulse *communication.WorkerPulse, resp *communication.PulseResponse) {
+	workerID := pulse.WorkerId
+	worker, ok := workers[workerID]
+	if !ok {
+		resp.Error = communication.ControllerError_CTRL_ERR_UNKNOWN_ID
+		return
+	}
+
+	if worker.task_id != 0 {
+		requeueTask(worker.task_id)
+	}
+
+	delete(workers, workerID)
+	resp.Error = communication.ControllerError_CTRL_ERR_OK
+}
+
+func handleConnection(conn conn.Unix) {
+	msg_data, err := conn.ReadMessage()
+	if err != nil {
+		log.Printf("Failed to read message: %v", err)
+		conn.Close()
+		return
+	}
+
+	pulse := communication.WorkerPulse{}
+	if err := proto.Unmarshal(msg_data, &pulse); err != nil {
+		log.Printf("Failed to unmarshal pulse: %v", err)
+		conn.Close()
+		return
+	}
+
+	resp := communication.PulseResponse{}
+
+	switch pulse.Type {
+	case communication.PulseType_PULSE_REGISTER:
+		handleRegisterPulse(&pulse, &resp)
+	case communication.PulseType_PULSE_OK:
+		handleOkPulse(&pulse, &resp)
+	case communication.PulseType_PULSE_FETCH_ME:
+		handleFetchMePulse(&pulse, &resp)
+	case communication.PulseType_PULSE_SHUTDOWN:
+		handleShutdownPulse(&pulse, &resp)
+	default:
+		log.Printf("Unknown pulse type: %v", pulse.Type)
+		resp.Error = communication.ControllerError_CTRL_ERR_UNKNOWN_TYPE
+	}
+
+	resp_data, err := proto.Marshal(&resp)
+	if err != nil {
+		log.Printf("Failed to marshal response: %v", err)
+		conn.Close()
+		return
+	}
+
+	if err := conn.WriteMessage(resp_data); err != nil {
+		log.Printf("Failed to write response: %v", err)
+	}
+
+	log.Printf("Recieved pulse: {%v}. Sent response: {%v}\n", pulse.String(), resp.String())
+
+	if err := conn.Close(); err != nil {
+		log.Printf("Error closing connection: %v", err)
+	}
+}
+
+func mainLoop() {
+	log.Print("Ready to receive messages on main.sock")
 	for {
 		netConn, err := listener.Accept()
 		if err != nil {
-			errorChan <- fmt.Errorf("workerInit - listener.Accept: %v", err)
-			break
+			log.Printf("Fatal accept error: %v; closing listener", err)
+			return
 		}
 
-		connection := conn.Unix{Conn: netConn}
-
-		worker := NewWorker(genWorkerId())
-		workers.Store(worker.id, worker)
-
-		idBuf := converter.IntToByteSlice(worker.id)
-		_, err = connection.Write(idBuf)
-		if err != nil {
-			errorChan <- fmt.Errorf("workerInit - connection.Write: %v", err)
-			if err := worker.SetWorkerState(workerDown); err != nil {
-				errorChan <- fmt.Errorf("workerInit - SetWorkerState: %v", err)
-			}
-			break
-		}
-
-		responseBuf := make([]byte, intByteLen)
-		_, err = connection.Read(responseBuf)
-		if err != nil {
-			errorChan <- fmt.Errorf("workerInit - conn.Read: %v", err)
-			if err := worker.SetWorkerState(workerDown); err != nil {
-				errorChan <- fmt.Errorf("workerInit - SetWorkerState: %v", err)
-			}
-			break
-		}
-
-		response, err := converter.ByteSliceToInt(responseBuf)
-		if err != nil {
-			errorChan <- fmt.Errorf("workerInit - converter.ByteSliceToInt: %v", err)
-			if err := worker.SetWorkerState(workerDown); err != nil {
-				errorChan <- fmt.Errorf("workerInit - SetWorkerState: %v", err)
-			}
-			break
-		}
-		if response != successfulResp {
-			errorChan <- fmt.Errorf("wrong response from worker")
-			if err := worker.SetWorkerState(workerDown); err != nil {
-				errorChan <- fmt.Errorf("workerInit - SetWorkerState: %v", err)
-			}
-			break
-		}
-
-		go worker.Run()
-
-		log.Printf("The worker is connected [ID=%d, Status=%d]\n", worker.id, worker.state)
-		connection.Close()
-	}
-}
-
-// loadBalancer is an implementation of round-robin algorithm for evenly distributing tasks among workers.
-// The maximum number of attempts to submit one task is 3.
-// In case of failure it logs the error through a special channel: errorChan.
-func loadBalancer(task *Task) {
-	log.Printf(
-		"Finding a worker for a task [TaskID=%d, Size=%d bytes, State=%d]\n",
-		task.id, len(task.body), task.state,
-	)
-	mu.Lock()
-	defer mu.Unlock()
-
-	startIndex := lastWorkerIndex
-	attempts := 0
-
-	for attempts < maxAttempts {
-		for i := 0; i <= workerId; i++ {
-			currentIndex := (startIndex + i) % (workerId + 1)
-
-			worker, exist := workers.Load(currentIndex)
-			if !exist {
-				continue
-			}
-
-			w := worker.(*Worker)
-			if w.state == workerFree {
-				select {
-				case w.taskChan <- task:
-					if err := task.SetTaskState(taskRedirected); err != nil {
-						errorChan <- fmt.Errorf("loadBalancer: task %d: %v", task.id, err)
-						if err := task.SetTaskState(taskFree); err != nil {
-							errorChan <- fmt.Errorf("loadBalancer: failed to revert task %d to free: %v", task.id, err)
-						}
-						continue
-					}
-					log.Printf("The task is distributed: ID=%d -> Worker ID=%d\n", task.id, currentIndex)
-					lastWorkerIndex = (currentIndex + 1) % (workerId + 1)
-					return
-				default:
-					continue
-				}
-			}
-		}
-		attempts++
-		time.Sleep(100 * time.Millisecond)
-		log.Printf("There are no available workers for the task [TaskID=%d]\n", task.id)
-	}
-
-	errorChan <- fmt.Errorf("no available workers for task %d", task.id)
-	if err := task.SetTaskState(taskFree); err != nil {
-		errorChan <- fmt.Errorf("loadBalancer: failed to set task %d to free: %v", task.id, err)
-	}
-}
-
-// taskManager checking new tasks ans send it to loadBalancer.
-// This function should always be run in a goroutine.
-func taskManager() {
-	for {
-		for i := 0; i <= taskId; i++ {
-			task, exist := tasks.Load(i)
-			if exist {
-				t := task.(*Task)
-				if t.state == taskFree {
-					loadBalancer(t)
-				}
-			}
-		}
+		conn := conn.Unix{Conn: netConn}
+		go handleConnection(conn)
 	}
 }
 
 // errorHandler catches the errors from goroutines and logs them.
 // This function should always be run in a goroutine.
 func errorHandler() {
-	for {
-		err := <-errorChan
-		log.Println(err)
+	for err := range errorChan {
+		log.Println("ERROR:", err)
 	}
 }
 
-// TODO: Maybe it's worth getting rid of this...
-func init() {
-	err := os.RemoveAll(workerInitSocketPath)
-	if err != nil {
-		log.Panic(err)
+func assignTaskToWorker(taskID uint64, workerID uint64) {
+	task, ok := tasks[taskID]
+	if !ok {
+		log.Printf("Task %d not found", taskID)
+		freeWorkers <- workerID
+		return
 	}
 
-	channel := make(chan os.Signal, 10)
-
-	listener, err = net.Listen("unix", workerInitSocketPath)
-	if err != nil {
-		log.Panic(err)
+	worker, ok := workers[workerID]
+	if !ok {
+		log.Printf("Worker %d not found", workerID)
+		queuedTasks <- taskID
+		return
 	}
 
-	signal.Notify(channel, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	if worker.state != WORKER_FREE {
+		log.Printf("Worker %d is not free", workerID)
+		queuedTasks <- taskID
+		freeWorkers <- workerID
+		return
+	}
 
-	go func() {
-		<-channel
+	msg := &communication.ControlMsg{
+		Type:      communication.ControlType_CTRL_SET_TASK,
+		TaskId:    taskID,
+		ExtraSize: uint64(len(task.body)),
+	}
 
-		listener.Close()
-		os.RemoveAll(workerInitSocketPath)
+	resp, _, err := sendControlMessage(workerID, msg, task.body)
+	if err != nil {
+		log.Printf("Failed to send SET_TASK to worker %d: %v", workerID, err)
+		handleWorkerFailure(workerID)
+		queuedTasks <- taskID
+		return
+	}
 
-		os.Exit(1)
-	}()
-}
-
-// TODO: add doc.
-func hasActiveWorkers() bool {
-	hasWorkers := false
-	workers.Range(func(key, value interface{}) bool {
-		worker := value.(*Worker)
-		if worker.state != workerDown {
-			hasWorkers = true
-			return false
+	if resp.Error != communication.WorkerError_WORKER_ERR_OK {
+		log.Printf("Worker %d error on SET_TASK: %v", workerID, resp.Error)
+		if resp.Error == communication.WorkerError_WORKER_ERR_BUSY {
+			freeWorkers <- workerID
+		} else {
+			handleWorkerFailure(workerID)
 		}
-		return true
-	})
-	return hasWorkers
+		queuedTasks <- taskID
+		return
+	}
+
+	worker.state = WORKER_BUSY
+	worker.task_id = taskID
 }
 
-func taskReceiver(taskChan <-chan []byte) {
-	for content := range taskChan {
-		task := NewTask(genTaskId(), content)
-		tasks.Store(task.id, task)
-		log.Printf("New task received from gRPC: %d", task.id)
+func dispanchTasks() {
+	for {
+		taskID := <-queuedTasks
+		workerID := <-freeWorkers
+
+		go assignTaskToWorker(taskID, workerID)
 	}
 }
 
-func InitManager(taskChanSize int) (chan<- []byte, error) {
-	taskChan := make(chan []byte, taskChanSize)
-	go func() {
-		ClusterInit([][]byte{}, taskChan)
-	}()
-	return taskChan, nil
+func fetchTaskResult(workerID uint64) {
+	msg := &communication.ControlMsg{
+		Type: communication.ControlType_CTRL_FETCH,
+	}
+
+	resp, extra, err := sendControlMessage(workerID, msg, nil)
+	if err != nil {
+		log.Printf("Failed to FETCH from worker %d: %v", workerID, err)
+		handleWorkerFailure(workerID)
+		return
+	}
+
+	switch resp.Error {
+	case communication.WorkerError_WORKER_ERR_NO_FETCH:
+		return
+	case communication.WorkerError_WORKER_ERR_TASK_FAILED:
+		requeueTask(resp.TaskId)
+		markWorkerFree(workerID)
+	case communication.WorkerError_WORKER_ERR_OK:
+		taskSolutions <- TaskSolution{Id: resp.TaskId, Body: extra}
+		delete(tasks, resp.TaskId)
+		log.Printf("Task %v solved", resp.TaskId)
+		markWorkerFree(workerID)
+	default:
+		log.Printf("Worker %d FETCH error: %v", workerID, resp.Error)
+		handleWorkerFailure(workerID)
+	}
 }
 
-// ClusterInit is the main function that starts the controller (all necessary goroutines)
-// and receives data from the server (needs to be implemented in the future,
-// currently a stub in the form of taskData is used).
-func ClusterInit(taskData [][]byte, taskChan <-chan []byte) {
-	log.Println("=== The controller is running ===")
-	log.Printf("Received tasks: %d\n", len(taskData))
+// very bad
+func checkHealth() {
+	for {
+		time.Sleep(30 * time.Second)
+		now := time.Now()
+		for workerID, worker := range workers {
+			elapsed := now.Sub(worker.last_pulse)
+			if elapsed > worker.next_pulse {
+				log.Printf("Worker %d missed pulse", workerID)
+				handleWorkerFailure(workerID)
+			}
+		}
+	}
+}
 
-	go workerInit()
+func AddTask(taskData []byte) uint64 {
+	taskId = genTaskId()
+	tasks[taskId] = NewTask(taskId, taskData)
+	queuedTasks <- taskId
+	return taskId
+}
+
+func GetTaskSolution() TaskSolution {
+	return <-taskSolutions
+}
+
+func removeContents(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func Init() {
+	err := removeContents(workerSocketPath)
+	if err != nil {
+		log.Panicf("removeContents: %v", err)
+	}
+
+	listener, err = net.Listen("unix", workerMainSocketPath)
+	if err != nil {
+		log.Panicf("net.Listen: %v", err)
+	}
+
+	go mainLoop()
 	go errorHandler()
-	go taskReceiver(taskChan)
+	go dispanchTasks()
+	go checkHealth()
 
-	log.Println("Waiting for at least one worker to connect...")
-	for {
-		if hasActiveWorkers() {
-			log.Println("Active workers have been found. I'm starting the assignment of tasks.")
-			break
+	go func() {
+		for workerID := range fetchWorkers {
+			go fetchTaskResult(workerID)
 		}
-		time.Sleep(1 * time.Second)
-	}
+	}()
 
-	for i := range taskData {
-		task := NewTask(genTaskId(), taskData[i])
-		tasks.Store(i, task)
-		log.Printf("Task added [ID=%d, Size=%d bytes, State=%d]\n", task.id, len(task.body), task.state)
-	}
+	defer func() {
+		listener.Close()
+		close(errorChan)
+		close(freeWorkers)
+		close(queuedTasks)
+		close(fetchWorkers)
+	}()
 
-	go taskManager()
-
-	for {
-		time.Sleep(1 * time.Second)
-	}
+	select {}
 }

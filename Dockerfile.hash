@@ -1,6 +1,6 @@
 FROM alpine:latest AS builder
 
-RUN apk update && apk add --no-cache g++ openssl-dev cmake make curl-dev
+RUN apk update && apk add --no-cache g++ openssl-dev cmake make curl-dev protobuf-dev
 RUN apk add bazel --repository=http://dl-cdn.alpinelinux.org/alpine/edge/testing/
 
 WORKDIR /app
@@ -17,7 +17,7 @@ RUN bazel build //:worker
 
 FROM alpine:latest
 
-RUN apk update &&  apk add --no-cache libstdc++ libgcc libssl3 libcurl
+RUN apk update &&  apk add --no-cache libstdc++ libgcc libssl3 libcurl protobuf-dev
 
 COPY --from=builder /app/bazel-bin/worker /usr/local/bin/worker
 COPY --from=builder /app/prometheus-cpp-with-submodules/build/lib/ /usr/lib
