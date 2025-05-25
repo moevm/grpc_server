@@ -1,14 +1,17 @@
 load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
-  name = "manager",
-  srcs = ["manager.go"],
-  deps = [
-    "//pkg/converter",
-    "//internal/conn"
-  ],
-  importpath = "github.com/moevm/grpc_server/internal/manager",
-  visibility = ["//visibility:public"],
+    name = "manager",
+    srcs = [
+        "manager.go",
+    ],
+    importpath = "github.com/moevm/grpc_server/internal/manager",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//internal/conn",
+        "//pkg/converter",
+        "@com_github_joho_godotenv//:go_default_library",
+    ],
 )
 
 go_test(
