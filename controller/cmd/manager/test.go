@@ -38,7 +38,7 @@ func main() {
 
 	ids := make(map[uint64]int, 5)
 	for i, task := range tasks {
-		id := manager.AddTask(task)
+		id := manager.AddTask(task, nil)
 		ids[id] = i
 	}
 

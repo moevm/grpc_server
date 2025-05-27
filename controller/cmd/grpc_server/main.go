@@ -15,10 +15,7 @@ import (
 func main() {
 	cfg := config.Load()
 
-	taskChan, err := manager.Init()
-	if err != nil {
-		log.Fatalf("Failed to initialize manager: %v", err)
-	}
+	go manager.Init()
 
 	lis, err := net.Listen("tcp", net.JoinHostPort(cfg.Host, cfg.Port))
 	if err != nil {
@@ -31,7 +28,7 @@ func main() {
 	}
 
 	service := grpc.NewServer(serverOpts...)
-	pb.RegisterFileServiceServer(service, grpcserver.NewServer(cfg.AllowedChars, taskChan))
+	pb.RegisterFileServiceServer(service, grpcserver.NewServer(cfg.AllowedChars))
 	reflection.Register(service)
 
 	log.Printf("Server starting on %s:%s", cfg.Host, cfg.Port)

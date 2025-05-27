@@ -3,6 +3,7 @@ set -eo pipefail
 
 COL_RED="\e[31;1m"
 COL_GREEN="\e[32;1m"
+COL_LBLUE="\e[96;1m"
 COL_RESET="\e[0m"
 
 CONTROLLER_LOGFILE="controller.log"
@@ -10,6 +11,7 @@ WORKER_NAMES=("worker1" "worker2")
 TIMEOUT_DURATION=20
 INIT_DURATION=2
 
+always_log="$1"
 user=$(id -un)
 group=$(id -gn)
 manager_pid=
@@ -25,31 +27,31 @@ main() {
 }
 
 setup() {
-    echo -e "Setting up socket directory..."
+    echo -e "${COL_LBLUE}Setting up socket directory...${COL_RESET}"
     sudo mkdir -p /run/controller/
     sudo chown ${user}:${group} /run/controller/
 }
 
 build() {
-    echo -e "Building worker..."
+    echo -e "${COL_LBLUE}Building worker...${COL_RESET}"
     docker compose build
     
-    echo -e "Building manager..." 
+    echo -e "${COL_LBLUE}Building manager...${COL_RESET}" 
     cd controller && go build cmd/manager/test.go && cd ..
 }
 
 run_manager() {
-    echo -e "Running manager..."
+    echo -e "${COL_LBLUE}Running manager...${COL_RESET}"
     timeout ${TIMEOUT_DURATION} controller/test &> ${CONTROLLER_LOGFILE} &
     manager_pid=$!
 
-    echo -e "Waiting ${INIT_DURATION} seconds for manager to initialize..."
+    echo -e "${COL_LBLUE}Waiting ${INIT_DURATION} seconds for manager to initialize...${COL_RESET}"
     sleep ${INIT_DURATION}
 }
 
 run_worker() {
     local worker=$1
-    echo -e "Starting ${worker}..."
+    echo -e "${COL_LBLUE}Starting ${worker}...${COL_RESET}"
     docker run \
         --user "$(id -u):$(id -g)" \
         -d \
@@ -68,7 +70,7 @@ run_workers() {
 }
 
 wait_for_manager() {
-    echo -e "Waining for manager to finish..."
+    echo -e "${COL_LBLUE}Waining for manager to finish...${COL_RESET}"
     set +e
     wait $manager_pid
     manager_exit_code=$?
@@ -104,9 +106,9 @@ check_manager_exit_code() {
 }
 
 show_failure_details() {
-    [[ -z ${fail} ]] && return
+    [[ -z ${always_log} ]] && [[ -z ${fail} ]] && return
     
-    echo -e  "\n${COL_RED}=== TEST FAILED ==="
+    echo -e  "\n${COL_RED}=== TEST FAILED ===${COL_RESET}"
     docker ps -a
     for worker in "${WORKER_NAMES[@]}"; do
         echo -e "\nLogs for ${worker}:"
@@ -116,11 +118,11 @@ show_failure_details() {
     echo -e "\nLogs for manager:"
     cat ${CONTROLLER_LOGFILE}
 
-    echo -e "=======================${COL_RESET}"
+    echo -e "======================="
 }
 
 cleanup() {
-    echo -e "Cleaning up..."
+    echo -e "${COL_LBLUE}Cleaning up...${COL_RESET}"
     rm -f controller/test ${CONTROLLER_LOGFILE}
     sudo rm -rf /run/controller
     docker container rm -f worker1 worker2 > /dev/null

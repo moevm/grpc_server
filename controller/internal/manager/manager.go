@@ -50,9 +50,9 @@ var (
 	tasks         = make(map[uint64]*Task)
 	taskId uint64 = 0
 
-	freeWorkers   = make(chan uint64)
-	fetchWorkers  = make(chan uint64)
-	queuedTasks   = make(chan uint64)
+	freeWorkers   = make(chan uint64, 32)
+	fetchWorkers  = make(chan uint64, 32)
+	queuedTasks   = make(chan uint64, 32)
 	taskSolutions = make(chan TaskSolution, 100)
 )
 
@@ -60,8 +60,9 @@ var (
 // Can be changed if it is necessary to add new info for the Task
 // for example: hashType.
 type Task struct {
-	id   uint64
-	body []byte
+	id       uint64
+	body     []byte
+	receiver *chan TaskSolution
 }
 
 type TaskSolution struct {
@@ -78,10 +79,11 @@ type Worker struct {
 }
 
 // Constructor for Task.
-func NewTask(taskId uint64, taskBody []byte) *Task {
+func NewTask(taskId uint64, taskBody []byte, receiver *chan TaskSolution) *Task {
 	return &Task{
-		id:   taskId,
-		body: taskBody,
+		id:       taskId,
+		body:     taskBody,
+		receiver: receiver,
 	}
 }
 
@@ -192,13 +194,18 @@ func requeueTask(taskID uint64) {
 	}
 }
 
-func handleRegisterPulse(_ *communication.WorkerPulse, resp *communication.PulseResponse) {
+func handleRegisterPulse(pulse *communication.WorkerPulse, resp *communication.PulseResponse) {
 	workerID := genWorkerId()
-	workers[workerID] = NewWorker()
+	worker := NewWorker()
 	*resp = communication.PulseResponse{
 		Error:    communication.ControllerError_CTRL_ERR_OK,
 		WorkerId: workerID,
 	}
+
+	worker.last_pulse = time.Now()
+	worker.next_pulse = time.Duration(pulse.NextPulse) * time.Second
+
+	workers[workerID] = worker
 }
 
 func handleOkPulse(pulse *communication.WorkerPulse, resp *communication.PulseResponse) {
@@ -265,6 +272,8 @@ func handleConnection(conn conn.Unix) {
 		return
 	}
 
+	log.Printf("Recieved pulse: {%v}\n", pulse.String())
+
 	resp := communication.PulseResponse{}
 
 	switch pulse.Type {
@@ -292,7 +301,7 @@ func handleConnection(conn conn.Unix) {
 		log.Printf("Failed to write response: %v", err)
 	}
 
-	log.Printf("Recieved pulse: {%v}. Sent response: {%v}\n", pulse.String(), resp.String())
+	log.Printf("Sent response to {%v}: {%v}\n", pulse.String(), resp.String())
 
 	if err := conn.Close(); err != nil {
 		log.Printf("Error closing connection: %v", err)
@@ -400,9 +409,19 @@ func fetchTaskResult(workerID uint64) {
 		requeueTask(resp.TaskId)
 		markWorkerFree(workerID)
 	case communication.WorkerError_WORKER_ERR_OK:
-		taskSolutions <- TaskSolution{Id: resp.TaskId, Body: extra}
-		delete(tasks, resp.TaskId)
-		log.Printf("Task %v solved", resp.TaskId)
+		task, ok := tasks[resp.TaskId]
+		desired_chan := &taskSolutions
+		if !ok {
+			log.Printf("Task %v solved but not found. Very weird", resp.TaskId)
+		} else {
+			log.Printf("Task %v solved", resp.TaskId)
+			if task.receiver != nil {
+				desired_chan = task.receiver
+			}
+			delete(tasks, resp.TaskId)
+		}
+
+		*desired_chan <- TaskSolution{Id: resp.TaskId, Body: extra}
 		markWorkerFree(workerID)
 	default:
 		log.Printf("Worker %d FETCH error: %v", workerID, resp.Error)
@@ -425,9 +444,10 @@ func checkHealth() {
 	}
 }
 
-func AddTask(taskData []byte) uint64 {
+// receiver can be nil, then task solution will be piped into taskSolutions and can be received via GetTaskSolution()
+func AddTask(taskData []byte, receiver *chan TaskSolution) uint64 {
 	taskId = genTaskId()
-	tasks[taskId] = NewTask(taskId, taskData)
+	tasks[taskId] = NewTask(taskId, taskData, receiver)
 	queuedTasks <- taskId
 	return taskId
 }

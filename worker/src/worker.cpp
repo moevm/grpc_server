@@ -78,6 +78,14 @@ void Worker::WriteMessage(int fd, const std::string &msg) {
 void Worker::SendPulse(PulseType type) {
   int main_fd = 0;
   try {
+    WorkerPulse pulse;
+    pulse.set_type(type);
+    pulse.set_worker_id(worker_id);
+    pulse.set_task_id(current_task_id);
+    pulse.set_next_pulse(EXPECTED_PULSE_TIME);
+    
+    spdlog::info("Sending pulse... {{{}}}", pulse.ShortDebugString());
+
     main_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (main_fd < 0)
       throw WorkerException(std::string("socket: ") + strerror(errno));
@@ -90,12 +98,8 @@ void Worker::SendPulse(PulseType type) {
       throw WorkerException(std::string("connect: ") + strerror(errno));
     }
 
-    WorkerPulse pulse;
-    pulse.set_type(type);
-    pulse.set_worker_id(worker_id);
-    pulse.set_task_id(current_task_id);
-    pulse.set_next_pulse(EXPECTED_PULSE_TIME);
     WriteProtoMessage(main_fd, pulse);
+    spdlog::info("OK. Waiting for response");
 
     pulse_interval =
         MIN_PULSE_TIME + (rand() % (MAX_PULSE_TIME - MIN_PULSE_TIME + 1));
@@ -103,7 +107,7 @@ void Worker::SendPulse(PulseType type) {
 
     PulseResponse response;
     ReadProtoMessage(main_fd, response);
-
+    
     if (response.error() != CTRL_ERR_OK) {
       throw WorkerException(ControllerError_Name(response.error()));
     }
@@ -113,8 +117,7 @@ void Worker::SendPulse(PulseType type) {
       worker_id = response.worker_id();
     }
 
-    spdlog::info("Sent pulse {{{}}}. Received {{{}}}", pulse.ShortDebugString(),
-                 response.ShortDebugString());
+    spdlog::info("Received {{{}}}", response.ShortDebugString());
   } catch (const std::exception &e) {
     close(main_fd);
     SetState(WorkerState::ERROR);
@@ -197,7 +200,6 @@ void Worker::ProcessTask_Static(Worker *worker, const std::vector<char> &data) {
   worker->SetState(WorkerState::BUSY);
   worker->ProcessTask(data);
   worker->SetState(WorkerState::FREE);
-  worker->current_task_id = 0;
 }
 
 void Worker::HandleSetTaskControlMessage(const ControlMsg &msg,
