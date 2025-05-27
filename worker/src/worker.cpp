@@ -83,7 +83,7 @@ void Worker::SendPulse(PulseType type) {
     pulse.set_worker_id(worker_id);
     pulse.set_task_id(current_task_id);
     pulse.set_next_pulse(EXPECTED_PULSE_TIME);
-    
+
     spdlog::info("Sending pulse... {{{}}}", pulse.ShortDebugString());
 
     main_fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -107,7 +107,7 @@ void Worker::SendPulse(PulseType type) {
 
     PulseResponse response;
     ReadProtoMessage(main_fd, response);
-    
+
     if (response.error() != CTRL_ERR_OK) {
       throw WorkerException(ControllerError_Name(response.error()));
     }
