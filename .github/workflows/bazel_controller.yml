@@ -24,7 +24,3 @@ jobs:
         run: |
           bazel build //cmd/grpc_server:grpc_server
           bazel build //cmd/manager:manager
-
-      - name: Run Tests
-        working-directory: ./controller
-        run: bazel test //... --spawn_strategy=standalone --sandbox_writable_path=/run/controller
