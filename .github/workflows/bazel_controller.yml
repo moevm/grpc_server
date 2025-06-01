@@ -4,6 +4,7 @@ on: [push]
 
 jobs:
   bazel-build-test:
+    name: Build and Test with Bazel
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

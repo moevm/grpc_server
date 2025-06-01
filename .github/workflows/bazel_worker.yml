@@ -4,6 +4,7 @@ on: [push]
 
 jobs:
   bazel-worker-build:
+    name: Build Worker with Bazel
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
