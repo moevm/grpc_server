@@ -1,0 +1,26 @@
+name: Bazel Build Controller
+
+on: [push]
+
+jobs:
+  bazel-build-test:
+    name: Build with Bazel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Bazel via Bazelisk
+        run: |
+          sudo curl -L https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+          sudo chmod +x /usr/local/bin/bazel
+
+      - name: Setup Controller Socket
+        run: |
+          sudo mkdir -p /run/controller
+          sudo chmod 777 /run/controller
+
+      - name: Build Controller Components
+        working-directory: ./controller
+        run: |
+          bazel build //cmd/grpc_server:grpc_server
+          bazel build //cmd/manager:manager
