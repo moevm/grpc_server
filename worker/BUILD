@@ -1,4 +1,4 @@
-# i don't know how to use pkg-config in Bazel so here it is typed manually
+# i don`t know how to use pkg-config in Bazel so here it is typed manually
 cc_library(
   name = "protobuf",
   visibility = ["//visibility:public"],
