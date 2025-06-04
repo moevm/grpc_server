@@ -28,14 +28,22 @@ cc_binary(
     "src/file.cpp",
     "src/worker.cpp",
     "src/metrics_collector.cpp",
-    "src/communication.pb.cc",
     "include/file.hpp",
     "include/md_calculator.hpp",
     "include/worker.hpp",
     "include/metrics_collector.hpp",
-    "include/communication.pb.hh",
   ],
-  deps = ["protobuf", "@spdlog//:spdlog"],
+  deps = ["protobuf", "@spdlog//:spdlog", ":communication_cc_proto"],
   includes = ["/usr/local/include"],
   linkopts = ["-L/usr/local/lib","-lssl", "-lcrypto", "-lprometheus-cpp-push", "-lprometheus-cpp-core", "-lcurl"],
+)
+
+cc_proto_library(
+    name = "communication_cc_proto",
+    deps = [":communication_proto"],
+)
+
+proto_library(
+    name = "communication_proto",
+    srcs = [ "communication.proto" ]
 )

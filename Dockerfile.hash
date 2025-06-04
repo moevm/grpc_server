@@ -12,9 +12,9 @@ COPY worker/src/ ./src/
 COPY worker/include/ ./include/
 COPY worker/BUILD ./
 COPY worker/MODULE.bazel ./
-COPY worker/toolchains/ ./toolchains
+COPY worker/communication.proto ./
 
-RUN bazel build //:worker --cpu=x86_64
+RUN bazel build //:worker
 
 FROM alpine:latest
 

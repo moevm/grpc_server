@@ -1,7 +1,7 @@
 #ifndef WORKER_HPP
 #define WORKER_HPP
 
-#include "../include/communication.pb.hh"
+#include "communication.pb.h"
 
 #include <cstdint>
 #include <string>

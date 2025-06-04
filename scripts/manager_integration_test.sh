@@ -37,12 +37,13 @@ build() {
     docker compose build
     
     echo -e "${COL_LBLUE}Building manager...${COL_RESET}" 
-    cd controller && go build cmd/manager/test.go && cd ..
+    cd controller && bazel build //cmd/manager:manager && cd ..
 }
 
 run_manager() {
     echo -e "${COL_LBLUE}Running manager...${COL_RESET}"
-    timeout ${TIMEOUT_DURATION} controller/test &> ${CONTROLLER_LOGFILE} &
+    cd controller
+    timeout ${TIMEOUT_DURATION} bazel run //cmd/manager:manager &> ${CONTROLLER_LOGFILE} &
     manager_pid=$!
 
     echo -e "${COL_LBLUE}Waiting ${INIT_DURATION} seconds for manager to initialize...${COL_RESET}"
@@ -123,9 +124,9 @@ show_failure_details() {
 
 cleanup() {
     echo -e "${COL_LBLUE}Cleaning up...${COL_RESET}"
-    rm -f controller/test ${CONTROLLER_LOGFILE}
     sudo rm -rf /run/controller
     docker container rm -f worker1 worker2 > /dev/null
+    rm -f ${CONTROLLER_LOGFILE} bazel-*
 }
 
 trap cleanup EXIT
