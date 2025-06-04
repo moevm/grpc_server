@@ -11,6 +11,5 @@ cc_binary(
     "include/worker.hpp",
     "include/metrics_collector.hpp",
   ],
-  includes = ["/usr/local/include"],
-  linkopts = ["-L/usr/local/lib","-lssl", "-lcrypto", "-lprometheus-cpp-push", "-lprometheus-cpp-core", "-lcurl"],
+
 )
