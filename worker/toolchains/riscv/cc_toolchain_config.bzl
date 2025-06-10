@@ -1,8 +1,28 @@
+load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
+load(
+    "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
+    "feature",
+    "flag_group",
+    "flag_set",
+    "tool_path",
+)
+
+all_link_actions = [
+    ACTION_NAMES.cpp_link_executable,
+    ACTION_NAMES.cpp_link_dynamic_library,
+    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+]
+
+all_compile_actions = [
+    ACTION_NAMES.cpp_compile,
+    ACTION_NAMES.c_compile,
+]
+
 def _impl(ctx):
     tool_paths = [
         tool_path(
             name = "gcc",
-            path = "/usr/bin/riscv64-linux-gnu-gcc",
+            path = "/usr/bin/riscv64-linux-gnu-g++",
         ),
         tool_path(
             name = "ld",
@@ -44,13 +64,16 @@ def _impl(ctx):
                     flag_groups = [
                         flag_group(
                             flags = [
-                                "-lstdc++",
-                                "-L/usr/local/lib",
-                                "-lssl",
-                                "-lcrypto",
+                                "-L/usr/riscv64-linux-gnu/lib",
+                                "-Wl,-rpath=/usr/riscv64-linux-gnu/lib",
+                                "-Wl,--start-group",
                                 "-lprometheus-cpp-push",
                                 "-lprometheus-cpp-core",
                                 "-lcurl",
+                                "-lssl",
+                                "-lcrypto",
+                                "-lz",
+                                "-Wl,--end-group",
                             ],
                         ),
                     ],
@@ -58,18 +81,18 @@ def _impl(ctx):
             ],
         ),
         feature(
-            name = "builtin_sysroot",
+            name = "cpp_compiler_flags",
             enabled = True,
             flag_sets = [
                 flag_set(
-                    actions = all_link_actions + [
-                        ACTION_NAMES.cpp_compile,
-                        ACTION_NAMES.c_compile,
-                    ],
+                    actions = [ACTION_NAMES.cpp_compile],
                     flag_groups = [
                         flag_group(
                             flags = [
-                                "--sysroot=/usr/riscv64-linux-gnu",
+                                "-std=c++17",
+                                "-isystem/usr/riscv64-linux-gnu/include/c++/11",
+                                "-isystem/usr/riscv64-linux-gnu/include/c++/11/riscv64-linux-gnu",
+                                "-isystem/usr/lib/gcc-cross/riscv64-linux-gnu/11/include",
                             ],
                         ),
                     ],
@@ -82,6 +105,8 @@ def _impl(ctx):
         ctx = ctx,
         features = features,
         cxx_builtin_include_directories = [
+            "/usr/riscv64-linux-gnu/include/c++/11",
+            "/usr/riscv64-linux-gnu/include/c++/11/riscv64-linux-gnu",
             "/usr/lib/gcc-cross/riscv64-linux-gnu/11/include",
             "/usr/lib/gcc-cross/riscv64-linux-gnu/11/include-fixed",
             "/usr/riscv64-linux-gnu/include",
@@ -89,12 +114,18 @@ def _impl(ctx):
             "/usr/local/include",
         ],
         toolchain_identifier = "riscv-toolchain",
-        host_system_name = "linux",
+        host_system_name = "local",
         target_system_name = "riscv64-linux-gnu",
         target_cpu = "riscv64",
         target_libc = "glibc",
-        compiler = "riscv-gcc",
+        compiler = "gcc",
         abi_version = "lp64d",
         abi_libc_version = "glibc_2.36",
         tool_paths = tool_paths,
     )
+
+cc_toolchain_config = rule(
+    implementation = _impl,
+    attrs = {},
+    provides = [CcToolchainConfigInfo],
+)

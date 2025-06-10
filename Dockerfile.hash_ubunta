@@ -1,0 +1,88 @@
+FROM ubuntu:22.04 AS builder
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list
+RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel-archive-keyring.gpg
+RUN mv bazel-archive-keyring.gpg /usr/share/keyrings/
+RUN apt-get update && apt-get install -y bazel
+
+WORKDIR /app
+
+COPY ./worker .
+COPY ./controller ./controller
+
+RUN  apt install -y gcc-riscv64-linux-gnu
+RUN apt-get install -y g++-riscv64-linux-gnu
+
+RUN wget https://www.openssl.org/source/openssl-3.5.0.tar.gz
+
+RUN tar xzf openssl-3.5.0.tar.gz
+
+RUN cd openssl-3.5.0
+
+RUN cd openssl-3.5.0 && chmod +x Configure && \
+    ./Configure linux-generic64 \
+      --prefix=/usr/riscv64-linux-gnu \
+      --cross-compile-prefix=riscv64-linux-gnu- &&\
+       make -j$(nproc) &&\
+    make install
+
+RUN wget https://github.com/madler/zlib/archive/refs/tags/v1.3.tar.gz
+RUN tar -xvzf v1.3.tar.gz
+RUN cd zlib-1.3/ &&\
+    CHOST=riscv64-linux-gnu ./configure --prefix=/usr/riscv64-linux-gnu &&\
+    make -j$(nproc) &&\
+    make install 
+RUN wget https://curl.se/download/curl-8.8.0.tar.gz
+RUN tar -xvzf curl-8.8.0.tar.gz
+RUN cd curl-8.8.0 &&\
+./configure \
+  --host=riscv64-linux-gnu \
+  --prefix=/usr/riscv64-linux-gnu \
+  --with-openssl=/usr/riscv64-linux-gnu \
+  --disable-shared &&\
+make -j$(nproc) &&\
+make install
+
+
+RUN wget https://github.com/jupp0r/prometheus-cpp/releases/download/v1.3.0/prometheus-cpp-with-submodules.tar.gz
+RUN tar -xvzf prometheus-cpp-with-submodules.tar.gz
+RUN rm -rf prometheus-cpp-with-submodules/build && cd prometheus-cpp-with-submodules && \
+    mkdir build && cd build && \
+    cat <<'EOF' > ../cmake/riscv64-toolchain.cmake
+set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_SYSTEM_PROCESSOR riscv64)
+
+set(CMAKE_C_COMPILER riscv64-linux-gnu-gcc)
+set(CMAKE_CXX_COMPILER riscv64-linux-gnu-g++)
+
+set(CMAKE_FIND_ROOT_PATH /usr/riscv64-linux-gnu)
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+EOF
+
+RUN riscv64-linux-gnu-gcc --version  # Должен вернуть версию компилятора
+RUN ls -l /usr/riscv64-linux-gnu  # Проверьте, что путь существует
+
+RUN cd prometheus-cpp-with-submodules && cd build && cmake .. \
+      -DCMAKE_TOOLCHAIN_FILE=../cmake/riscv64-toolchain.cmake \
+      -DCMAKE_INSTALL_PREFIX=/usr/riscv64-linux-gnu \
+      -DENABLE_TESTING=OFF \
+    && make -j$(nproc) \
+    && make install
+
+RUN bazel build //:worker --platforms=//platforms:riscv64_linux
+
+
+
+FROM ubuntu:22.04
+
+COPY --from=builder /app/bazel-bin/worker /usr/local/bin/worker
+COPY --from=builder /app/prometheus-cpp-with-submodules/build/lib/ /usr/lib
+
+ENTRYPOINT ["/usr/local/bin/worker", "/data/test.txt", "sha256"]
