@@ -1,7 +1,10 @@
 FROM ubuntu:22.04 AS builder
 
 RUN apt-get update && apt-get install -y \
+    cmake \
     curl \
+    git \
+    gnupg \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
@@ -66,9 +69,6 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 EOF
 
-RUN riscv64-linux-gnu-gcc --version  # Должен вернуть версию компилятора
-RUN ls -l /usr/riscv64-linux-gnu  # Проверьте, что путь существует
-
 RUN cd prometheus-cpp-with-submodules && cd build && cmake .. \
       -DCMAKE_TOOLCHAIN_FILE=../cmake/riscv64-toolchain.cmake \
       -DCMAKE_INSTALL_PREFIX=/usr/riscv64-linux-gnu \
@@ -78,11 +78,9 @@ RUN cd prometheus-cpp-with-submodules && cd build && cmake .. \
 
 RUN bazel build //:worker --platforms=//platforms:riscv64_linux
 
-
-
 FROM ubuntu:22.04
 
 COPY --from=builder /app/bazel-bin/worker /usr/local/bin/worker
 COPY --from=builder /app/prometheus-cpp-with-submodules/build/lib/ /usr/lib
 
-ENTRYPOINT ["/usr/local/bin/worker", "/data/test.txt", "sha256"]
+ENTRYPOINT ["file", "/usr/local/bin/worker"]
