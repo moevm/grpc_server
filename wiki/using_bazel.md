@@ -9,15 +9,23 @@
 
 The controller is written in Go and uses Bazel for building:
 
-Create and set permissions for the controller socket directory:
+1. Create the runtime directory and assign ownership to the user under which the controller will run (typically, this is the user currently logged in):
+
 ```bash
 sudo mkdir -p /run/controller
-sudo chmod 777 /run/controller
+sudo chown <user>:<group> /run/controller
+```
 
+> **Note:**
+> Replace `<user>:<group>` with the appropriate username and group that will run the controller.
+> For example, if you are logged in as `smile`, use `smile:smile`.
+
+2. Launch the controller from the `controller` directory:
+
+```bash
 cd controller
 bazel run //cmd/grpc_server:grpc_server
 ```
-
 ### Worker
 
 The worker is written in C++ and also uses Bazel:
