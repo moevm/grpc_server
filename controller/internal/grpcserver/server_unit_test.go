@@ -2,14 +2,15 @@ package grpcserver_test
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/moevm/grpc_server/internal/grpcserver"
 	pb "github.com/moevm/grpc_server/pkg/proto/file_service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"testing"
-	"time"
 )
 
 func TestUploadFile_TextValidation(t *testing.T) {
