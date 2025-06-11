@@ -66,7 +66,7 @@ func TestUploadFile_TextValidation(t *testing.T) {
 				}
 			}
 
-			t.Logf("Test \"%v\": OK!", tc.name)
+			t.Logf("TestUploadFile_TextValidation: \"%v\" OK!", tc.name)
 		})
 	}
 }
@@ -87,8 +87,6 @@ func TestUploadFile_BinaryValidation(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 		t.Error("Binary task was not sent to channel")
 	}
-
-	t.Log("TestUploadFile_BinaryValidation: OK!")
 }
 
 func TestUploadFile_InvalidFileType(t *testing.T) {
@@ -109,6 +107,4 @@ func TestUploadFile_InvalidFileType(t *testing.T) {
 		t.Error("Task should not be sent for invalid file type")
 	default:
 	}
-
-	t.Log("TestUploadFile_InvalidFileType: OK!")
 }
