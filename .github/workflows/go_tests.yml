@@ -12,8 +12,8 @@ jobs:
       - name: Prepare socket directory
         run: sudo mkdir -p /run/controller/ && sudo chown runner:runner /run/controller/ && sudo chmod 755 /run/controller/
 
-      - name: run
-        uses: ngalaiko/bazel-action/1.2.1@master
+      - name: Bazel Action
+        uses: ngalaiko/bazel-action@2.0.0
         with:
           working_dir: ./controller
           args: test --sandbox_writable_path=/run/controller --cache_test_results=no --test_output=all //...
