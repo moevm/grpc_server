@@ -1,4 +1,3 @@
-
 platform(
     name = "x86_64",
     constraint_values = [
