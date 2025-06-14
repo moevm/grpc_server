@@ -8,6 +8,9 @@ go_library(
     deps = [
         "//internal/conn",
         "//pkg/converter",
+        "//pkg/proto/communication:communication_go_proto",
+        "@org_golang_google_protobuf//proto",
+        "@com_github_joho_godotenv//:go_default_library",
     ],
 )
 
