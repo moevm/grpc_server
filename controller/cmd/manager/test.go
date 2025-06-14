@@ -32,18 +32,21 @@ func main() {
 		expected[i] = md5.Sum(task)
 	}
 
-	go manager.Init()
+	mgr, err := manager.NewManager()
+	if err != nil {
+		log.Fatalf("manager.NewManager(): %v", err)
+	}
 
 	time.Sleep(10 * time.Second)
 
 	ids := make(map[uint64]int, 5)
 	for i, task := range tasks {
-		id := manager.AddTask(task, nil)
+		id := mgr.AddTask(task, nil)
 		ids[id] = i
 	}
 
 	for range 5 {
-		solution := manager.GetTaskSolution()
+		solution := mgr.GetTaskSolution()
 		task_id := ids[solution.Id]
 		if !bytes.Equal(solution.Body, expected[task_id][:]) {
 			fmt.Printf("%v != %v", solution.Body, expected[task_id][:])

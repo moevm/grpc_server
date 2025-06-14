@@ -16,11 +16,13 @@ type Server struct {
 	pb.UnimplementedFileServiceServer
 	allowedChars string
 	charMap      map[rune]bool
+	mgr          manager.IManager
 }
 
-func NewServer(allowedChars string) *Server {
+func NewServer(allowedChars string, mgr manager.IManager) *Server {
 	s := &Server{
 		allowedChars: allowedChars,
+		mgr:          mgr,
 	}
 	s.charMap = s.initCharMap()
 	return s
@@ -59,7 +61,7 @@ func (s *Server) UploadFile(ctx context.Context, req *pb.FileRequest) (*pb.FileR
 	}
 
 	receiver := make(chan manager.TaskSolution, 1)
-	manager.AddTask(content, &receiver)
+	s.mgr.AddTask(content, &receiver)
 
 	solution := <-receiver
 	msg := fmt.Sprintf("Validation successful. Hash is %v", solution.Body)

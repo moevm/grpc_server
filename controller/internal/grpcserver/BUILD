@@ -12,3 +12,17 @@ go_library(
         "@org_golang_google_grpc//status",
     ],
 )
+
+go_test(
+    name = "grpcserver_test",
+    srcs = ["test.go"],
+    deps = [
+        ":grpcserver",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "//internal/manager",
+        "//pkg/proto/file_service:file_service_go_proto",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
+    ],
+)

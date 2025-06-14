@@ -17,6 +17,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/moevm/grpc_server/internal/conn"
@@ -25,36 +27,45 @@ import (
 	communication "github.com/moevm/grpc_server/pkg/proto/communication"
 )
 
-const (
-	// Worker states.
-	WORKER_BUSY    = 0
-	WORKER_FREE    = 1
-	WORKER_BOOTING = 2
-	WORKER_FETCH   = 3
+type WorkerState int
 
+const (
+	WorkerBusy WorkerState = iota
+	WorkerFree
+	WorkerBooting
+	WorkerFetch
+)
+
+const (
 	workerMainSocketPath = "/run/controller/main.sock"
 	workerSocketPath     = "/run/controller/"
 )
 
-var (
-	// Channel for errors returned from goroutines.
-	errorChan = make(chan error, 10)
+type IManager interface {
+	AddTask(taskData []byte, receiver *chan TaskSolution) uint64
+	GetTaskSolution() TaskSolution
+}
 
+type Manager struct {
 	listener net.Listener
 
-	// Workers map.
-	workers         = make(map[uint64]*Worker)
-	workerId uint64 = 0
+	workers      map[uint64]*Worker
+	workersMutex sync.Mutex
+	workerId     uint64
 
-	// Tasks map.
-	tasks         = make(map[uint64]*Task)
-	taskId uint64 = 0
+	tasks      map[uint64]*Task
+	tasksMutex sync.Mutex
+	taskId     uint64
 
-	freeWorkers   = make(chan uint64, 32)
-	fetchWorkers  = make(chan uint64, 32)
-	queuedTasks   = make(chan uint64, 32)
-	taskSolutions = make(chan TaskSolution, 100)
-)
+	freeWorkers   chan uint64
+	fetchWorkers  chan uint64
+	queuedTasks   chan uint64
+	taskSolutions chan TaskSolution
+	errorChan     chan error
+
+	shutdown     chan struct{}
+	shutdownOnce sync.Once
+}
 
 // Task is a general representation of tasks coming to the controller.
 // Can be changed if it is necessary to add new info for the Task
@@ -72,10 +83,10 @@ type TaskSolution struct {
 
 // Worker contains everything necessary for communication with the worker and his current state.
 type Worker struct {
-	state      int
-	last_pulse time.Time
-	next_pulse time.Duration
-	task_id    uint64
+	state     WorkerState
+	lastPulse time.Time
+	nextPulse time.Duration
+	taskId    uint64
 }
 
 // Constructor for Task.
@@ -84,15 +95,6 @@ func NewTask(taskId uint64, taskBody []byte, receiver *chan TaskSolution) *Task 
 		id:       taskId,
 		body:     taskBody,
 		receiver: receiver,
-	}
-}
-
-// Constructor for Worker.
-func NewWorker() *Worker {
-	return &Worker{
-		state:      WORKER_BOOTING,
-		last_pulse: time.Now(),
-		task_id:    0, // no task
 	}
 }
 
@@ -153,202 +155,206 @@ func sendControlMessage(workerID uint64, msg *communication.ControlMsg, extraDat
 	return resp, respExtra, nil
 }
 
-func genTaskId() uint64 {
-	taskId += 1
-	return taskId
-}
-
-func genWorkerId() uint64 {
-	workerId += 1
-	return workerId
-}
-
-func handleWorkerFailure(workerID uint64) {
+func (m *Manager) handleWorkerFailure(workerID uint64) {
 	log.Printf("Terminating worker %v session", workerID)
-	worker, ok := workers[workerID]
+	worker, ok := m.workers[workerID]
 	if !ok {
 		return
 	}
 
-	if worker.task_id != 0 {
-		requeueTask(worker.task_id)
+	if worker.taskId != 0 {
+		m.requeueTask(worker.taskId)
 	}
 
-	delete(workers, workerID)
+	delete(m.workers, workerID)
 }
 
-func markWorkerFree(workerID uint64) {
-	worker, ok := workers[workerID]
+func (m *Manager) markWorkerFree(workerID uint64) {
+	worker, ok := m.workers[workerID]
 	if !ok {
 		return
 	}
 
-	worker.state = WORKER_FREE
-	worker.task_id = 0
-	freeWorkers <- workerID
+	worker.state = WorkerFree
+	worker.taskId = 0
+	m.freeWorkers <- workerID
 }
 
-func requeueTask(taskID uint64) {
-	if _, ok := tasks[taskID]; ok {
-		queuedTasks <- taskID
+func (m *Manager) requeueTask(taskID uint64) {
+	if _, ok := m.tasks[taskID]; ok {
+		m.queuedTasks <- taskID
 	}
 }
 
-func handleRegisterPulse(pulse *communication.WorkerPulse, resp *communication.PulseResponse) {
-	workerID := genWorkerId()
-	worker := NewWorker()
-	*resp = communication.PulseResponse{
+func (m *Manager) handleRegisterPulse(pulse *communication.WorkerPulse) communication.PulseResponse {
+	m.workersMutex.Lock()
+	defer m.workersMutex.Unlock()
+
+	atomic.AddUint64(&m.workerId, 1)
+	workerID := m.workerId
+	m.workers[workerID] = &Worker{
+		state:     WorkerBooting,
+		lastPulse: time.Now(),
+		nextPulse: time.Duration(pulse.NextPulse) * time.Second,
+	}
+
+	return communication.PulseResponse{
 		Error:    communication.ControllerError_CTRL_ERR_OK,
 		WorkerId: workerID,
 	}
-
-	worker.last_pulse = time.Now()
-	worker.next_pulse = time.Duration(pulse.NextPulse) * time.Second
-
-	workers[workerID] = worker
 }
 
-func handleOkPulse(pulse *communication.WorkerPulse, resp *communication.PulseResponse) {
-	worker, ok := workers[pulse.WorkerId]
+func (m *Manager) handleOkPulse(pulse *communication.WorkerPulse) communication.PulseResponse {
+	m.workersMutex.Lock()
+	defer m.workersMutex.Unlock()
+
+	worker, ok := m.workers[pulse.WorkerId]
 
 	if !ok {
-		*resp = communication.PulseResponse{
+		return communication.PulseResponse{
 			Error:    communication.ControllerError_CTRL_ERR_UNKNOWN_ID,
 			WorkerId: 0,
 		}
-		return
 	}
 
-	if worker.state == WORKER_BOOTING {
-		markWorkerFree(pulse.WorkerId)
+	if worker.state == WorkerBooting {
+		m.markWorkerFree(pulse.WorkerId)
 	}
 
-	worker.last_pulse = time.Now()
-	worker.next_pulse = time.Duration(pulse.NextPulse) * time.Second
+	worker.lastPulse = time.Now()
+	worker.nextPulse = time.Duration(pulse.NextPulse) * time.Second
 
-	*resp = communication.PulseResponse{
+	return communication.PulseResponse{
 		Error:    communication.ControllerError_CTRL_ERR_OK,
 		WorkerId: 0,
 	}
 }
 
-func handleFetchMePulse(pulse *communication.WorkerPulse, resp *communication.PulseResponse) {
-	handleOkPulse(pulse, resp)
+func (m *Manager) handleFetchMePulse(pulse *communication.WorkerPulse) communication.PulseResponse {
+	resp := m.handleOkPulse(pulse)
 	if resp.Error != communication.ControllerError_CTRL_ERR_OK {
-		return
+		return resp
 	}
 
-	fetchWorkers <- pulse.WorkerId
+	m.fetchWorkers <- pulse.WorkerId
+	return communication.PulseResponse{
+		Error:    communication.ControllerError_CTRL_ERR_OK,
+		WorkerId: 0,
+	}
 }
 
-func handleShutdownPulse(pulse *communication.WorkerPulse, resp *communication.PulseResponse) {
+func (m *Manager) handleShutdownPulse(pulse *communication.WorkerPulse) communication.PulseResponse {
 	workerID := pulse.WorkerId
-	worker, ok := workers[workerID]
+	worker, ok := m.workers[workerID]
 	if !ok {
-		resp.Error = communication.ControllerError_CTRL_ERR_UNKNOWN_ID
-		return
+		return communication.PulseResponse{
+			Error:    communication.ControllerError_CTRL_ERR_UNKNOWN_ID,
+			WorkerId: 0,
+		}
 	}
 
-	if worker.task_id != 0 {
-		requeueTask(worker.task_id)
+	if worker.taskId != 0 {
+		m.requeueTask(worker.taskId)
 	}
 
-	delete(workers, workerID)
-	resp.Error = communication.ControllerError_CTRL_ERR_OK
+	delete(m.workers, workerID)
+	return communication.PulseResponse{
+		Error:    communication.ControllerError_CTRL_ERR_OK,
+		WorkerId: 0,
+	}
 }
 
-func handleConnection(conn conn.Unix) {
-	msg_data, err := conn.ReadMessage()
+func (m *Manager) handleConnection(conn conn.Unix) {
+	defer conn.Close()
+
+	msgData, err := conn.ReadMessage()
 	if err != nil {
-		log.Printf("Failed to read message: %v", err)
-		conn.Close()
+		m.errorChan <- fmt.Errorf("read error: %w", err)
 		return
 	}
 
-	pulse := communication.WorkerPulse{}
-	if err := proto.Unmarshal(msg_data, &pulse); err != nil {
-		log.Printf("Failed to unmarshal pulse: %v", err)
-		conn.Close()
+	var pulse communication.WorkerPulse
+	if err := proto.Unmarshal(msgData, &pulse); err != nil {
+		m.errorChan <- fmt.Errorf("unmarshal error: %w", err)
 		return
 	}
 
-	log.Printf("Recieved pulse: {%v}\n", pulse.String())
+	resp := m.handlePulse(&pulse)
+	respData, err := proto.Marshal(&resp)
+	if err != nil {
+		m.errorChan <- fmt.Errorf("marshal error: %w", err)
+		return
+	}
 
-	resp := communication.PulseResponse{}
+	if err := conn.WriteMessage(respData); err != nil {
+		m.errorChan <- fmt.Errorf("write error: %w", err)
+	}
+}
 
+func (m *Manager) handlePulse(pulse *communication.WorkerPulse) communication.PulseResponse {
 	switch pulse.Type {
 	case communication.PulseType_PULSE_REGISTER:
-		handleRegisterPulse(&pulse, &resp)
+		return m.handleRegisterPulse(pulse)
 	case communication.PulseType_PULSE_OK:
-		handleOkPulse(&pulse, &resp)
+		return m.handleOkPulse(pulse)
 	case communication.PulseType_PULSE_FETCH_ME:
-		handleFetchMePulse(&pulse, &resp)
+		return m.handleFetchMePulse(pulse)
 	case communication.PulseType_PULSE_SHUTDOWN:
-		handleShutdownPulse(&pulse, &resp)
+		return m.handleShutdownPulse(pulse)
 	default:
-		log.Printf("Unknown pulse type: %v", pulse.Type)
-		resp.Error = communication.ControllerError_CTRL_ERR_UNKNOWN_TYPE
-	}
-
-	resp_data, err := proto.Marshal(&resp)
-	if err != nil {
-		log.Printf("Failed to marshal response: %v", err)
-		conn.Close()
-		return
-	}
-
-	if err := conn.WriteMessage(resp_data); err != nil {
-		log.Printf("Failed to write response: %v", err)
-	}
-
-	log.Printf("Sent response to {%v}: {%v}\n", pulse.String(), resp.String())
-
-	if err := conn.Close(); err != nil {
-		log.Printf("Error closing connection: %v", err)
+		return communication.PulseResponse{
+			Error: communication.ControllerError_CTRL_ERR_UNKNOWN_TYPE,
+		}
 	}
 }
 
-func mainLoop() {
-	log.Print("Ready to receive messages on main.sock")
+func (m *Manager) mainLoop() {
+	log.Print("Listening on main.sock")
 	for {
-		netConn, err := listener.Accept()
-		if err != nil {
-			log.Printf("Fatal accept error: %v; closing listener", err)
+		select {
+		case <-m.shutdown:
 			return
+		default:
+			netConn, err := m.listener.Accept()
+			if err != nil {
+				if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
+					continue
+				}
+				log.Printf("Fatal accept error: %v", err)
+				return
+			}
+			go m.handleConnection(conn.Unix{Conn: netConn})
 		}
-
-		conn := conn.Unix{Conn: netConn}
-		go handleConnection(conn)
 	}
 }
 
 // errorHandler catches the errors from goroutines and logs them.
 // This function should always be run in a goroutine.
-func errorHandler() {
-	for err := range errorChan {
+func (m *Manager) errorHandler() {
+	for err := range m.errorChan {
 		log.Println("ERROR:", err)
 	}
 }
 
-func assignTaskToWorker(taskID uint64, workerID uint64) {
-	task, ok := tasks[taskID]
+func (m *Manager) assignTaskToWorker(taskID uint64, workerID uint64) {
+	task, ok := m.tasks[taskID]
 	if !ok {
 		log.Printf("Task %d not found", taskID)
-		freeWorkers <- workerID
+		m.freeWorkers <- workerID
 		return
 	}
 
-	worker, ok := workers[workerID]
+	worker, ok := m.workers[workerID]
 	if !ok {
 		log.Printf("Worker %d not found", workerID)
-		queuedTasks <- taskID
+		m.queuedTasks <- taskID
 		return
 	}
 
-	if worker.state != WORKER_FREE {
+	if worker.state != WorkerFree {
 		log.Printf("Worker %d is not free", workerID)
-		queuedTasks <- taskID
-		freeWorkers <- workerID
+		m.queuedTasks <- taskID
+		m.freeWorkers <- workerID
 		return
 	}
 
@@ -361,36 +367,36 @@ func assignTaskToWorker(taskID uint64, workerID uint64) {
 	resp, _, err := sendControlMessage(workerID, msg, task.body)
 	if err != nil {
 		log.Printf("Failed to send SET_TASK to worker %d: %v", workerID, err)
-		handleWorkerFailure(workerID)
-		queuedTasks <- taskID
+		m.handleWorkerFailure(workerID)
+		m.queuedTasks <- taskID
 		return
 	}
 
 	if resp.Error != communication.WorkerError_WORKER_ERR_OK {
 		log.Printf("Worker %d error on SET_TASK: %v", workerID, resp.Error)
 		if resp.Error == communication.WorkerError_WORKER_ERR_BUSY {
-			freeWorkers <- workerID
+			m.freeWorkers <- workerID
 		} else {
-			handleWorkerFailure(workerID)
+			m.handleWorkerFailure(workerID)
 		}
-		queuedTasks <- taskID
+		m.queuedTasks <- taskID
 		return
 	}
 
-	worker.state = WORKER_BUSY
-	worker.task_id = taskID
+	worker.state = WorkerBusy
+	worker.taskId = taskID
 }
 
-func dispanchTasks() {
+func (m *Manager) dispatchTasks() {
 	for {
-		taskID := <-queuedTasks
-		workerID := <-freeWorkers
+		taskID := <-m.queuedTasks
+		workerID := <-m.freeWorkers
 
-		go assignTaskToWorker(taskID, workerID)
+		go m.assignTaskToWorker(taskID, workerID)
 	}
 }
 
-func fetchTaskResult(workerID uint64) {
+func (m *Manager) fetchTaskResult(workerID uint64) {
 	msg := &communication.ControlMsg{
 		Type: communication.ControlType_CTRL_FETCH,
 	}
@@ -398,7 +404,7 @@ func fetchTaskResult(workerID uint64) {
 	resp, extra, err := sendControlMessage(workerID, msg, nil)
 	if err != nil {
 		log.Printf("Failed to FETCH from worker %d: %v", workerID, err)
-		handleWorkerFailure(workerID)
+		m.handleWorkerFailure(workerID)
 		return
 	}
 
@@ -406,11 +412,11 @@ func fetchTaskResult(workerID uint64) {
 	case communication.WorkerError_WORKER_ERR_NO_FETCH:
 		return
 	case communication.WorkerError_WORKER_ERR_TASK_FAILED:
-		requeueTask(resp.TaskId)
-		markWorkerFree(workerID)
+		m.requeueTask(resp.TaskId)
+		m.markWorkerFree(workerID)
 	case communication.WorkerError_WORKER_ERR_OK:
-		task, ok := tasks[resp.TaskId]
-		desired_chan := &taskSolutions
+		task, ok := m.tasks[resp.TaskId]
+		desired_chan := &m.taskSolutions
 		if !ok {
 			log.Printf("Task %v solved but not found. Very weird", resp.TaskId)
 		} else {
@@ -418,92 +424,126 @@ func fetchTaskResult(workerID uint64) {
 			if task.receiver != nil {
 				desired_chan = task.receiver
 			}
-			delete(tasks, resp.TaskId)
+			delete(m.tasks, resp.TaskId)
 		}
 
 		*desired_chan <- TaskSolution{Id: resp.TaskId, Body: extra}
-		markWorkerFree(workerID)
+		m.markWorkerFree(workerID)
 	default:
 		log.Printf("Worker %d FETCH error: %v", workerID, resp.Error)
-		handleWorkerFailure(workerID)
+		m.handleWorkerFailure(workerID)
+	}
+}
+
+func (m *Manager) handleFetchWorkers() {
+	for {
+		select {
+		case <-m.shutdown:
+			return
+		case workerID := <-m.fetchWorkers:
+			go m.fetchTaskResult(workerID)
+		}
 	}
 }
 
 // very bad
-func checkHealth() {
+func (m *Manager) checkHealth() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
 	for {
-		time.Sleep(30 * time.Second)
-		now := time.Now()
-		for workerID, worker := range workers {
-			elapsed := now.Sub(worker.last_pulse)
-			if elapsed > worker.next_pulse {
-				log.Printf("Worker %d missed pulse", workerID)
-				handleWorkerFailure(workerID)
+		select {
+		case <-m.shutdown:
+			return
+		case <-ticker.C:
+			m.workersMutex.Lock()
+			now := time.Now()
+			for workerID, worker := range m.workers {
+				if now.Sub(worker.lastPulse) > worker.nextPulse {
+					log.Printf("Worker %d missed pulse", workerID)
+					m.handleWorkerFailure(workerID)
+				}
 			}
+			m.workersMutex.Unlock()
 		}
 	}
 }
 
 // receiver can be nil, then task solution will be piped into taskSolutions and can be received via GetTaskSolution()
-func AddTask(taskData []byte, receiver *chan TaskSolution) uint64 {
-	taskId = genTaskId()
-	tasks[taskId] = NewTask(taskId, taskData, receiver)
-	queuedTasks <- taskId
-	return taskId
+func (m *Manager) AddTask(taskData []byte, receiver *chan TaskSolution) uint64 {
+	atomic.AddUint64(&m.taskId, 1)
+	taskID := m.taskId
+	task := &Task{
+		id:       taskID,
+		body:     taskData,
+		receiver: receiver,
+	}
+
+	m.tasksMutex.Lock()
+	m.tasks[taskID] = task
+	m.tasksMutex.Unlock()
+
+	m.queuedTasks <- taskID
+	return taskID
 }
 
-func GetTaskSolution() TaskSolution {
-	return <-taskSolutions
+func (m *Manager) GetTaskSolution() TaskSolution {
+	return <-m.taskSolutions
 }
 
 func removeContents(dir string) error {
-	d, err := os.Open(dir)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return err
 	}
-	defer d.Close()
-	names, err := d.Readdirnames(-1)
-	if err != nil {
-		return err
-	}
-	for _, name := range names {
-		err = os.RemoveAll(filepath.Join(dir, name))
-		if err != nil {
+
+	for _, entry := range entries {
+		if err := os.RemoveAll(filepath.Join(dir, entry.Name())); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func Init() {
-	err := removeContents(workerSocketPath)
-	if err != nil {
-		log.Panicf("removeContents: %v", err)
+func NewManager() (*Manager, error) {
+	if err := removeContents(workerSocketPath); err != nil {
+		return nil, fmt.Errorf("failed to clean socket directory: %w", err)
 	}
 
-	listener, err = net.Listen("unix", workerMainSocketPath)
+	listener, err := net.Listen("unix", workerMainSocketPath)
 	if err != nil {
-		log.Panicf("net.Listen: %v", err)
+		return nil, fmt.Errorf("failed to create listener: %w", err)
 	}
 
-	go mainLoop()
-	go errorHandler()
-	go dispanchTasks()
-	go checkHealth()
+	m := &Manager{
+		listener:      listener,
+		workers:       make(map[uint64]*Worker),
+		tasks:         make(map[uint64]*Task),
+		freeWorkers:   make(chan uint64, 32),
+		fetchWorkers:  make(chan uint64, 32),
+		queuedTasks:   make(chan uint64, 32),
+		taskSolutions: make(chan TaskSolution, 100),
+		errorChan:     make(chan error, 10),
+		shutdown:      make(chan struct{}),
+	}
 
-	go func() {
-		for workerID := range fetchWorkers {
-			go fetchTaskResult(workerID)
-		}
-	}()
+	go m.mainLoop()
+	go m.errorHandler()
+	go m.dispatchTasks()
+	go m.checkHealth()
+	go m.handleFetchWorkers()
 
-	defer func() {
-		listener.Close()
-		close(errorChan)
-		close(freeWorkers)
-		close(queuedTasks)
-		close(fetchWorkers)
-	}()
+	return m, nil
+}
 
-	select {}
+func (m *Manager) Shutdown() {
+	m.shutdownOnce.Do(func() {
+		close(m.shutdown)
+		m.listener.Close()
+
+		close(m.freeWorkers)
+		close(m.fetchWorkers)
+		close(m.queuedTasks)
+		close(m.taskSolutions)
+		close(m.errorChan)
+	})
 }
