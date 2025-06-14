@@ -10,9 +10,11 @@ linters-settings:
   goimports:
     skip-generated: true
 
+issues:
+  exclude-dirs:
+    - pkg/proto
+  exclude-files:
+    - ".*\\.pb\\.go$"
+
 run:
   modules-dir: controller
-  skip-dirs:
-    - pkg/proto
-  skip-files:
-    - ".*\\.pb\\.go$"
