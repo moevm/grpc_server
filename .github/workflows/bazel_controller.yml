@@ -1,26 +1,34 @@
-name: Bazel Build Controller
+name: go tests
 
 on: [push]
 
 jobs:
-  bazel-build-test:
-    name: Build with Bazel
+  test:
+    name: Run Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Mount bazel cache
+        uses: actions/cache@v4
+        with:
+          path: "/home/runner/.cache/bazel"
+          key: bazel
 
       - name: Install Bazel via Bazelisk
         run: |
           sudo curl -L https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -o /usr/local/bin/bazel
           sudo chmod +x /usr/local/bin/bazel
 
-      - name: Setup Controller Socket
-        run: |
-          sudo mkdir -p /run/controller
-          sudo chmod 777 /run/controller
+      - name: Prepare socket directory
+        run: sudo mkdir -p /run/controller/ && sudo chown runner:runner /run/controller/ && sudo chmod 755 /run/controller/
 
       - name: Build Controller Components
         working-directory: ./controller
         run: |
           bazel build //cmd/grpc_server:grpc_server
           bazel build //cmd/manager:manager
+
+      - name: Test
+        run: |
+          cd controller && bazel test --sandbox_writable_path=/run/controller --cache_test_results=no --test_arg=-test.v --test_output=streamed //...

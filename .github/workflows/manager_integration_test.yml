@@ -40,4 +40,4 @@ jobs:
 
       - name: Run tests
         working-directory: ./
-        run: ./scripts/manager_integration_test.sh
+        run: ./scripts/manager_integration_test.sh log

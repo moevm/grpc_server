@@ -71,7 +71,7 @@ run_workers() {
 }
 
 wait_for_manager() {
-    echo -e "${COL_LBLUE}Waining for manager to finish...${COL_RESET}"
+    echo -e "${COL_LBLUE}Waiting for manager to finish...${COL_RESET}"
     set +e
     wait $manager_pid
     manager_exit_code=$?
@@ -126,7 +126,7 @@ cleanup() {
     echo -e "${COL_LBLUE}Cleaning up...${COL_RESET}"
     sudo rm -rf /run/controller
     docker container rm -f worker1 worker2 > /dev/null
-    rm -f ${CONTROLLER_LOGFILE} bazel-*
+    rm -f ${CONTROLLER_LOGFILE} bazel-* MODULE.bazel.lock
 }
 
 trap cleanup EXIT

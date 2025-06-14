@@ -5,5 +5,5 @@ go_library(
     srcs = ["config.go"],
     importpath = "github.com/moevm/grpc_server/internal/config",
     visibility = ["//visibility:public"],
-    deps = ["@com_github_joho_godotenv//:go_default_library"],
+    deps = ["@com_github_joho_godotenv//:godotenv"],
 )
