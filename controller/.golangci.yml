@@ -12,7 +12,7 @@ linters-settings:
 
 issues:
   exclude-dirs:
-    - pkg/proto
+    - github.com/moevm/grpc_server/pkg/proto/
   exclude-files:
     - ".*\\.pb\\.go$"
 
