@@ -5,3 +5,16 @@ linters:
   enable:
     - gofmt
     - govet
+
+# Ignore protofiles. They are not generated yet
+linters-settings:
+  gci:
+    skip-generated: true
+  goimports:
+    skip-generated: true
+
+run:
+  skip-dirs:
+    - pkg/proto
+  skip-files:
+    - ".*\\.pb\\.go$"
