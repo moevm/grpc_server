@@ -1,20 +1,7 @@
+run:
+  modules-dir: controller
+
 linters:
   enable:
     - gofmt
     - govet
-
-# Ignore protofiles. They are not generated yet
-linters-settings:
-  gci:
-    skip-generated: true
-  goimports:
-    skip-generated: true
-
-issues:
-  exclude-dirs:
-    - github.com/moevm/grpc_server/pkg/proto/
-  exclude-files:
-    - ".*\\.pb\\.go$"
-
-run:
-  modules-dir: controller
