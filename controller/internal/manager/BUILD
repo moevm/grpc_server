@@ -8,14 +8,8 @@ go_library(
     deps = [
         "//internal/conn",
         "//pkg/converter",
+        "//pkg/proto/communication:communication_go_proto",
+        "@org_golang_google_protobuf//proto",
+        "@com_github_joho_godotenv//:go_default_library",
     ],
-)
-
-go_test(
-    name = "manager_test",
-    size = "large",
-    srcs = ["manager_test.go"],
-    embed = [":manager"],
-    tags = ["integration"],
-    deps = ["//internal/worker"],
 )

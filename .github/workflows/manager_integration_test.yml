@@ -1,0 +1,19 @@
+name: manager integration test
+
+on: [push]
+
+jobs:
+  manager_integration_test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Bazel via Bazelisk
+        run: |
+          sudo curl -L https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+          sudo chmod +x /usr/local/bin/bazel
+
+      - name: Run tests
+        working-directory: ./
+        run: ./scripts/manager_integration_test.sh log

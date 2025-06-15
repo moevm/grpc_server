@@ -6,6 +6,7 @@ go_library(
     importpath = "github.com/moevm/grpc_server/internal/grpcserver",
     visibility = ["//visibility:public"],
     deps = [
+        "//internal/manager",
         "//pkg/proto/file_service:file_service_go_proto",
         "@org_golang_google_grpc//codes",
         "@org_golang_google_grpc//status",
@@ -13,20 +14,15 @@ go_library(
 )
 
 go_test(
-    name = "server_test",
+    name = "grpcserver_test",
+    srcs = ["server_test.go"],
     embed = [ ":grpcserver" ],
-    srcs = [ 
-        "server_unit_test.go",
-        "server_integration_test.go"
-    ],
     deps = [
-        "//internal/config",
-        "//pkg/proto/file_service:file_service_go_proto",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
-        "@org_golang_google_grpc//:go_default_library",
+        "//internal/manager",
+        "//pkg/proto/file_service:file_service_go_proto",
         "@org_golang_google_grpc//codes",
-        "@org_golang_google_grpc//credentials/insecure",
         "@org_golang_google_grpc//status",
     ],
 )
