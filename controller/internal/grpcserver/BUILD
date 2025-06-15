@@ -15,7 +15,7 @@ go_library(
 
 go_test(
     name = "grpcserver_test",
-    srcs = ["test.go"],
+    srcs = ["server_test.go"],
     deps = [
         ":grpcserver",
         "@com_github_stretchr_testify//assert",
