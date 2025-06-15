@@ -186,7 +186,7 @@ func (m *Manager) requeueTask(taskID uint64) {
 	}
 }
 
-func (m *Manager) handleRegisterPulse(pulse *communication.WorkerPulse) communication.PulseResponse {
+func (m *Manager) handleRegisterPulse(pulse *communication.WorkerPulse) *communication.PulseResponse {
 	m.workersMutex.Lock()
 	defer m.workersMutex.Unlock()
 
@@ -198,20 +198,20 @@ func (m *Manager) handleRegisterPulse(pulse *communication.WorkerPulse) communic
 		nextPulse: time.Duration(pulse.NextPulse) * time.Second,
 	}
 
-	return communication.PulseResponse{
+	return &communication.PulseResponse{
 		Error:    communication.ControllerError_CTRL_ERR_OK,
 		WorkerId: workerID,
 	}
 }
 
-func (m *Manager) handleOkPulse(pulse *communication.WorkerPulse) communication.PulseResponse {
+func (m *Manager) handleOkPulse(pulse *communication.WorkerPulse) *communication.PulseResponse {
 	m.workersMutex.Lock()
 	defer m.workersMutex.Unlock()
 
 	worker, ok := m.workers[pulse.WorkerId]
 
 	if !ok {
-		return communication.PulseResponse{
+		return &communication.PulseResponse{
 			Error:    communication.ControllerError_CTRL_ERR_UNKNOWN_ID,
 			WorkerId: 0,
 		}
@@ -224,30 +224,30 @@ func (m *Manager) handleOkPulse(pulse *communication.WorkerPulse) communication.
 	worker.lastPulse = time.Now()
 	worker.nextPulse = time.Duration(pulse.NextPulse) * time.Second
 
-	return communication.PulseResponse{
+	return &communication.PulseResponse{
 		Error:    communication.ControllerError_CTRL_ERR_OK,
 		WorkerId: 0,
 	}
 }
 
-func (m *Manager) handleFetchMePulse(pulse *communication.WorkerPulse) communication.PulseResponse {
+func (m *Manager) handleFetchMePulse(pulse *communication.WorkerPulse) *communication.PulseResponse {
 	resp := m.handleOkPulse(pulse)
 	if resp.Error != communication.ControllerError_CTRL_ERR_OK {
 		return resp
 	}
 
 	m.fetchWorkers <- pulse.WorkerId
-	return communication.PulseResponse{
+	return &communication.PulseResponse{
 		Error:    communication.ControllerError_CTRL_ERR_OK,
 		WorkerId: 0,
 	}
 }
 
-func (m *Manager) handleShutdownPulse(pulse *communication.WorkerPulse) communication.PulseResponse {
+func (m *Manager) handleShutdownPulse(pulse *communication.WorkerPulse) *communication.PulseResponse {
 	workerID := pulse.WorkerId
 	worker, ok := m.workers[workerID]
 	if !ok {
-		return communication.PulseResponse{
+		return &communication.PulseResponse{
 			Error:    communication.ControllerError_CTRL_ERR_UNKNOWN_ID,
 			WorkerId: 0,
 		}
@@ -258,7 +258,7 @@ func (m *Manager) handleShutdownPulse(pulse *communication.WorkerPulse) communic
 	}
 
 	delete(m.workers, workerID)
-	return communication.PulseResponse{
+	return &communication.PulseResponse{
 		Error:    communication.ControllerError_CTRL_ERR_OK,
 		WorkerId: 0,
 	}
@@ -280,7 +280,7 @@ func (m *Manager) handleConnection(conn conn.Unix) {
 	}
 
 	resp := m.handlePulse(&pulse)
-	respData, err := proto.Marshal(&resp)
+	respData, err := proto.Marshal(resp)
 	if err != nil {
 		m.errorChan <- fmt.Errorf("marshal error: %w", err)
 		return
@@ -291,7 +291,7 @@ func (m *Manager) handleConnection(conn conn.Unix) {
 	}
 }
 
-func (m *Manager) handlePulse(pulse *communication.WorkerPulse) communication.PulseResponse {
+func (m *Manager) handlePulse(pulse *communication.WorkerPulse) *communication.PulseResponse {
 	switch pulse.Type {
 	case communication.PulseType_PULSE_REGISTER:
 		return m.handleRegisterPulse(pulse)
@@ -302,7 +302,7 @@ func (m *Manager) handlePulse(pulse *communication.WorkerPulse) communication.Pu
 	case communication.PulseType_PULSE_SHUTDOWN:
 		return m.handleShutdownPulse(pulse)
 	default:
-		return communication.PulseResponse{
+		return &communication.PulseResponse{
 			Error: communication.ControllerError_CTRL_ERR_UNKNOWN_TYPE,
 		}
 	}
@@ -317,7 +317,7 @@ func (m *Manager) mainLoop() {
 		default:
 			netConn, err := m.listener.Accept()
 			if err != nil {
-				if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 					continue
 				}
 				log.Printf("Fatal accept error: %v", err)
