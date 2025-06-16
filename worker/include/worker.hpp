@@ -97,6 +97,8 @@ public:
   Worker();
   ~Worker();
 
+  inline uint64_t GetID() const { return worker_id; }
+
   WorkerState GetState() const { return state; }
   virtual void ProcessTask(const std::vector<char> &data) = 0;
   void MainLoop();

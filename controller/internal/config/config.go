@@ -21,7 +21,7 @@ func Load() *ServerConfig {
 	}
 
 	return &ServerConfig{
-		Host:           getEnv("SERVER_HOST", "localhost"),
+		Host:           getEnv("SERVER_HOST", "0.0.0.0"),
 		Port:           getEnv("SERVER_PORT", "50051"),
 		MaxMessageSize: getEnvAsInt("MAX_MESSAGE_SIZE", 4*1024*1024), // 4MB
 		AllowedChars:   getEnv("ALLOWED_CHARS", "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 !?.,\n"),
