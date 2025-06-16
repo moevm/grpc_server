@@ -21,12 +21,8 @@ protected:
 
 public:
   HashWorker(const char *gateway_address, const char *gateway_port)
-      : metrics_collector(
-          gateway_address,
-          gateway_port,
-          ("worker-" + std::to_string(GetID())).c_str()
-        )
-  {}
+      : metrics_collector(gateway_address, gateway_port,
+                          ("worker-" + std::to_string(GetID())).c_str()) {}
 };
 
 int main() {
@@ -39,7 +35,8 @@ int main() {
     return 1;
   }
 
-  spdlog::info("Initialize MetricsCollector with {}:{}", gateway_address, gateway_port);
+  spdlog::info("Initialize MetricsCollector with {}:{}", gateway_address,
+               gateway_port);
 
   try {
     HashWorker(gateway_address, gateway_port).MainLoop();
