@@ -5,7 +5,7 @@
 #include <spdlog/spdlog.h>
 
 class HashWorker : public Worker {
-  MetricsCollector &metrics_collector;
+  MetricsCollector metrics_collector;
 
 protected:
   void ProcessTask(const std::vector<char> &data) {
@@ -20,27 +20,26 @@ protected:
   }
 
 public:
-  HashWorker(MetricsCollector &metrics_collector)
-      : metrics_collector(metrics_collector) {}
+  HashWorker(const char *gateway_address, const char *gateway_port)
+      : metrics_collector(gateway_address, gateway_port,
+                          ("worker-" + std::to_string(GetID())).c_str()) {}
 };
 
 int main() {
   const char *gateway_address = getenv("METRICS_GATEWAY_ADDRESS");
   const char *gateway_port = getenv("METRICS_GATEWAY_PORT");
-  const char *worker_name = getenv("METRICS_WORKER_NAME");
 
-  if (gateway_address == nullptr || gateway_port == nullptr ||
-      worker_name == nullptr) {
-    spdlog::error("Environment variables are not fully specified\n"
-                  "[INFO] Specify METRICS_GATEWAY_ADDRESS METRICS_GATEWAY_PORT "
-                  "METRICS_WORKER_NAME\n");
+  if (gateway_address == nullptr || gateway_port == nullptr) {
+    spdlog::error("Environment variables are not fully specified. "
+                  "Specify METRICS_GATEWAY_ADDRESS and METRICS_GATEWAY_PORT");
     return 1;
   }
 
+  spdlog::info("Initialize MetricsCollector with {}:{}", gateway_address,
+               gateway_port);
+
   try {
-    MetricsCollector metrics_collector(gateway_address, gateway_port,
-                                       worker_name);
-    HashWorker(metrics_collector).MainLoop();
+    HashWorker(gateway_address, gateway_port).MainLoop();
   } catch (WorkerException &e) {
     spdlog::error(e.what());
     return 1;
