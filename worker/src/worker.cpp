@@ -108,7 +108,7 @@ void Worker::SendPulse(PulseType type) {
     PulseResponse response;
     ReadProtoMessage(main_fd, response);
 
-    if (response.error() != CTRL_ERR_OK) {
+    if (response.error() != CTRL_SUCCESS) {
       throw WorkerException(ControllerError_Name(response.error()));
     }
     close(main_fd);
@@ -183,7 +183,7 @@ int Worker::GetPulseTimeout() {
 
 void Worker::HandleRestartControlMessage(WorkerResponse &resp) {
   SetState(WorkerState::SHUTTING_DOWN);
-  resp.set_error(WORKER_ERR_OK);
+  resp.set_error(WORKER_SUCCESS);
 }
 
 void Worker::HandleFetchControlMessage(WorkerResponse &resp) {
@@ -219,7 +219,7 @@ void Worker::HandleGetStatusControlMessage(WorkerResponse &resp) {}
 void Worker::HandleControlMessage(int client_fd) {
   WorkerResponse response;
   response.set_task_id(current_task_id);
-  response.set_error(WORKER_ERR_OK);
+  response.set_error(WORKER_SUCCESS);
 
   try {
     ControlMsg msg;

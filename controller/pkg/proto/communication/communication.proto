@@ -11,7 +11,7 @@ enum PulseType {
 
 enum ControllerError {
     CTRL_ERR_INVALID = 0;
-    CTRL_ERR_OK = 1;
+    CTRL_SUCCESS = 1;
     CTRL_ERR_UNKNOWN_TYPE = 2;
     CTRL_ERR_UNKNOWN_ID = 3;
     CTRL_ERR_FAILED = 4;
@@ -45,7 +45,7 @@ message ControlMsg {
 
 enum WorkerError {
     WORKER_ERROR_INVALID = 0;
-    WORKER_ERR_OK = 1;
+    WORKER_SUCCESS = 1;
     WORKER_ERR_NO_FETCH = 2;
     WORKER_ERR_BUSY = 3;
     WORKER_ERR_TASK_FAILED = 4;

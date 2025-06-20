@@ -199,7 +199,7 @@ func (m *Manager) handleRegisterPulse(pulse *communication.WorkerPulse) *communi
 	}
 
 	return &communication.PulseResponse{
-		Error:    communication.ControllerError_CTRL_ERR_OK,
+		Error:    communication.ControllerError_CTRL_SUCCESS,
 		WorkerId: workerID,
 	}
 }
@@ -225,20 +225,20 @@ func (m *Manager) handleOkPulse(pulse *communication.WorkerPulse) *communication
 	worker.nextPulse = time.Duration(pulse.NextPulse) * time.Second
 
 	return &communication.PulseResponse{
-		Error:    communication.ControllerError_CTRL_ERR_OK,
+		Error:    communication.ControllerError_CTRL_SUCCESS,
 		WorkerId: 0,
 	}
 }
 
 func (m *Manager) handleFetchMePulse(pulse *communication.WorkerPulse) *communication.PulseResponse {
 	resp := m.handleOkPulse(pulse)
-	if resp.Error != communication.ControllerError_CTRL_ERR_OK {
+	if resp.Error != communication.ControllerError_CTRL_SUCCESS {
 		return resp
 	}
 
 	m.fetchWorkers <- pulse.WorkerId
 	return &communication.PulseResponse{
-		Error:    communication.ControllerError_CTRL_ERR_OK,
+		Error:    communication.ControllerError_CTRL_SUCCESS,
 		WorkerId: 0,
 	}
 }
@@ -259,7 +259,7 @@ func (m *Manager) handleShutdownPulse(pulse *communication.WorkerPulse) *communi
 
 	delete(m.workers, workerID)
 	return &communication.PulseResponse{
-		Error:    communication.ControllerError_CTRL_ERR_OK,
+		Error:    communication.ControllerError_CTRL_SUCCESS,
 		WorkerId: 0,
 	}
 }
@@ -372,7 +372,7 @@ func (m *Manager) assignTaskToWorker(taskID uint64, workerID uint64) {
 		return
 	}
 
-	if resp.Error != communication.WorkerError_WORKER_ERR_OK {
+	if resp.Error != communication.WorkerError_WORKER_SUCCESS {
 		log.Printf("Worker %d error on SET_TASK: %v", workerID, resp.Error)
 		if resp.Error == communication.WorkerError_WORKER_ERR_BUSY {
 			m.freeWorkers <- workerID
@@ -414,7 +414,7 @@ func (m *Manager) fetchTaskResult(workerID uint64) {
 	case communication.WorkerError_WORKER_ERR_TASK_FAILED:
 		m.requeueTask(resp.TaskId)
 		m.markWorkerFree(workerID)
-	case communication.WorkerError_WORKER_ERR_OK:
+	case communication.WorkerError_WORKER_SUCCESS:
 		task, ok := m.tasks[resp.TaskId]
 		desired_chan := &m.taskSolutions
 		if !ok {
