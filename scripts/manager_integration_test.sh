@@ -34,8 +34,7 @@ setup() {
 
 build() {
     echo -e "${COL_LBLUE}Building worker...${COL_RESET}"
-    docker compose build
-    
+    cd worker && docker compose build && cd ..
     echo -e "${COL_LBLUE}Building manager...${COL_RESET}" 
     cd controller && bazel build //cmd/manager:manager && cd ..
 }
