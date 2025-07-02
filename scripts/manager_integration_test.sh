@@ -60,7 +60,7 @@ run_worker() {
         -e "METRICS_GATEWAY_PORT=9091" \
         -e "METRICS_WORKER_NAME=${worker}" \
         --name "${worker}" \
-        "grpc_server-worker"
+        "worker-worker"
 }
 
 run_workers() {
