@@ -1,9 +1,8 @@
 module(
   name = "worker",
 )
-
 bazel_dep(name = "platforms", version = "0.0.10")
-
+bazel_dep(name = "spdlog", version = "1.15.2")
 register_toolchains(
     "//toolchains/x86_64:cc_toolchain_for_linux_x86_64",
     "//toolchains/riscv:cc_toolchain_for_linux_riscv64",

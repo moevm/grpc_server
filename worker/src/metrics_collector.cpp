@@ -2,7 +2,7 @@
 
 #include <chrono>
 #include <fstream>
-#include <iostream>
+#include <spdlog/spdlog.h>
 #include <thread>
 #include <unistd.h>
 
@@ -85,8 +85,7 @@ void MetricsCollector::MainLoop() {
 
     int status = gateway.PushAdd();
     if (status != 200) {
-      std::cerr << "[ERROR] Failed to push metrics. Status " << status
-                << std::endl;
+      spdlog::warn("Failed to push metrics. Status {}", status);
     }
   }
 }

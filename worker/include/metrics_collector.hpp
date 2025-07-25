@@ -1,3 +1,6 @@
+#ifndef METRICS_COLLECTOR_HPP
+#define METRICS_COLLECTOR_HPP
+
 #include <chrono>
 #include <prometheus/gateway.h>
 #include <prometheus/gauge.h>
@@ -42,3 +45,5 @@ public:
   void StartTask();
   void StopTask();
 };
+
+#endif

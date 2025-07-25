@@ -1,10 +1,10 @@
-FROM gcr.io/bazel-public/bazel:latest
+FROM gcr.io/bazel-public/bazel:8.2.1
 
 WORKDIR /app
 COPY . .
 
-RUN bazel build //cmd/manager:manager
+RUN bazel build //cmd/grpc_server:grpc_server
 
 VOLUME ["/run/controller"]
 
-ENTRYPOINT ["./bazel-bin/cmd/manager/manager_/manager"]
+ENTRYPOINT ["./bazel-bin/cmd/grpc_server/grpc_server_/grpc_server"]

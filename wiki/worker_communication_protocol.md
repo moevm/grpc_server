@@ -39,7 +39,8 @@ message PulseResponse {
 
 Поля *worker_id* и *task_id* игнорируются. Контроллер регистрирует воркера. При ошибке посылает соответствующее сообщение. Иначе посылает сообщение OK и передаёт воркеру его worker_id.
 
-При успешной регистрации воркер создаёт `/run/controller/WORKER_ID.sock` и слушает подключения.
+Если ошибок не произошло, то контроллер присваивает этому воркеру статус BOOTING. Воркер в это время создаёт `/run/controller/WORKER_ID.sock` и слушает подключения.
+Контроллер переводит воркера из состояния *BOOTING* в состояние *FREE* как только получает от воркера очередной WorkerPulse. Поэтому воркер после успешного создания сокета посылает *OK WorkerPulse*.
 
 ### OK:
 
@@ -135,3 +136,19 @@ message WorkerResponse {
 ### GET_STATUS:
 
 Контроллер запрашивает состояние воркера. Воркер посылает WorkerResponse без extra данных, указывает текущий *task_id*.
+
+
+## ABI
+
+Формат передачи сообщений:
+
+| Offset | Type       | Name | Meaning                     |
+| ------ | ---------- | ---- | --------------------------- |
+| 0      | uint64     | size | Message size                | 
+| 8      | byte[size] | msg  | Serialized protobuf message |
+
+
+## TODO
+
+* Add full english translation (google translate does funny things)
+* Protobuf messages do not have a fixed size. This is inconvenient. The *size* field could be removed if messages had a fixed size.
