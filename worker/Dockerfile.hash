@@ -1,4 +1,4 @@
-FROM alpine:latest AS builder
+FROM alpine:3.21.3 AS builder
 
 RUN apk update && apk add --no-cache g++ openssl-dev cmake make curl-dev protobuf-dev
 RUN apk add bazel --repository=http://dl-cdn.alpinelinux.org/alpine/edge/testing/
@@ -8,15 +8,15 @@ WORKDIR /app
 COPY scripts/get_prometheus_cpp.sh scripts/
 RUN sh scripts/get_prometheus_cpp.sh
 
-COPY worker/src/ ./src/
-COPY worker/include/ ./include/
-COPY worker/BUILD ./
-COPY worker/MODULE.bazel ./
-COPY worker/communication.proto ./
+COPY ./src/ ./src/
+COPY ./include/ ./include/
+COPY ./BUILD ./
+COPY ./MODULE.bazel ./
+COPY ./communication.proto ./
 
 RUN bazel build //:worker
 
-FROM alpine:latest
+FROM alpine:3.21.3
 
 RUN apk update &&  apk add --no-cache libstdc++ libgcc libssl3 libcurl protobuf-dev
 
