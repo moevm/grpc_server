@@ -78,6 +78,8 @@ def _impl(ctx):
         ctx = ctx,
         features = features, 
         cxx_builtin_include_directories = [
+            "/usr/lib/llvm18/lib/clang/18/include",
+            "/usr/lib/llvm-19/lib/clang/19/include",
             "/usr/lib/llvm-18/lib/clang/18/include",
             "/usr/include",
             "/usr/local/include",
