@@ -3,3 +3,6 @@ module(
 )
 
 bazel_dep(name = "spdlog", version = "1.15.2")
+bazel_dep(name = "abseil-cpp", version = "20250512.1")
+bazel_dep(name = "protobuf", version = "32.0-rc1")
+bazel_dep(name = "curl", version = "8.8.0.bcr.3")

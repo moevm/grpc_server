@@ -1,12 +1,56 @@
-FROM alpine:3.21.3 AS builder
+FROM ubuntu:22.04 AS builder
 
-RUN apk update && apk add --no-cache g++ openssl-dev cmake make curl-dev protobuf-dev
-RUN apk add bazel --repository=http://dl-cdn.alpinelinux.org/alpine/edge/testing/
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    wget \
+    unzip \
+    openjdk-21-jdk \
+    python3 \
+    g++ \
+    zip \
+    git && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app 
+RUN wget https://github.com/bazelbuild/bazel/releases/download/8.3.1/bazel-8.3.1-dist.zip
+
+RUN unzip bazel-8.3.1-dist.zip -d bazel-src
+WORKDIR /app/bazel-src
+RUN env EXTRA_BAZEL_ARGS="--tool_java_runtime_version=local_jdk" \
+    SOURCE_DATE_EPOCH=0 \
+    bash ./compile.sh
+RUN cp output/bazel /usr/local/bin/
 
 WORKDIR /app
 
 COPY scripts/get_prometheus_cpp.sh scripts/
-RUN sh scripts/get_prometheus_cpp.sh
+RUN apt-get update && apt-get install -y \
+    cmake \
+    curl \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y \
+    libcurl4-openssl-dev \ 
+    libbenchmark-dev \      
+    && rm -rf /var/lib/apt/lists/*
+
+RUN bash scripts/get_prometheus_cpp.sh
+
+RUN wget -q https://www.openssl.org/source/openssl-3.5.0.tar.gz && \
+    tar xzf openssl-3.5.0.tar.gz && \
+    rm openssl-3.5.0.tar.gz && \
+    cd openssl-3.5.0 && \
+    ./config --prefix=/usr/local/openssl \
+             --openssldir=/usr/local/openssl \
+             --libdir=lib \
+             no-tests && \ 
+    make -j$(nproc) && \
+    make install_sw && \
+    cd .. && \
+    rm -rf openssl-3.5.0
+ENV PATH="/usr/local/openssl/bin:${PATH}"  
+WORKDIR /app
 
 COPY ./src/ ./src/
 COPY ./include/ ./include/
@@ -16,12 +60,11 @@ COPY ./communication.proto ./
 
 RUN bazel build //:worker
 
-FROM alpine:3.21.3
-
-RUN apk update &&  apk add --no-cache libstdc++ libgcc libssl3 libcurl protobuf-dev
+FROM ubuntu:22.04
 
 COPY --from=builder /app/bazel-bin/worker /usr/local/bin/worker
 COPY --from=builder /app/prometheus-cpp-with-submodules/build/lib/ /usr/lib
+COPY --from=builder /usr/lib /usr/lib
 
 
 WORKDIR /data
