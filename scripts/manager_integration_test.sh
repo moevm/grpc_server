@@ -34,7 +34,7 @@ setup() {
 
 build() {
     echo -e "${COL_LBLUE}Building worker...${COL_RESET}"
-    cd worker && docker compose build && cd ..
+    docker compose --file ./worker/docker-compose.yml build 
     echo -e "${COL_LBLUE}Building manager...${COL_RESET}" 
     cd controller && bazel build //cmd/manager:manager && cd ..
 }
@@ -60,7 +60,7 @@ run_worker() {
         -e "METRICS_GATEWAY_PORT=9091" \
         -e "METRICS_WORKER_NAME=${worker}" \
         --name "${worker}" \
-        "worker-worker"
+        "grpc_server-worker"
 }
 
 run_workers() {

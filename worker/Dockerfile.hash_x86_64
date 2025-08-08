@@ -1,0 +1,37 @@
+FROM alpine:3.21.3 AS builder
+
+RUN apk update && apk add --no-cache g++ openssl-dev cmake make curl-dev protobuf-dev
+RUN apk add bazel --repository=http://dl-cdn.alpinelinux.org/alpine/edge/testing/
+
+WORKDIR /app
+
+COPY scripts/get_prometheus_cpp.sh scripts/
+RUN sh scripts/get_prometheus_cpp.sh
+RUN apk add --no-cache llvm18 clang18
+RUN ln -s /usr/lib/llvm18/bin/llvm-ar /bin/llvm-ar-18
+RUN ln -s /usr/bin/clang++-18 /usr/bin/clang++
+RUN ln -s /usr/bin/clang-18 /usr/bin/clang
+
+
+COPY ./src/ ./src/
+COPY ./include/ ./include/
+COPY ./BUILD ./
+COPY ./MODULE.bazel ./
+COPY ./communication.proto ./
+COPY ./toolchains ./toolchains
+COPY ./platforms ./platforms
+
+
+RUN bazel build //:worker --extra_toolchains=//toolchains/x86_64:cc_toolchain_for_linux_x86_64 --platforms=//platforms:x86_64_linux
+
+FROM alpine:3.21.3
+
+RUN apk update &&  apk add --no-cache libstdc++ libgcc libssl3 libcurl protobuf-dev
+
+COPY --from=builder /app/bazel-bin/worker /usr/local/bin/worker
+COPY --from=builder /app/prometheus-cpp-with-submodules/build/lib/ /usr/lib
+
+
+WORKDIR /data
+
+ENTRYPOINT ["/usr/local/bin/worker", "/data/test.txt", "sha256"]
