@@ -4,7 +4,7 @@ services:
   worker:
     build: 
       context: .
-      dockerfile: Dockerfile.hash_x86_64
+      dockerfile: Dockerfile.cc_x86_to_x86
     volumes:
       - ./data:/data 
     working_dir: /data
