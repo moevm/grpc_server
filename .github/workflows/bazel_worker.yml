@@ -16,4 +16,4 @@ jobs:
           bazel --version
 
       - name: Build worker
-        run: docker compose build
+        run: docker compose --file ./worker/docker-compose.yml build
