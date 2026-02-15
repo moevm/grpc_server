@@ -20,8 +20,6 @@ Options:
 Examples:
     $(basename "$0") start --count=3
     $(basename "$0") stop
-    $(basename "$0") status
-    $(basename "$0") restart --count=5
 EOF
 }
 
