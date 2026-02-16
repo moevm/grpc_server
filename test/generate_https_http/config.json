@@ -1,6 +1,5 @@
 {
-    "min_sleep": 3,
-    "max_sleep": 6,
+    "RPS": 4,
     "root_urls": [
         "http://4chan.org",
         "https://www.reddit.com",
