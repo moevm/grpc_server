@@ -1,0 +1,12 @@
+This README file contains information on the contents of the meta-cluster layer.
+
+Please see the corresponding sections below for details.
+
+Dependencies
+============
+
+  URI: <first dependency>
+  branch: <branch name>
+
+  URI: <second dependency>
+  branch: <branch name>
