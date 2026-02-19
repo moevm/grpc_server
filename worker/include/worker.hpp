@@ -98,7 +98,7 @@ public:
   ~Worker();
 
   inline uint64_t GetID() const { return worker_id; }
-
+  void requestPolicyFromController();
   WorkerState GetState() const { return state; }
   virtual void ProcessTask(const std::vector<char> &data) = 0;
   void MainLoop();

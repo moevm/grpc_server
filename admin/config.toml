@@ -1,0 +1,22 @@
+[global.rules]
+block_categories = ["MALWARE", "SOCIAL"]
+block_domains = ["youtube.com", "tiktok.com"]
+allow_domains = ["github.com", "stackoverflow.com"]
+
+[global.rules.block_by_trust]
+ENTERTAINMENT = 6
+NEWS = 4
+
+[filters.filter_1]
+block_categories = ["SOCIAL", "ENTERTAINMENT"]
+block_domains = ["instagram.com"]
+allow_domains = ["vk.com"]
+
+[filters.filter_1.block_by_trust]
+SOCIAL = 8
+ENTERTAINMENT = 7
+
+[filters.filter_2]
+block_categories = ["MALWARE"]
+allow_domains = ["github.com", "gitlab.com"]
+min_trust_level = 3

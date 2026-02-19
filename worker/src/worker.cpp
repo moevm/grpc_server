@@ -157,6 +157,7 @@ Worker::Worker() : listener_fd(-1), state(WorkerState::BOOTING) {
 
   SendPulse(PULSE_OK);
   SetState(WorkerState::FREE);
+  requestPolicyFromController();
 }
 
 Worker::~Worker() {
@@ -212,6 +213,10 @@ void Worker::HandleSetTaskControlMessage(const ControlMsg &msg,
 
   current_task_id = msg.task_id();
   std::thread(ProcessTask_Static, this, extra).detach();
+}
+
+void Worker::requestPolicyFromController() {
+    spdlog::info("Worker {} requesting policy from controller.", worker_id);
 }
 
 void Worker::HandleGetStatusControlMessage(WorkerResponse &resp) {}

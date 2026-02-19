@@ -15,6 +15,7 @@ go_library(
         "//internal/config",
         "//internal/grpcserver",
         "//internal/manager",
+        "//pkg/proto/admin_service:admin_service_go_proto",
         "//pkg/proto/file_service:file_service_go_proto",
         "@org_golang_google_grpc//:go_default_library",
         "@org_golang_google_grpc//reflection",

@@ -10,16 +10,20 @@ import (
 	pb "github.com/moevm/grpc_server/pkg/proto/file_service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	adminPb "github.com/moevm/grpc_server/pkg/proto/admin_service"
 )
 
 func main() {
 	cfg := config.Load()
-
-	mgr, err := manager.NewManager()
+	adminServer := grpcserver.NewAdminServer()
+	configData, configVersion := adminServer.GetConfig() 
+	mgr, err := manager.NewManager(configData, configVersion)
 	if err != nil {
 		log.Fatalf("manager.NewManager(): %v", err)
 	}
 
+	adminServer.SetManager(mgr)
+	
 	lis, err := net.Listen("tcp", net.JoinHostPort(cfg.Host, cfg.Port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
@@ -31,6 +35,7 @@ func main() {
 	}
 
 	service := grpc.NewServer(serverOpts...)
+	adminPb.RegisterAdminServiceServer(service, adminServer)
 	pb.RegisterFileServiceServer(service, grpcserver.NewServer(cfg.AllowedChars, mgr))
 	reflection.Register(service)
 

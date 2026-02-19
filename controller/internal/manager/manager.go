@@ -23,7 +23,6 @@ import (
 
 	"github.com/moevm/grpc_server/internal/conn"
 	"google.golang.org/protobuf/proto"
-
 	communication "github.com/moevm/grpc_server/pkg/proto/communication"
 )
 
@@ -49,6 +48,7 @@ type IManager interface {
 type Manager struct {
 	listener net.Listener
 
+	policyManager *PolicyManager
 	workers      map[uint64]*Worker
 	workersMutex sync.Mutex
 	workerId     uint64
@@ -504,7 +504,27 @@ func removeContents(dir string) error {
 	return nil
 }
 
-func NewManager() (*Manager, error) {
+func (m *Manager) HandleGetPolicy(workerID uint64) ([]byte, error) {
+    log.Printf("Worker %d requested policy", workerID)
+
+    policyProto := m.policyManager.GetWorkerPolicyProto(workerID)
+
+    policyBytes, err := proto.Marshal(policyProto)
+    if err != nil {
+        return nil, err
+    }
+
+    log.Printf("Sending policy to worker %d", workerID)
+    return policyBytes, nil
+}
+
+func (m *Manager) UpdateConfig(configData []byte, version uint64) {
+	if m.policyManager != nil {
+		m.policyManager.UpdateConfig(configData, version)
+	}
+}
+
+func NewManager(configData []byte, version uint64) (*Manager, error) {
 	if err := removeContents(workerSocketPath); err != nil {
 		return nil, fmt.Errorf("failed to clean socket directory: %w", err)
 	}
@@ -516,6 +536,7 @@ func NewManager() (*Manager, error) {
 
 	m := &Manager{
 		listener:      listener,
+		policyManager: NewPolicyManager(configData, version),
 		workers:       make(map[uint64]*Worker),
 		tasks:         make(map[uint64]*Task),
 		freeWorkers:   make(chan uint64, 32),

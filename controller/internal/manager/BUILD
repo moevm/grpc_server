@@ -2,7 +2,7 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "manager",
-    srcs = ["manager.go"],
+    srcs = ["manager.go",  "policy_manager.go",],
     importpath = "github.com/moevm/grpc_server/internal/manager",
     visibility = ["//visibility:public"],
     deps = [
@@ -11,5 +11,6 @@ go_library(
         "//pkg/proto/communication:communication_go_proto",
         "@org_golang_google_protobuf//proto",
         "@com_github_joho_godotenv//:go_default_library",
+        "@com_github_pelletier_go_toml//:go_default_library",
     ],
 )
