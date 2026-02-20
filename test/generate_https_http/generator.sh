@@ -10,15 +10,16 @@ show_help() {
 Usage: $(basename "$0") [COMMAND] [OPTIONS]
 
 Commands:
-    start       Запустить процессы
-    stop        Остановить все процессы
+    start       start process
+    stop        stop all proces
 
 Options:
-    --count=N   Количество процессов (по умолчанию: 2)
-    --help      Показать эту справку
+    --count=N           number of process (default: 2)
+    --help              show help
+    --max_concurrent     max concurent requests
 
 Examples:
-    $(basename "$0") start --count=3
+    $(basename "$0") start --count=3 --max_concurrent=4
     $(basename "$0") stop
 EOF
 }
@@ -26,17 +27,17 @@ EOF
 check_dependencies() {
 
     if [ ! -f "main.py" ]; then
-        echo "Не найден файл main.py"
+        echo "Not found file main.py"
         exit 1
     fi
 
     if [ ! -f "config.json" ]; then
-        echo "Не найден файл config.json"
+        echo "Not found file config.json"
         exit 1
     fi
 
     if [ ! -f "requirements.txt" ]; then
-        echo "Не найден файл requirements.txt"
+        echo "Not found file requirements.txt"
         exit 1
     fi
 
@@ -67,6 +68,7 @@ is_process_running() {
 start_processes() {
 
     local count=$1
+    local max_concurent=$2
 
     if [ -f "$PID_FILE" ]; then
         local running_pids=()
@@ -77,7 +79,7 @@ start_processes() {
         done < "$PID_FILE"
 
         if [ ${#running_pids[@]} -gt 0 ]; then
-            echo "Уже есть запущенные клиенты, остновите их командой stop"
+            echo "There are already running clients, stop them with the stop command"
             return 1
         else
             > "$PID_FILE"
@@ -91,7 +93,7 @@ start_processes() {
 
     for ((i=0;i<count;i++)); do
 
-        python3 main.py --config config.json --log "$LOG_LEVEL" >> "$LOG_FILE" 2>&1 & local pid=$!
+        python3 main.py --config config.json --log "$LOG_LEVEL" --max_concurent $max_concurent >> "$LOG_FILE" 2>&1 & local pid=$!
 
         echo "$pid" >> "$PID_FILE"
 
@@ -102,7 +104,7 @@ start_processes() {
 stop_process() {
 
     if [ ! -f "$PID_FILE" ]; then
-        echo "Нет активных процессов"
+        echo "No active processes"
         return 0
     fi
 
@@ -118,6 +120,7 @@ stop_process() {
 
 COMMAND=""
 COUNT=2
+MAX_CONCURENT=5
 
 if [ $# -gt 0 ] && [[ ! "$1" =~ ^-- ]]; then
     COMMAND="$1"
@@ -134,8 +137,12 @@ for arg in "$@"; do
             show_help
             exit 0
             ;;
+        --max_concurent=*)
+            MAX_CONCURENT="${arg#*=}"
+            shift
+            ;;
         *)
-            echo "Неизвестная опция: $arg"
+            echo "Unknown option: $arg"
             ;;
     esac
 done
@@ -143,12 +150,12 @@ done
 
 case "$COMMAND" in
     start)
-        start_processes "$COUNT"
+        start_processes "$COUNT" "$MAX_CONCURENT"
         ;;
     stop)
         stop_process
         ;;
     *)
-        echo "Неизвестная команда: $COMMAND"
+        echo "Unknown command: $COMMAND"
         ;;
 esac

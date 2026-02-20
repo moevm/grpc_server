@@ -1,5 +1,6 @@
 import json
 
+import time
 import random
 import argparse
 import logging
@@ -7,63 +8,80 @@ import asyncio
 import httpx
 
 
-class GenerateTraficHttpHttps:
+class GenerateTrafficHttpHttps:
 
     def __init__(self):
         self._config = {}
 
-    async def _request(self, url: str, client: httpx.AsyncClient):
+    async def _request(self, url: str, client: httpx.AsyncClient, timeout: float = 10.0):
         try:
-            response = await client.get(url, timeout=10.0)
+            response = await client.get(url, timeout=timeout)
             return response
-        except Exception as ex:
-            logging.error(f"Error request to {url}: {ex}")
+        except Exception:
+            logging.error(f"Error request to {url}")
             return None
 
-    def load_config_file(self, file_path: str):
-        with open(file_path, 'r') as config_file:
-            config = json.load(config_file)
-            self.set_config(config)
+    def load_config_file(self, file_path: str) -> bool:
 
-    def set_config(self, config):
-        self._config = config
+        try:
+            with open(file_path, 'r') as config_file:
+                config = json.load(config_file)
+                self._config = config
 
-    def set_option(self, option, value):
-        self._config[option] = value
+        except Exception as ex:
+            logging.error(ex)
+            return False
 
-    async def _generate_async(self):
+        return True
+
+    async def _generate_async(self, max_concurrent_requests: int):
+
+        semaphore = asyncio.Semaphore(max_concurrent_requests)
+
+        delay = 1.0 / self._config["RPS"]
 
         async with httpx.AsyncClient() as client:
             while True:
                 url = random.choice(self._config["root_urls"])
 
-                response = await self._request(url, client)
+                async def make_request(target_url: str):
+                    async with semaphore:
+                        return await self._request(target_url, client)
 
-                if response:
-                    logging.info(f"Request to {url} status {response.status_code}")
-
-                delay = 1 / self._config["RPS"]
+                asyncio.create_task(make_request(url))
 
                 await asyncio.sleep(delay)
 
-    def generate(self):
+    def generate(self, max_concurrent_requests: int):
 
-        asyncio.run(self._generate_async())
+        asyncio.run(self._generate_async(max_concurrent_requests))
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', metavar='-c', required=True, type=str, help='config file')
     parser.add_argument('--log', metavar='-l', required=True, type=str, help='logging level')
+    parser.add_argument('--max_concurrent', metavar='m', required=True, type=int, help='max concurent requests')
     args = parser.parse_args()
 
-    level = getattr(logging, args.log.upper())
+    try:
+        level = getattr(logging, args.log.upper())
+    except Exception as ex:
+        print(ex)
+        return
+
     logging.basicConfig(level=level)
 
-    generator = GenerateTraficHttpHttps()
-    generator.load_config_file(args.config)
+    generator = GenerateTrafficHttpHttps()
 
-    generator.generate()
+    if not generator.load_config_file(args.config):
+        return
+
+    generator.generate(args.max_concurent)
+
+
+if __name__ == '__main__':
+    main()
 
 
 
