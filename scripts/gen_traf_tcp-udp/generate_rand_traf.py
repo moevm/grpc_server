@@ -3,87 +3,96 @@ import random
 import sys
 import argparse
 from datetime import datetime
+from enum import Enum
 import json
+import socket
 
 
-def check():
+
+class ResultFunction(Enum):
+    TIME_EXCEEDED = 1
+    REQUEST_COMPLETED = 0
+    ERROR_EXECUTING_SCRIPT = -1
+
+def pars():
     parser = argparse.ArgumentParser(
-        description="Генератор трафика с контролем RPS и таймаутами",
+        description="Traffic generator with RPS control and timeouts",
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
         "--quantity", "-q",
         type=int,
         default=10,
-        help="Количество запросов (обязательный параметр)"
+        help="Number of requests (10 by default)"
     )
     parser.add_argument(
         "--rps", "-r",
         type=int,
         default=10,
-        help="Желаемое количество запросов в секунду (по умолчанию 10)"
+        help="The desired number of requests per second (10 by default)"
     )
     parser.add_argument(
         "--timeout", "-t",
         type=int,
         default=5,
-        help="Таймаут на один запрос в секундах (по умолчанию 5)"
+        help="Timeout per request in seconds (5 by default)"
     )
     parser.add_argument(
         "--file", "-f",
         type=str,
         default="sites.txt",
-        help="Файл со списком сайтов (по умолчанию sites.txt)"
+        help="A file with a list of sites (by default sites.txt )"
     )
     parser.add_argument(
         "--max_concurrent", "-m",
         type=int,
         default=50,
-        help="Максимальное количество одновременно выполеняемых задач (по умолчанию 50)"
+        help="Maximum number of simultaneous tasks (50 by default)"
     )
 
     args = parser.parse_args()
 
     if args.quantity <= 0:
-        print("Ошибка: количество запросов должно быть положительным числом")
-        sys.exit(1)
+        print("Error: the number of requests must be a positive number, using the default value of 10")
+        args.quantity = 10
     if args.rps <= 0:
-        print("Ошибка: RPS должно быть положительным числом, используем значение по умолчанию 10")
+        print("Error: RPS must be a positive number, using the default value of 10")
         args.rps = 10
     if args.timeout <= 0:
-        print("Ошибка: таймаут должен быть положительным числом, используем значение по умолчанию 5")
+        print("Error: the timeout must be a positive number, using the default value of 5")
         args.timeout = 5
     if args.max_concurrent <= 0:
-        print("Ошибка: количество одновременно выполеняемых задач должно быть положительным числом, используем значение по умолчанию 50")
+        print("Error: the number of tasks being completed at the same time must be a positive number, using the default value of 50")
         args.max_concurrent = 50
 
     try:
         with open(args.file, 'r') as f:
             sites = [line.strip() for line in f if line.strip()]
     except FileNotFoundError:
-        print(f"Ошибка: файл '{args.file}' не найден")
+        print(f"Error: file '{args.file}' not found")
         sys.exit(1)
 
     if not sites:
-        print(f"Ошибка: файл '{args.file}' пуст")
+        print(f"Error: file '{args.file}' is empty")
         sys.exit(1)
 
     return args.quantity, sites, args.rps, args.timeout, args.max_concurrent
 
-
 async def check_one(site, timeout):
     try:
+        # process_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # process_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         process = await asyncio.create_subprocess_exec('./generate_traf.sh', '1',\
                                                         site, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)  
         await asyncio.wait_for(process.communicate(), timeout=timeout)
         if process.returncode == 0:
-            return site, 0
-        return site, -1 
+            return site, ResultFunction.REQUEST_COMPLETED
+        return site, ResultFunction.ERROR_EXECUTING_SCRIPT
     
     except asyncio.TimeoutError:
         process.kill()
         await process.wait()
-        return site, 1
+        return site, ResultFunction.TIME_EXCEEDED
 
 def log(quantity, rps, timeout, max_concurrent, results):
     success_count = 0
@@ -141,13 +150,13 @@ def log(quantity, rps, timeout, max_concurrent, results):
     try:
         with open(filename, 'w', encoding='utf-8') as file:
             json.dump(log_data, file, indent=2, ensure_ascii=False)
-        print(f"\nЛоги сохранёны в файл: {filename}")
+        print(f"\nLogs are saved to a file: {filename}")
     except Exception as e:
-        print(f"\nОшибка при сохранении логов: {e}")
+        print(f"\nError saving logs: {e}")
 
 
 async def main():
-    quantity, sites, rps, timeout, max_concurrent = check()
+    quantity, sites, rps, timeout, max_concurrent = pars()
     
     semaphore = asyncio.Semaphore(max_concurrent)
     delay = 1.0 / rps
@@ -155,9 +164,9 @@ async def main():
     tasks = []
     for _ in range(quantity):
         site = random.choice(sites)
-        async def task_wrapper():
+        async def task_wrapper(certain_site=site):
             async with semaphore:
-                return await check_one(site, timeout)
+                return await check_one(certain_site, timeout)
         
         task = asyncio.create_task(task_wrapper())
         tasks.append(task)
