@@ -37,6 +37,8 @@ const (
 
 const (
 	workerMainSocketPath = "/run/controller/main.sock"
+	workerPolicySocketPath = "/run/controller/policy.sock"
+	workerClassifySocketPath = "/run/controller/classify.sock"
 	workerSocketPath     = "/run/controller/"
 )
 
@@ -47,6 +49,8 @@ type IManager interface {
 
 type Manager struct {
 	listener net.Listener
+	policyListener net.Listener  
+	classifyListener net.Listener
 
 	policyManager *PolicyManager
 	workers      map[uint64]*Worker
@@ -328,6 +332,100 @@ func (m *Manager) mainLoop() {
 	}
 }
 
+
+func (m *Manager) policyLoop() {
+	log.Print("Listening on policy.sock")
+	for {
+		select {
+		case <-m.shutdown:
+			return
+		default:
+			netConn, err := m.policyListener.Accept()
+			if err != nil {
+				log.Printf("Policy accept error: %v", err)
+				continue
+			}
+			go m.handlePolicyConnection(conn.Unix{Conn: netConn})
+		}
+	}
+}
+
+func (m *Manager) classifyLoop() {
+	log.Print("Listening on classify.sock")
+	for {
+		select {
+		case <-m.shutdown:
+			return
+		default:
+			netConn, err := m.classifyListener.Accept()
+			if err != nil {
+				log.Printf("Classify accept error: %v", err)
+				continue
+			}
+			go m.handleClassifyConnection(conn.Unix{Conn: netConn})
+		}
+	}
+}
+
+func (m *Manager) handlePolicyConnection(conn conn.Unix) {
+	defer conn.Close()
+
+	msgData, err := conn.ReadMessage()
+	if err != nil {
+		m.errorChan <- fmt.Errorf("policy read error: %w", err)
+		return
+	}
+
+	var req communication.GetPolicyRequest
+	if err := proto.Unmarshal(msgData, &req); err != nil {
+		m.errorChan <- fmt.Errorf("policy unmarshal error: %w", err)
+		return
+	}
+
+	log.Printf("Policy request received from worker %d", req.WorkerId)
+	
+	policyBytes, err := m.HandleGetPolicy(req.WorkerId)
+	if err != nil {
+		log.Printf("Error getting policy: %v", err)
+		return
+	}
+	
+	conn.WriteMessage(policyBytes)
+	log.Printf("Policy sent worker %d", req.WorkerId)
+}
+
+func (m *Manager) handleClassifyConnection(conn conn.Unix) {
+	defer conn.Close()
+
+	msgData, err := conn.ReadMessage()
+	if err != nil {
+		m.errorChan <- fmt.Errorf("classify read error: %w", err)
+		return
+	}
+
+	var req communication.ClassifyRequest
+	if err := proto.Unmarshal(msgData, &req); err != nil {
+		m.errorChan <- fmt.Errorf("classify unmarshal error: %w", err)
+		return
+	}
+
+	log.Printf("Classify request received from worker %d for domen '%s'", 
+		req.WorkerId, req.Domen)
+
+	resp := &communication.ClassifyResponse{
+		Category:   "unknown",
+		TrustLevel: 50,
+	}
+	
+	respData, err := proto.Marshal(resp)
+	if err != nil {
+		m.errorChan <- fmt.Errorf("marshal classify response error: %w", err)
+		return
+	}
+	
+	conn.WriteMessage(respData)
+	log.Printf("Classify response sent to worker %d", req.WorkerId)
+}
 // errorHandler catches the errors from goroutines and logs them.
 // This function should always be run in a goroutine.
 func (m *Manager) errorHandler() {
@@ -534,8 +632,20 @@ func NewManager(configData []byte, version uint64) (*Manager, error) {
 		return nil, fmt.Errorf("failed to create listener: %w", err)
 	}
 
+	policyListener, err := net.Listen("unix", workerPolicySocketPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create policy listener: %w", err)
+	}
+
+	classifyListener, err := net.Listen("unix", workerClassifySocketPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create classify listener: %w", err)
+	}
+
 	m := &Manager{
 		listener:      listener,
+		policyListener: policyListener,
+		classifyListener: classifyListener,
 		policyManager: NewPolicyManager(configData, version),
 		workers:       make(map[uint64]*Worker),
 		tasks:         make(map[uint64]*Task),
@@ -548,6 +658,8 @@ func NewManager(configData []byte, version uint64) (*Manager, error) {
 	}
 
 	go m.mainLoop()
+	go m.policyLoop()  
+	go m.classifyLoop()
 	go m.errorHandler()
 	go m.dispatchTasks()
 	go m.checkHealth()

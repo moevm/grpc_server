@@ -29,7 +29,7 @@ def main():
 
     try:
         client = AdminClient()
-        response = client.load_config(args.file)
+        client.load_config(args.file)
         print("Config loaded")
     except Exception as e:
         print(f"Error loading config: {e}")

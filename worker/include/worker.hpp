@@ -8,6 +8,8 @@
 
 #define SOCKET_DIR "/run/controller/"
 #define MAIN_SOCKET_NAME "main.sock"
+#define POLICY_SOCKET_NAME "policy.sock"
+#define CLASSIFY_SOCKET_NAME "classify.sock"
 #define EXPECTED_PULSE_TIME 60
 #define MIN_PULSE_TIME 30
 #define MAX_PULSE_TIME 45
@@ -99,6 +101,7 @@ public:
 
   inline uint64_t GetID() const { return worker_id; }
   void requestPolicyFromController();
+  void classifyDomen(const std::string& domen);
   WorkerState GetState() const { return state; }
   virtual void ProcessTask(const std::vector<char> &data) = 0;
   void MainLoop();

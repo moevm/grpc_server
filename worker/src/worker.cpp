@@ -125,6 +125,75 @@ void Worker::SendPulse(PulseType type) {
   }
 }
 
+void Worker::requestPolicyFromController() {
+  int main_fd = 0;
+  try {
+    spdlog::info("Worker {} requests policy", worker_id);
+    
+    GetPolicyRequest req;
+    req.set_worker_id(worker_id);
+    
+    main_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (main_fd < 0)
+        throw WorkerException(std::string("socket: ") + strerror(errno));
+
+    sockaddr_un addr{};
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, SOCKET_DIR POLICY_SOCKET_NAME,
+            sizeof(addr.sun_path) - 1);
+
+    if (connect(main_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+        throw WorkerException(std::string("connect: ") + strerror(errno));
+    WriteProtoMessage(main_fd, req);
+    WorkerPolicy policy;
+    ReadProtoMessage(main_fd, policy);
+
+    spdlog::info("Policy received", policy.ShortDebugString());
+
+    close(main_fd);
+  } catch (const std::exception &e) {
+      close(main_fd);
+      SetState(WorkerState::ERROR);
+      spdlog::error("requestPolicyFromController failed: {}", e.what());
+      throw WorkerException(std::string("requestPolicyFromController: ") + e.what());
+  }
+}
+
+void Worker::classifyDomen(const std::string& domen){
+  int main_fd = 0;
+  try{
+    spdlog::info("Worker {} classifying domen '{}'", worker_id, domen);
+    ClassifyRequest req;
+    req.set_worker_id(worker_id);
+    req.set_domen(domen);
+
+    main_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+     if (main_fd < 0)
+          throw WorkerException(std::string("socket: ") + strerror(errno));
+
+    sockaddr_un addr{};
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, SOCKET_DIR CLASSIFY_SOCKET_NAME,
+            sizeof(addr.sun_path) - 1);
+    
+    if (connect(main_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+      throw WorkerException(std::string("connect: ") + strerror(errno));
+    
+    WriteProtoMessage(main_fd, req);
+    ClassifyResponse resp;
+    ReadProtoMessage(main_fd, resp);
+    
+    spdlog::info("Domen '{}' classified as category '{}' with trust level {}", domen, resp.category(), resp.trust_level());
+    
+    close(main_fd);
+    
+  } catch (const std::exception &e) {
+    close(main_fd);
+    SetState(WorkerState::ERROR);
+    throw WorkerException(std::string("classifyDomain: ") + e.what());
+  }
+}
+
 Worker::Worker() : listener_fd(-1), state(WorkerState::BOOTING) {
   SendPulse(PULSE_REGISTER);
 
@@ -213,10 +282,6 @@ void Worker::HandleSetTaskControlMessage(const ControlMsg &msg,
 
   current_task_id = msg.task_id();
   std::thread(ProcessTask_Static, this, extra).detach();
-}
-
-void Worker::requestPolicyFromController() {
-    spdlog::info("Worker {} requesting policy from controller.", worker_id);
 }
 
 void Worker::HandleGetStatusControlMessage(WorkerResponse &resp) {}
