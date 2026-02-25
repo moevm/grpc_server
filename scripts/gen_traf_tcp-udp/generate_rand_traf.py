@@ -6,7 +6,8 @@ from datetime import datetime
 from enum import Enum
 import json
 import socket
-
+import logging
+from pathlib import Path
 
 
 class ResultFunction(Enum):
@@ -49,6 +50,18 @@ def pars():
         default=50,
         help="Maximum number of simultaneous tasks (50 by default)"
     )
+    parser.add_argument(
+        "--log_level", "-l",
+        type=str,
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL (INFO by default)"
+    )
+    parser.add_argument(
+        "--console_log", "-ncl",
+        action="store_true",
+        help="Disable console logging (by default console logging is enabled)"
+    )
 
     args = parser.parse_args()
 
@@ -76,7 +89,7 @@ def pars():
         print(f"Error: file '{args.file}' is empty")
         sys.exit(1)
 
-    return args.quantity, sites, args.rps, args.timeout, args.max_concurrent
+    return args.quantity, sites, args.rps, args.timeout, args.max_concurrent, args.log_level, args.console_log
 
 async def check_one(site, timeout):
     try:
@@ -94,11 +107,42 @@ async def check_one(site, timeout):
         await process.wait()
         return site, ResultFunction.TIME_EXCEEDED
 
-def log(quantity, rps, timeout, max_concurrent, results):
-    success_count = 0
-    timeout_count = 0
-    error_count = 0
-    fatal_error_count = 0
+def setup_logger(flag_stream_handler, input_level_logging):
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+    file_log = log_dir / f"LOG: {datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
+    
+
+    logger = logging.getLogger(__name__)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+
+    logger.setLevel(input_level_logging)
+    
+
+
+    if flag_stream_handler:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(input_level_logging)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+
+
+    file_handler = logging.FileHandler(file_log, encoding='utf-8')
+    file_handler.setLevel(input_level_logging)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
+    return logger, file_log
+
+def log(quantity, rps, timeout, max_concurrent, results, logger, file_log):
+     
+    logger.info(f"   Запросов: {quantity}")
+    logger.info(f"   RPS: {rps}")
+    logger.info(f"   Таймаут: {timeout}с")
+    logger.info(f"   Конкурентность: {max_concurrent}")
+    logger.debug(f"   Файл результатов: {file_log}")
+    
+    success_count = timeout_count = error_count = fatal_error_count = 0
 
     log_data = {
         "parameters": {
@@ -118,22 +162,27 @@ def log(quantity, rps, timeout, max_concurrent, results):
                 "status": "exception",
                 "details": str(res)
             })
+            logger.exception(f"Request to {site} - EXCEPTION: {res}")
+
         else:
             site, code = res
-            if code == 0:
+            if code.value == 0:
                 status = "success"
                 success_count += 1
-            elif code == 1:
+                logger.debug(f"Request to {site} - SUCCESS")
+            elif code.value == 1:
                 status = "timeout"
                 timeout_count += 1
+                logger.error(f"Request to {site} - TIMEOUT")
             else:
                 status = "error"
                 error_count += 1
+                logger.error(f"Request to {site} - ERROR")
 
             log_data["results"].append({
                     "site": site,
                     "status": status,
-                    "code": code
+                    "code": code.name
                 })
 
     log_data["statistics"] = {
@@ -144,19 +193,16 @@ def log(quantity, rps, timeout, max_concurrent, results):
         "fatal_error": fatal_error_count
     }
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"log_{timestamp}.json"
-
     try:
-        with open(filename, 'w', encoding='utf-8') as file:
+        with open(file_log, 'w', encoding='utf-8') as file:
             json.dump(log_data, file, indent=2, ensure_ascii=False)
-        print(f"\nLogs are saved to a file: {filename}")
+        print(f"\nLogs are saved to a file: {file_log}")
     except Exception as e:
         print(f"\nError saving logs: {e}")
 
 
 async def main():
-    quantity, sites, rps, timeout, max_concurrent = pars()
+    quantity, sites, rps, timeout, max_concurrent, log_level, console_log = pars()
     
     semaphore = asyncio.Semaphore(max_concurrent)
     delay = 1.0 / rps
@@ -175,7 +221,8 @@ async def main():
     
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    log(quantity, rps, timeout, max_concurrent, results)
+    logger, file_log = setup_logger(console_log, log_level)
+    log(quantity, rps, timeout, max_concurrent, results, logger, file_log)
     
  
 if __name__ == "__main__":
