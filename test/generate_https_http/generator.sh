@@ -2,7 +2,6 @@
 
 PID_FILE="pids"
 VENV_DIR="venv"
-LOG_FILE="logs.log"
 LOG_LEVEL="info"
 
 show_help() {
@@ -89,11 +88,11 @@ start_processes() {
     check_dependencies
     setup_venv
 
-    > "$LOG_FILE"
+    mkdir -p logs
 
     for ((i=0;i<count;i++)); do
 
-        python3 main.py --config config.json --log "$LOG_LEVEL" --max_concurent $max_concurent >> "$LOG_FILE" 2>&1 & local pid=$!
+        python3 main.py --config config.json --log "$LOG_LEVEL" --max_concurent $max_concurent > "logs/logs_${i}.log" 2>&1 & local pid=$!
 
         echo "$pid" >> "$PID_FILE"
 
@@ -110,7 +109,7 @@ stop_process() {
 
     while read pid; do
         if is_process_running "$pid" ; then
-            kill "$pid" 2>/dev/null
+            kill -2 "$pid" 2>/dev/null
         fi
     done < "$PID_FILE"
 
