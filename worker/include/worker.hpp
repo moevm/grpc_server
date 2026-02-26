@@ -103,7 +103,7 @@ public:
 
   inline uint64_t GetID() const { return worker_id; }
   void requestPolicyFromController();
-  void classifyDomain(const std::string& domain);
+  void classifyDomain(const std::string &domain);
   WorkerState GetState() const { return state; }
   virtual void ProcessTask(const std::vector<char> &data) = 0;
   void MainLoop();

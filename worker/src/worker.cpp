@@ -129,15 +129,15 @@ void Worker::requestPolicyFromController() {
   int main_fd = 0;
   try {
     spdlog::info("Worker {} requests policy", worker_id);
-    
+
     GetPolicyRequest req;
     req.set_worker_id(worker_id);
     req.set_policy_hash(current_policy_hash);
     req.set_config_version(current_config_version);
-    
+
     main_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (main_fd < 0)
-        throw WorkerException(std::string("socket: ") + strerror(errno));
+      throw WorkerException(std::string("socket: ") + strerror(errno));
 
     sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
@@ -145,7 +145,7 @@ void Worker::requestPolicyFromController() {
             sizeof(addr.sun_path) - 1);
 
     if (connect(main_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
-        throw WorkerException(std::string("connect: ") + strerror(errno));
+      throw WorkerException(std::string("connect: ") + strerror(errno));
     WriteProtoMessage(main_fd, req);
     WorkerPolicy policy;
     ReadProtoMessage(main_fd, policy);
@@ -154,41 +154,43 @@ void Worker::requestPolicyFromController() {
 
     close(main_fd);
   } catch (const std::exception &e) {
-      close(main_fd);
-      SetState(WorkerState::ERROR);
-      spdlog::error("requestPolicyFromController failed: {}", e.what());
-      throw WorkerException(std::string("requestPolicyFromController: ") + e.what());
+    close(main_fd);
+    SetState(WorkerState::ERROR);
+    spdlog::error("requestPolicyFromController failed: {}", e.what());
+    throw WorkerException(std::string("requestPolicyFromController: ") +
+                          e.what());
   }
 }
 
-void Worker::classifyDomain(const std::string& domain) {
+void Worker::classifyDomain(const std::string &domain) {
   int main_fd = 0;
-  try{
+  try {
     spdlog::info("Worker {} classifying domain '{}'", worker_id, domain);
     ClassifyRequest req;
     req.set_worker_id(worker_id);
     req.set_domain(domain);
 
     main_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-     if (main_fd < 0)
-          throw WorkerException(std::string("socket: ") + strerror(errno));
+    if (main_fd < 0)
+      throw WorkerException(std::string("socket: ") + strerror(errno));
 
     sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, SOCKET_DIR CLASSIFY_SOCKET_NAME,
             sizeof(addr.sun_path) - 1);
-    
+
     if (connect(main_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
       throw WorkerException(std::string("connect: ") + strerror(errno));
-    
+
     WriteProtoMessage(main_fd, req);
     ClassifyResponse resp;
     ReadProtoMessage(main_fd, resp);
-    
-    spdlog::info("Domain '{}' classified as category '{}' with trust level {}", domain, resp.categories(0), resp.trust_level());
-    
+
+    spdlog::info("Domain '{}' classified as category '{}' with trust level {}",
+                 domain, resp.categories(0), resp.trust_level());
+
     close(main_fd);
-    
+
   } catch (const std::exception &e) {
     close(main_fd);
     SetState(WorkerState::ERROR);
