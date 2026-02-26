@@ -132,6 +132,8 @@ void Worker::requestPolicyFromController() {
     
     GetPolicyRequest req;
     req.set_worker_id(worker_id);
+    req.set_policy_hash(current_policy_hash);
+    req.set_config_version(current_config_version);
     
     main_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (main_fd < 0)
@@ -147,7 +149,7 @@ void Worker::requestPolicyFromController() {
     WriteProtoMessage(main_fd, req);
     WorkerPolicy policy;
     ReadProtoMessage(main_fd, policy);
-
+    current_policy_hash = policy.policy_hash();
     spdlog::info("Policy received", policy.ShortDebugString());
 
     close(main_fd);
@@ -159,13 +161,13 @@ void Worker::requestPolicyFromController() {
   }
 }
 
-void Worker::classifyDomen(const std::string& domen){
+void Worker::classifyDomain(const std::string& domain) {
   int main_fd = 0;
   try{
-    spdlog::info("Worker {} classifying domen '{}'", worker_id, domen);
+    spdlog::info("Worker {} classifying domain '{}'", worker_id, domain);
     ClassifyRequest req;
     req.set_worker_id(worker_id);
-    req.set_domen(domen);
+    req.set_domain(domain);
 
     main_fd = socket(AF_UNIX, SOCK_STREAM, 0);
      if (main_fd < 0)
@@ -183,7 +185,7 @@ void Worker::classifyDomen(const std::string& domen){
     ClassifyResponse resp;
     ReadProtoMessage(main_fd, resp);
     
-    spdlog::info("Domen '{}' classified as category '{}' with trust level {}", domen, resp.category(), resp.trust_level());
+    spdlog::info("Domain '{}' classified as category '{}' with trust level {}", domain, resp.categories(0), resp.trust_level());
     
     close(main_fd);
     

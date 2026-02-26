@@ -39,7 +39,31 @@ int main() {
                gateway_port);
 
   try {
-    HashWorker(gateway_address, gateway_port).MainLoop();
+    HashWorker worker(gateway_address, gateway_port);
+
+    bool test_mode = false;
+
+    if (getenv("TEST_REQUEST_POLICY") != nullptr) {
+        test_mode = true;
+        spdlog::info("Test mode: requesting policy");
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+        worker.requestPolicyFromController();
+    }
+
+    if (const char* domain = getenv("TEST_CLASSIFY_DOMAIN")) {
+        test_mode = true;
+        spdlog::info("Test mode: classifying domain '{}'", domain);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        worker.classifyDomain(domain);
+    }
+
+    if (test_mode) {
+        spdlog::info("Test mode completed, exiting");
+        return 0;
+    }
+
+    worker.MainLoop();
+
   } catch (WorkerException &e) {
     spdlog::error(e.what());
     return 1;

@@ -9,14 +9,11 @@ import (
 type AdminServer struct {
 	pb.UnimplementedAdminServiceServer
 	configData []byte
-	version    uint64
 	manager    *manager.Manager 
 }
 
 func NewAdminServer() *AdminServer {
-	return &AdminServer{
-		version: 0,
-	}
+	return &AdminServer{}
 }
 
 func (s *AdminServer) SetManager(m *manager.Manager) {
@@ -25,10 +22,9 @@ func (s *AdminServer) SetManager(m *manager.Manager) {
 
 func (s *AdminServer) LoadConfig(ctx context.Context, req *pb.LoadConfigRequest) (*pb.LoadConfigResponse, error) {
 	s.configData = req.ConfigData
-	s.version++
 	
 	if s.manager != nil {
-		s.manager.UpdateConfig(s.configData, s.version)
+		s.manager.UpdateConfig(s.configData)
 	}
 
 	return &pb.LoadConfigResponse{
@@ -36,7 +32,6 @@ func (s *AdminServer) LoadConfig(ctx context.Context, req *pb.LoadConfigRequest)
 	}, nil
 }
 
-
-func (s *AdminServer) GetConfig() ([]byte, uint64) {
-	return s.configData, s.version
+func (s *AdminServer) GetConfig() []byte {
+	return s.configData
 }

@@ -5,6 +5,9 @@ proto_library(
     name = "communication_proto",
     srcs = ["communication.proto"],
     visibility = ["//visibility:public"],
+    deps = [
+        "@protobuf//:struct_proto",
+    ],
 )
 
 go_proto_library(

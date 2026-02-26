@@ -16,8 +16,7 @@ import (
 func main() {
 	cfg := config.Load()
 	adminServer := grpcserver.NewAdminServer()
-	configData, configVersion := adminServer.GetConfig() 
-	mgr, err := manager.NewManager(configData, configVersion)
+	mgr, err := manager.NewManager()
 	if err != nil {
 		log.Fatalf("manager.NewManager(): %v", err)
 	}

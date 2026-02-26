@@ -384,14 +384,24 @@ func (m *Manager) handlePolicyConnection(conn conn.Unix) {
 
 	log.Printf("Policy request received from worker %d", req.WorkerId)
 	
-	policyBytes, err := m.HandleGetPolicy(req.WorkerId)
+	policyBytes, needUpdate, err := m.HandleGetPolicy(req.WorkerId, req.PolicyHash)
 	if err != nil {
 		log.Printf("Error getting policy: %v", err)
 		return
 	}
 	
+	if !needUpdate {
+		log.Printf("Worker %d already has latest policy", req.WorkerId)
+		resp := &communication.WorkerResponse{
+			Error: communication.WorkerError_WORKER_ERR_OK,
+		}
+		respBytes, _ := proto.Marshal(resp)
+		conn.WriteMessage(respBytes)
+		return
+	}
+	
 	conn.WriteMessage(policyBytes)
-	log.Printf("Policy sent worker %d", req.WorkerId)
+	log.Printf("Policy sent to worker %d", req.WorkerId)
 }
 
 func (m *Manager) handleClassifyConnection(conn conn.Unix) {
@@ -410,10 +420,10 @@ func (m *Manager) handleClassifyConnection(conn conn.Unix) {
 	}
 
 	log.Printf("Classify request received from worker %d for domen '%s'", 
-		req.WorkerId, req.Domen)
+		req.WorkerId, req.Domain)
 
 	resp := &communication.ClassifyResponse{
-		Category:   "unknown",
+		Categories: []string{"unknown"},
 		TrustLevel: 50,
 	}
 	
@@ -602,27 +612,30 @@ func removeContents(dir string) error {
 	return nil
 }
 
-func (m *Manager) HandleGetPolicy(workerID uint64) ([]byte, error) {
+func (m *Manager) HandleGetPolicy(workerID uint64, currentHash uint64) ([]byte, bool, error) {
     log.Printf("Worker %d requested policy", workerID)
 
     policyProto := m.policyManager.GetWorkerPolicyProto(workerID)
 
-    policyBytes, err := proto.Marshal(policyProto)
-    if err != nil {
-        return nil, err
+    if currentHash == policyProto.PolicyHash {
+        return nil, false, nil
     }
 
-    log.Printf("Sending policy to worker %d", workerID)
-    return policyBytes, nil
+    policyBytes, err := proto.Marshal(policyProto)
+    if err != nil {
+        return nil, false, err
+    }
+
+    return policyBytes, true, nil
 }
 
-func (m *Manager) UpdateConfig(configData []byte, version uint64) {
+func (m *Manager) UpdateConfig(configData []byte) {
 	if m.policyManager != nil {
-		m.policyManager.UpdateConfig(configData, version)
+		m.policyManager.UpdateConfig(configData)
 	}
 }
 
-func NewManager(configData []byte, version uint64) (*Manager, error) {
+func NewManager() (*Manager, error) {
 	if err := removeContents(workerSocketPath); err != nil {
 		return nil, fmt.Errorf("failed to clean socket directory: %w", err)
 	}
@@ -646,7 +659,7 @@ func NewManager(configData []byte, version uint64) (*Manager, error) {
 		listener:      listener,
 		policyListener: policyListener,
 		classifyListener: classifyListener,
-		policyManager: NewPolicyManager(configData, version),
+		policyManager: NewPolicyManager(),
 		workers:       make(map[uint64]*Worker),
 		tasks:         make(map[uint64]*Task),
 		freeWorkers:   make(chan uint64, 32),
@@ -672,6 +685,8 @@ func (m *Manager) Shutdown() {
 	m.shutdownOnce.Do(func() {
 		close(m.shutdown)
 		m.listener.Close()
+		m.policyListener.Close()
+		m.classifyListener.Close()
 
 		close(m.freeWorkers)
 		close(m.fetchWorkers)

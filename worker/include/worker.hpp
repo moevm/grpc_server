@@ -37,6 +37,8 @@ class Worker {
   int listener_fd = -1;
   uint64_t worker_id = 0;
   uint64_t current_task_id = 0;
+  uint64_t current_policy_hash = 0;
+  uint64_t current_config_version = 0;
   std::chrono::time_point<std::chrono::steady_clock> last_pulse_time;
   uint64_t pulse_interval = MIN_PULSE_TIME;
 
@@ -101,7 +103,7 @@ public:
 
   inline uint64_t GetID() const { return worker_id; }
   void requestPolicyFromController();
-  void classifyDomen(const std::string& domen);
+  void classifyDomain(const std::string& domain);
   WorkerState GetState() const { return state; }
   virtual void ProcessTask(const std::vector<char> &data) = 0;
   void MainLoop();

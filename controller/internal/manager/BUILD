@@ -7,10 +7,10 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//internal/conn",
-        "//pkg/converter",
         "//pkg/proto/communication:communication_go_proto",
         "@org_golang_google_protobuf//proto",
         "@com_github_joho_godotenv//:go_default_library",
         "@com_github_pelletier_go_toml//:go_default_library",
+        "@org_golang_google_protobuf//types/known/structpb",
     ],
 )

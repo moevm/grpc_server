@@ -32,5 +32,8 @@ cc_proto_library(
 
 proto_library(
     name = "communication_proto",
-    srcs = [ "communication.proto" ]
+    srcs = [ "communication.proto" ],
+    deps = [
+        "@protobuf//:struct_proto",
+    ],
 )
