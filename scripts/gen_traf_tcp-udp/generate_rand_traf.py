@@ -3,17 +3,12 @@ import random
 import sys
 import argparse
 from datetime import datetime
-from enum import Enum
 import json
-import socket
 import logging
 from pathlib import Path
+import nmap
 
 
-class ResultFunction(Enum):
-    TIME_EXCEEDED = 1
-    REQUEST_COMPLETED = 0
-    ERROR_EXECUTING_SCRIPT = -1
 
 def pars():
     parser = argparse.ArgumentParser(
@@ -35,7 +30,7 @@ def pars():
     parser.add_argument(
         "--timeout", "-t",
         type=int,
-        default=5,
+        default=17,
         help="Timeout per request in seconds (5 by default)"
     )
     parser.add_argument(
@@ -72,8 +67,8 @@ def pars():
         print("Error: RPS must be a positive number, using the default value of 10")
         args.rps = 10
     if args.timeout <= 0:
-        print("Error: the timeout must be a positive number, using the default value of 5")
-        args.timeout = 5
+        print("Error: the timeout must be a positive number, using the default value of 17 - the optimal time for analyzing a compound is at standard values.")
+        args.timeout = 17
     if args.max_concurrent <= 0:
         print("Error: the number of tasks being completed at the same time must be a positive number, using the default value of 50")
         args.max_concurrent = 50
@@ -92,20 +87,63 @@ def pars():
     return args.quantity, sites, args.rps, args.timeout, args.max_concurrent, args.log_level, args.console_log
 
 async def check_one(site, timeout):
-    try:
-        # process_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # process_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        process = await asyncio.create_subprocess_exec('./generate_traf.sh', '1',\
-                                                        site, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)  
-        await asyncio.wait_for(process.communicate(), timeout=timeout)
-        if process.returncode == 0:
-            return site, ResultFunction.REQUEST_COMPLETED
-        return site, ResultFunction.ERROR_EXECUTING_SCRIPT
+    scan_timeout = max(2, timeout - 2)
     
+    result = {
+        'site': site,
+        'tcp_ports': {},
+        'udp_ports': {},
+        'status': 'unknown',
+        'ip': None
+    }
+    
+    try:
+        nm = nmap.PortScanner()
+        
+        await asyncio.wait_for(
+            asyncio.to_thread(
+                nm.scan,
+                site, 
+                '53,80,443,123,161',
+                f'-sS -sU -T4 --host-timeout {scan_timeout}s'
+            ),
+            timeout
+        )
+        
+        if nm.all_hosts():
+            result['ip'] = nm.all_hosts()[0]
+            
+            for proto in nm[result['ip']].all_protocols():
+                for port in nm[result['ip']][proto].keys():
+                    state = nm[result['ip']][proto][port]['state']
+                    service = nm[result['ip']][proto][port].get('name', 'unknown')
+                    
+                    if state == 'open':
+                        if proto == 'tcp':
+                            result['tcp_ports'][port] = {
+                                'state': state,
+                                'service': service
+                            }
+                        elif proto == 'udp':
+                            result['udp_ports'][port] = {
+                                'state': state,
+                                'service': service
+                            }
+        
+        if result['tcp_ports'] or result['udp_ports']:
+            result['status'] = 'success'
+        else:
+            result['status'] = 'no_open_ports'
+        
     except asyncio.TimeoutError:
-        process.kill()
-        await process.wait()
-        return site, ResultFunction.TIME_EXCEEDED
+        result['status'] = 'timeout'
+    
+    except Exception as e:
+        result['status'] = 'error'
+        result['error'] = str(e)
+    
+    return result
+     
 
 def setup_logger(flag_stream_handler, input_level_logging):
     log_dir = Path("logs")
@@ -142,7 +180,7 @@ def log(quantity, rps, timeout, max_concurrent, results, logger, file_log):
     logger.info(f"   Конкурентность: {max_concurrent}")
     logger.debug(f"   Файл результатов: {file_log}")
     
-    success_count = timeout_count = error_count = fatal_error_count = 0
+    no_ports_count = success_count = timeout_count = error_count = 0
 
     log_data = {
         "parameters": {
@@ -156,41 +194,49 @@ def log(quantity, rps, timeout, max_concurrent, results, logger, file_log):
 
     for res in results:
         if isinstance(res, Exception):
-            fatal_error_count += 1
             log_data["results"].append({
                 "site": "unknown",
                 "status": "exception",
                 "details": str(res)
             })
-            logger.exception(f"Request to {site} - EXCEPTION: {res}")
+            logger.exception(f"Request - EXCEPTION: {res}")
 
         else:
-            site, code = res
-            if code.value == 0:
-                status = "success"
+            site_data = res
+            
+            log_entry = {
+                "site": site_data['site'],
+                "ip": site_data['ip'],
+                "status": site_data['status'],
+                "tcp_ports": site_data['tcp_ports'],
+                "udp_ports": site_data['udp_ports']
+            }
+            
+            if 'error' in site_data:
+                log_entry["error"] = site_data['error']
+            
+            log_data["results"].append(log_entry)
+            
+            if site_data['status'] == 'success':
                 success_count += 1
-                logger.debug(f"Request to {site} - SUCCESS")
-            elif code.value == 1:
-                status = "timeout"
+                logger.debug(f"Request to {site_data['site']} - SUCCESS")
+            elif site_data['status'] == 'timeout':
                 timeout_count += 1
-                logger.error(f"Request to {site} - TIMEOUT")
+                logger.error(f"Request to {site_data['site']} - TIMEOUT")
+            elif site_data['status'] == 'no_open_ports':
+                no_ports_count += 1
+                logger.warning(f"Request to {site_data['site']} - NO OPEN PORTS")
             else:
-                status = "error"
                 error_count += 1
-                logger.error(f"Request to {site} - ERROR")
+                logger.error(f"Request to {site_data['site']} - ERROR")
 
-            log_data["results"].append({
-                    "site": site,
-                    "status": status,
-                    "code": code.name
-                })
 
     log_data["statistics"] = {
+        "no_ports_count" : no_ports_count,
         "success": success_count,
         "timeout": timeout_count,
         "error": error_count,
-        "total": quantity,
-        "fatal_error": fatal_error_count
+        "total": quantity
     }
 
     try:
