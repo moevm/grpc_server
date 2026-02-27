@@ -33,7 +33,6 @@ class TestIntegration(unittest.TestCase):
     def run_main(self, args):
         with patch('sys.argv', ['script.py'] + args + ['-f', str(self.sites_file)] + ['-n', "logs/test"]):
             asyncio.run(main())
-        time.sleep(0.5)
         return self.get_last_log_file()
     
 
