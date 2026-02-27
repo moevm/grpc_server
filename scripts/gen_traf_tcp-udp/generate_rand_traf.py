@@ -24,14 +24,14 @@ def pars():
     parser.add_argument(
         "--rps", "-r",
         type=int,
-        default=10,
-        help="The desired number of requests per second (10 by default)"
+        default=15,
+        help="The desired number of requests per second (15 by default)"
     )
     parser.add_argument(
         "--timeout", "-t",
         type=int,
-        default=17,
-        help="Timeout per request in seconds (5 by default)"
+        default=20,
+        help="Timeout per request in seconds (20 by default)"
     )
     parser.add_argument(
         "--file", "-f",
@@ -53,9 +53,15 @@ def pars():
         help="Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL (INFO by default)"
     )
     parser.add_argument(
-        "--console_log", "-ncl",
+        "--no_console_log", "-ncl",
         action="store_true",
         help="Disable console logging (by default console logging is enabled)"
+    )
+    parser.add_argument(
+        "--name_folder_log", "-n",
+        type=str,
+        default="logs",
+        help="A name of folder logs(by default logs)"
     )
 
     args = parser.parse_args()
@@ -64,11 +70,11 @@ def pars():
         print("Error: the number of requests must be a positive number, using the default value of 10")
         args.quantity = 10
     if args.rps <= 0:
-        print("Error: RPS must be a positive number, using the default value of 10")
-        args.rps = 10
+        print("Error: RPS must be a positive number, using the default value of 15")
+        args.rps = 15
     if args.timeout <= 0:
-        print("Error: the timeout must be a positive number, using the default value of 17 - the optimal time for analyzing a compound is at standard values.")
-        args.timeout = 17
+        print("Error: the timeout must be a positive number, using the default value of 20 - the optimal time for analyzing a compound is at standard values.")
+        args.timeout = 20
     if args.max_concurrent <= 0:
         print("Error: the number of tasks being completed at the same time must be a positive number, using the default value of 50")
         args.max_concurrent = 50
@@ -84,7 +90,7 @@ def pars():
         print(f"Error: file '{args.file}' is empty")
         sys.exit(1)
 
-    return args.quantity, sites, args.rps, args.timeout, args.max_concurrent, args.log_level, args.console_log
+    return args.quantity, sites, args.rps, args.timeout, args.max_concurrent, args.log_level, args.no_console_log, args.name_folder_log
 
 async def check_one(site, timeout):
     scan_timeout = max(2, timeout - 2)
@@ -145,10 +151,10 @@ async def check_one(site, timeout):
     return result
      
 
-def setup_logger(flag_stream_handler, input_level_logging):
-    log_dir = Path("logs")
+def setup_logger(flag_stream_handler, input_level_logging, name_folder_log):
+    log_dir = Path(name_folder_log)
     log_dir.mkdir(exist_ok=True)
-    file_log = log_dir / f"LOG: {datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
+    file_log = log_dir / f"LOG_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S-%f')}.json"
     
 
     logger = logging.getLogger(__name__)
@@ -158,17 +164,17 @@ def setup_logger(flag_stream_handler, input_level_logging):
     
 
 
-    if flag_stream_handler:
+    if not flag_stream_handler:
         console_handler = logging.StreamHandler()
         console_handler.setLevel(input_level_logging)
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
 
 
-    file_handler = logging.FileHandler(file_log, encoding='utf-8')
-    file_handler.setLevel(input_level_logging)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+    # file_handler = logging.FileHandler(file_log, encoding='utf-8')
+    # file_handler.setLevel(input_level_logging)
+    # file_handler.setFormatter(formatter)
+    # logger.addHandler(file_handler)
 
     return logger, file_log
 
@@ -248,7 +254,7 @@ def log(quantity, rps, timeout, max_concurrent, results, logger, file_log):
 
 
 async def main():
-    quantity, sites, rps, timeout, max_concurrent, log_level, console_log = pars()
+    quantity, sites, rps, timeout, max_concurrent, log_level, console_log, name_folder_log = pars()
     
     semaphore = asyncio.Semaphore(max_concurrent)
     delay = 1.0 / rps
@@ -267,7 +273,7 @@ async def main():
     
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    logger, file_log = setup_logger(console_log, log_level)
+    logger, file_log = setup_logger(console_log, log_level, name_folder_log)
     log(quantity, rps, timeout, max_concurrent, results, logger, file_log)
     
  
