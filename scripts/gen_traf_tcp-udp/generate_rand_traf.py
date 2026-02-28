@@ -7,7 +7,10 @@ import json
 import logging
 from pathlib import Path
 import nmap
-
+import requests
+from bs4 import BeautifulSoup
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def pars():
@@ -126,10 +129,24 @@ async def check_one(site, timeout):
                     
                     if state == 'open':
                         if proto == 'tcp':
+
                             result['tcp_ports'][port] = {
                                 'state': state,
                                 'service': service
                             }
+
+                            if port == 80 or port == 443:
+                                protocol = 'https' if port == 443 else 'http'
+                                url = f"{protocol}://{site}:{port}"
+                                response = requests.get(url, timeout=5, verify=False)
+                                status_code = response.status_code
+                                soup = BeautifulSoup(response.text, 'html.parser')
+                                title = soup.find('title').text if soup.find('title') else None
+                                
+                                result['tcp_ports'][port]['http_status'] = status_code
+                                result['tcp_ports'][port]['title'] = title
+                            
+                            
                         elif proto == 'udp':
                             result['udp_ports'][port] = {
                                 'state': state,
@@ -147,6 +164,9 @@ async def check_one(site, timeout):
     except Exception as e:
         result['status'] = 'error'
         result['error'] = str(e)
+
+
+    
     
     return result
      
@@ -171,20 +191,15 @@ def setup_logger(flag_stream_handler, input_level_logging, name_folder_log):
         logger.addHandler(console_handler)
 
 
-    # file_handler = logging.FileHandler(file_log, encoding='utf-8')
-    # file_handler.setLevel(input_level_logging)
-    # file_handler.setFormatter(formatter)
-    # logger.addHandler(file_handler)
-
     return logger, file_log
 
 def log(quantity, rps, timeout, max_concurrent, results, logger, file_log):
      
-    logger.info(f"   Запросов: {quantity}")
+    logger.info(f"   Requests: {quantity}")
     logger.info(f"   RPS: {rps}")
-    logger.info(f"   Таймаут: {timeout}с")
-    logger.info(f"   Конкурентность: {max_concurrent}")
-    logger.debug(f"   Файл результатов: {file_log}")
+    logger.info(f"   Timeout: {timeout}с")
+    logger.info(f"   Max concurrent processes: {max_concurrent}")
+    logger.debug(f"   The results file: {file_log}")
     
     no_ports_count = success_count = timeout_count = error_count = 0
 
