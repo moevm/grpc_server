@@ -204,7 +204,7 @@ void Worker::statsReport() {
     spdlog::info("Worker {} send stats", worker_id);
     StatsReport req;
     req.set_worker_id(worker_id);
-    
+
     main_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (main_fd < 0)
       throw WorkerException(std::string("socket: ") + strerror(errno));
