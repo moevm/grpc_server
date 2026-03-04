@@ -50,6 +50,13 @@ int main() {
       worker.requestPolicyFromController();
     }
 
+    if (getenv("TEST_STATS") != nullptr) {
+      test_mode = true;
+      spdlog::info("Test mode: send stats");
+      std::this_thread::sleep_for(std::chrono::seconds(2));
+      worker.statsReport();
+    }
+
     if (const char *domain = getenv("TEST_CLASSIFY_DOMAIN")) {
       test_mode = true;
       spdlog::info("Test mode: classifying domain '{}'", domain);

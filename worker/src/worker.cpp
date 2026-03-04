@@ -198,6 +198,35 @@ void Worker::classifyDomain(const std::string &domain) {
   }
 }
 
+void Worker::statsReport() {
+  int main_fd = 0;
+  try {
+    spdlog::info("Worker {} send stats", worker_id);
+    StatsReport req;
+    req.set_worker_id(worker_id);
+    
+    main_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (main_fd < 0)
+      throw WorkerException(std::string("socket: ") + strerror(errno));
+
+    sockaddr_un addr{};
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, SOCKET_DIR STATS_SOCKET_NAME,
+            sizeof(addr.sun_path) - 1);
+
+    if (connect(main_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+      throw WorkerException(std::string("connect: ") + strerror(errno));
+
+    WriteProtoMessage(main_fd, req);
+    close(main_fd);
+
+  } catch (const std::exception &e) {
+    close(main_fd);
+    SetState(WorkerState::ERROR);
+    throw WorkerException(std::string("statsReport: ") + e.what());
+  }
+}
+
 Worker::Worker() : listener_fd(-1), state(WorkerState::BOOTING) {
   SendPulse(PULSE_REGISTER);
 

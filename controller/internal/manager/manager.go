@@ -39,6 +39,7 @@ const (
 	workerMainSocketPath = "/run/controller/main.sock"
 	workerPolicySocketPath = "/run/controller/policy.sock"
 	workerClassifySocketPath = "/run/controller/classify.sock"
+	workerStatsSocketPath = "/run/controller/stats.sock"
 	workerSocketPath     = "/run/controller/"
 )
 
@@ -51,6 +52,7 @@ type Manager struct {
 	listener net.Listener
 	policyListener net.Listener  
 	classifyListener net.Listener
+	statsListener net.Listener
 
 	policyManager *PolicyManager
 	workers      map[uint64]*Worker
@@ -367,6 +369,24 @@ func (m *Manager) classifyLoop() {
 	}
 }
 
+func (m *Manager) statsLoop() {
+	log.Print("Listening on stats.sock")
+	for {
+		select {
+		case <-m.shutdown:
+			return
+		default:
+			netConn, err := m.statsListener.Accept()
+			if err != nil {
+				log.Printf("Stats accept error: %v", err)
+				continue
+			}
+			go m.handleStatsConnection(conn.Unix{Conn: netConn})
+		}
+	}
+}
+
+
 func (m *Manager) handlePolicyConnection(conn conn.Unix) {
 	defer conn.Close()
 
@@ -436,6 +456,26 @@ func (m *Manager) handleClassifyConnection(conn conn.Unix) {
 	conn.WriteMessage(respData)
 	log.Printf("Classify response sent to worker %d", req.WorkerId)
 }
+
+func (m *Manager) handleStatsConnection(conn conn.Unix) {
+	defer conn.Close()
+
+	msgData, err := conn.ReadMessage()
+	if err != nil {
+		m.errorChan <- fmt.Errorf("stats read error: %w", err)
+		return
+	}
+
+	var req communication.StatsReport
+	if err := proto.Unmarshal(msgData, &req); err != nil {
+		m.errorChan <- fmt.Errorf("stats unmarshal error: %w", err)
+		return
+	}
+
+	log.Printf("Stats worker %d", req.WorkerId)
+
+}
+
 // errorHandler catches the errors from goroutines and logs them.
 // This function should always be run in a goroutine.
 func (m *Manager) errorHandler() {
@@ -655,10 +695,16 @@ func NewManager() (*Manager, error) {
 		return nil, fmt.Errorf("failed to create classify listener: %w", err)
 	}
 
+	statsListener, err := net.Listen("unix", workerStatsSocketPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stats listener: %w", err)
+	}
+
 	m := &Manager{
 		listener:      listener,
 		policyListener: policyListener,
 		classifyListener: classifyListener,
+		statsListener: statsListener,
 		policyManager: NewPolicyManager(),
 		workers:       make(map[uint64]*Worker),
 		tasks:         make(map[uint64]*Task),
@@ -673,6 +719,7 @@ func NewManager() (*Manager, error) {
 	go m.mainLoop()
 	go m.policyLoop()  
 	go m.classifyLoop()
+	go m.statsLoop()
 	go m.errorHandler()
 	go m.dispatchTasks()
 	go m.checkHealth()
@@ -687,6 +734,7 @@ func (m *Manager) Shutdown() {
 		m.listener.Close()
 		m.policyListener.Close()
 		m.classifyListener.Close()
+		m.statsListener.Close()
 
 		close(m.freeWorkers)
 		close(m.fetchWorkers)

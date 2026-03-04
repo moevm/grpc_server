@@ -50,6 +50,32 @@ func TestWorkerPolicyRequest(t *testing.T) {
 	assert.Contains(t, string(output), "Policy received")
 }
 
+func TestWorkerStatsReport(t *testing.T) {
+	root := findProjectRoot()
+
+	ctrlBin := filepath.Join(root, "controller", "bazel-bin", "cmd", "grpc_server", "grpc_server_", "grpc_server")
+	workerBin := filepath.Join(root, "worker", "bazel-bin", "worker")
+
+	ctrl := exec.Command(ctrlBin)
+	ctrl.Start()
+	defer ctrl.Process.Kill()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	worker := exec.CommandContext(ctx, workerBin)
+	worker.Env = []string{
+		"METRICS_GATEWAY_ADDRESS=localhost",
+		"METRICS_GATEWAY_PORT=9091",
+		"TEST_STATS=true",
+	}
+
+	output, err := worker.CombinedOutput()
+	assert.NoError(t, err, "Worker failed")
+	assert.Contains(t, string(output), "Worker 1 send stats")
+	assert.Contains(t, string(output), "Policy received")
+}
+
 func TestWorkerClassifyRequest(t *testing.T) {
 	root := findProjectRoot()
 
