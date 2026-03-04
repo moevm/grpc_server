@@ -10,6 +10,8 @@
 #include <sys/un.h>
 #include <thread>
 #include <unistd.h>
+#include <grpcpp/grpcpp.h>
+#include "communication.grpc.pb.h"
 
 void Worker::LogStateChange(WorkerState new_state) {
   const char *state_names[] = {"BOOTING", "FREE", "BUSY", "SHUTTING_DOWN",
@@ -126,7 +128,6 @@ void Worker::SendPulse(PulseType type) {
 }
 
 void Worker::requestPolicyFromController() {
-  int main_fd = 0;
   try {
     spdlog::info("Worker {} requests policy", worker_id);
 
@@ -135,100 +136,82 @@ void Worker::requestPolicyFromController() {
     req.set_policy_hash(current_policy_hash);
     req.set_config_version(current_config_version);
 
-    main_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (main_fd < 0)
-      throw WorkerException(std::string("socket: ") + strerror(errno));
-
-    sockaddr_un addr{};
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, SOCKET_DIR POLICY_SOCKET_NAME,
-            sizeof(addr.sun_path) - 1);
-
-    if (connect(main_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
-      throw WorkerException(std::string("connect: ") + strerror(errno));
-    WriteProtoMessage(main_fd, req);
     WorkerPolicy policy;
-    ReadProtoMessage(main_fd, policy);
-    current_policy_hash = policy.policy_hash();
-    spdlog::info("Policy received", policy.ShortDebugString());
+    grpc::ClientContext context;
 
-    close(main_fd);
+    auto status = stub_->GetPolicy(&context, req, &policy);
+    if (!status.ok()) {
+      throw WorkerException("GetPolicy failed: " + status.error_message());
+    }
+
+    current_policy_hash = policy.policy_hash();
+    spdlog::info("Policy received");
+
   } catch (const std::exception &e) {
-    close(main_fd);
     SetState(WorkerState::ERROR);
-    spdlog::error("requestPolicyFromController failed: {}", e.what());
-    throw WorkerException(std::string("requestPolicyFromController: ") +
-                          e.what());
+    throw WorkerException(std::string("requestPolicyFromController: ") + e.what());
   }
 }
 
 void Worker::classifyDomain(const std::string &domain) {
-  int main_fd = 0;
   try {
     spdlog::info("Worker {} classifying domain '{}'", worker_id, domain);
+
     ClassifyRequest req;
     req.set_worker_id(worker_id);
     req.set_domain(domain);
 
-    main_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (main_fd < 0)
-      throw WorkerException(std::string("socket: ") + strerror(errno));
-
-    sockaddr_un addr{};
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, SOCKET_DIR CLASSIFY_SOCKET_NAME,
-            sizeof(addr.sun_path) - 1);
-
-    if (connect(main_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
-      throw WorkerException(std::string("connect: ") + strerror(errno));
-
-    WriteProtoMessage(main_fd, req);
     ClassifyResponse resp;
-    ReadProtoMessage(main_fd, resp);
+    grpc::ClientContext context;
 
+    auto status = stub_->Classify(&context, req, &resp);
+    if (!status.ok()) {
+      throw WorkerException("Classify failed: " + status.error_message());
+    }
+
+    std::string cat = resp.categories_size() > 0 ? resp.categories(0) : "unknown";
     spdlog::info("Domain '{}' classified as category '{}' with trust level {}",
-                 domain, resp.categories(0), resp.trust_level());
-
-    close(main_fd);
+                 domain, cat, resp.trust_level());
 
   } catch (const std::exception &e) {
-    close(main_fd);
     SetState(WorkerState::ERROR);
     throw WorkerException(std::string("classifyDomain: ") + e.what());
   }
 }
 
 void Worker::statsReport() {
-  int main_fd = 0;
   try {
     spdlog::info("Worker {} send stats", worker_id);
-    StatsReport req;
-    req.set_worker_id(worker_id);
 
-    main_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (main_fd < 0)
-      throw WorkerException(std::string("socket: ") + strerror(errno));
+    StatsReport report;
+    report.set_worker_id(worker_id);
+    report.set_time(time(nullptr));
 
-    sockaddr_un addr{};
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, SOCKET_DIR STATS_SOCKET_NAME,
-            sizeof(addr.sun_path) - 1);
+    grpc::ClientContext context;
+    google::protobuf::Empty response;
 
-    if (connect(main_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
-      throw WorkerException(std::string("connect: ") + strerror(errno));
+    auto status = stub_->SendStats(&context, report, &response);
+    if (!status.ok()) {
+      throw WorkerException("SendStats failed: " + status.error_message());
+    }
 
-    WriteProtoMessage(main_fd, req);
-    close(main_fd);
+    spdlog::info("Stats sent successfully");
 
   } catch (const std::exception &e) {
-    close(main_fd);
-    SetState(WorkerState::ERROR);
-    throw WorkerException(std::string("statsReport: ") + e.what());
+    spdlog::error("statsReport failed: {}", e.what());
   }
 }
 
 Worker::Worker() : listener_fd(-1), state(WorkerState::BOOTING) {
   SendPulse(PULSE_REGISTER);
+
+  std::string controller_addr = "localhost:50051";
+  if (const char* env_addr = getenv("CONTROLLER_GRPC_ADDR")) {
+    controller_addr = env_addr;
+  }
+  auto channel = grpc::CreateChannel(controller_addr, grpc::InsecureChannelCredentials());
+  stub_ = DataService::NewStub(channel);
+  spdlog::info("gRPC channel created to {}", controller_addr);
 
   socket_path = std::string(SOCKET_DIR) + std::to_string(worker_id) + ".sock";
   unlink(socket_path.c_str());

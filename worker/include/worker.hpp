@@ -5,6 +5,10 @@
 
 #include <cstdint>
 #include <string>
+#include <grpcpp/grpcpp.h>  
+#include "communication.grpc.pb.h"
+
+#include <memory>
 
 #define SOCKET_DIR "/run/controller/"
 #define MAIN_SOCKET_NAME "main.sock"
@@ -45,6 +49,8 @@ class Worker {
 
   std::string fetch_data;
   std::string extra_data;
+
+  std::unique_ptr<DataService::Stub> stub_;
 
   enum class InitResponse : uint64_t { OK = 1 };
   WorkerState state;

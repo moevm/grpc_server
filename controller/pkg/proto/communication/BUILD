@@ -7,6 +7,7 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "@protobuf//:struct_proto",
+        "@protobuf//:empty_proto",
     ],
 )
 

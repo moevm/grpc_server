@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	adminPb "github.com/moevm/grpc_server/pkg/proto/admin_service"
+	commPb "github.com/moevm/grpc_server/pkg/proto/communication"
 )
 
 func main() {
@@ -23,6 +24,8 @@ func main() {
 
 	adminServer.SetManager(mgr)
 	
+	dataServer := grpcserver.NewDataServer(mgr)
+
 	lis, err := net.Listen("tcp", net.JoinHostPort(cfg.Host, cfg.Port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
@@ -36,6 +39,7 @@ func main() {
 	service := grpc.NewServer(serverOpts...)
 	adminPb.RegisterAdminServiceServer(service, adminServer)
 	pb.RegisterFileServiceServer(service, grpcserver.NewServer(cfg.AllowedChars, mgr))
+	commPb.RegisterDataServiceServer(service, dataServer)  
 	reflection.Register(service)
 
 	log.Printf("Server starting on %s:%s", cfg.Host, cfg.Port)

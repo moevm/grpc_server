@@ -1,6 +1,13 @@
 syntax = "proto3";
 option go_package = "github.com/moevm/grpc_server/pkg/proto/communication";
 import "google/protobuf/struct.proto";
+import "google/protobuf/empty.proto";
+
+service DataService {
+    rpc GetPolicy(GetPolicyRequest) returns (WorkerPolicy);
+    rpc Classify(ClassifyRequest) returns (ClassifyResponse);
+    rpc SendStats(StatsReport) returns (google.protobuf.Empty);
+}
 
 enum PulseType {
     PULSE_INVALD = 0;
@@ -88,7 +95,7 @@ message ClassifyResponse {
 
 message ResourceStats {
     string domain = 1;
-    uint64 blosked = 2;
+    uint64 blocked = 2;
     uint64 allowed = 3;
 }
 
