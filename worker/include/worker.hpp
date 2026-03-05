@@ -3,10 +3,10 @@
 
 #include "communication.pb.h"
 
-#include <cstdint>
-#include <string>
-#include <grpcpp/grpcpp.h>  
 #include "communication.grpc.pb.h"
+#include <cstdint>
+#include <grpcpp/grpcpp.h>
+#include <string>
 
 #include <memory>
 

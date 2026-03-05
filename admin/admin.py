@@ -6,7 +6,7 @@ import os
 import admin_service_pb2
 import admin_service_pb2_grpc
 
-load_dotenv(os.path.join(os.path.dirname(__file__), "..", "controller", ".env"))
+load_dotenv(".env")
 
 class AdminClient:
     def __init__(self):

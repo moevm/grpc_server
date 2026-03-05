@@ -1,8 +1,10 @@
 #include "../include/worker.hpp"
 
+#include "communication.grpc.pb.h"
 #include <arpa/inet.h>
 #include <cerrno>
 #include <endian.h>
+#include <grpcpp/grpcpp.h>
 #include <poll.h>
 #include <spdlog/spdlog.h>
 #include <string.h>
@@ -10,8 +12,6 @@
 #include <sys/un.h>
 #include <thread>
 #include <unistd.h>
-#include <grpcpp/grpcpp.h>
-#include "communication.grpc.pb.h"
 
 void Worker::LogStateChange(WorkerState new_state) {
   const char *state_names[] = {"BOOTING", "FREE", "BUSY", "SHUTTING_DOWN",
@@ -149,7 +149,8 @@ void Worker::requestPolicyFromController() {
 
   } catch (const std::exception &e) {
     SetState(WorkerState::ERROR);
-    throw WorkerException(std::string("requestPolicyFromController: ") + e.what());
+    throw WorkerException(std::string("requestPolicyFromController: ") +
+                          e.what());
   }
 }
 
@@ -169,7 +170,8 @@ void Worker::classifyDomain(const std::string &domain) {
       throw WorkerException("Classify failed: " + status.error_message());
     }
 
-    std::string cat = resp.categories_size() > 0 ? resp.categories(0) : "unknown";
+    std::string cat =
+        resp.categories_size() > 0 ? resp.categories(0) : "unknown";
     spdlog::info("Domain '{}' classified as category '{}' with trust level {}",
                  domain, cat, resp.trust_level());
 
@@ -206,10 +208,11 @@ Worker::Worker() : listener_fd(-1), state(WorkerState::BOOTING) {
   SendPulse(PULSE_REGISTER);
 
   std::string controller_addr = "localhost:50051";
-  if (const char* env_addr = getenv("CONTROLLER_GRPC_ADDR")) {
+  if (const char *env_addr = getenv("CONTROLLER_GRPC_ADDR")) {
     controller_addr = env_addr;
   }
-  auto channel = grpc::CreateChannel(controller_addr, grpc::InsecureChannelCredentials());
+  auto channel =
+      grpc::CreateChannel(controller_addr, grpc::InsecureChannelCredentials());
   stub_ = DataService::NewStub(channel);
   spdlog::info("gRPC channel created to {}", controller_addr);
 
