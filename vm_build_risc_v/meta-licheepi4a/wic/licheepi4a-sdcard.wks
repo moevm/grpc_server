@@ -1,0 +1,7 @@
+# WKS file for Lichee Pi 4A SD card / eMMC image
+# Layout matches RevyOS fastboot partition scheme:
+#   - boot partition: fw_dynamic.bin, Image, DTB, light_aon_fpga.bin
+#   - root partition: ext4 rootfs
+
+part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=ext4 --label boot --active --align 4096 --size 200M
+part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --label root --align 4096

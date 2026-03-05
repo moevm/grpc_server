@@ -64,4 +64,4 @@ RDEPENDS:${PN}-examples += "${PN}"
 
 INSANE_SKIP:${PN} += "dev-so"
 
-COMPATIBLE_MACHINE = "(qemuriscv64)"
+COMPATIBLE_MACHINE = "(qemuriscv64|licheepi4a)"

@@ -45,6 +45,7 @@ WORKDIR /home/builder
 COPY scripts/build/build.sh /home/builder/scripts/build.sh
 COPY scripts/build/run.sh /home/builder/scripts/run.sh
 COPY meta-cluster /home/builder/meta-cluster
+COPY meta-licheepi4a /home/builder/meta-licheepi4a
 RUN chmod +x /home/builder/scripts/build.sh
 RUN chmod +x /home/builder/scripts/run.sh
 
