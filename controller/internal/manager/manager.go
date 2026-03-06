@@ -505,14 +505,14 @@ func removeContents(dir string) error {
 	return nil
 }
 
-func (m *Manager) HandleGetPolicy(workerID uint64, currentHash uint64) ([]byte, bool, error) {
+func (m *Manager) HandleGetPolicy(workerID uint64, currentHash uint64, currentVersion uint64) ([]byte, bool, error) {
 	log.Printf("Worker %d requested policy", workerID)
 
-	policyProto := m.policyManager.GetWorkerPolicyProto(workerID)
-
-	if currentHash == policyProto.PolicyHash {
+	if m.policyManager.version == currentVersion {
 		return nil, false, nil
 	}
+
+	policyProto := m.policyManager.GetWorkerPolicyProto(workerID)
 
 	policyBytes, err := proto.Marshal(policyProto)
 	if err != nil {

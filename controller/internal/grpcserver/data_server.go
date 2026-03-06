@@ -9,6 +9,7 @@ import (
     "google.golang.org/grpc/codes"
     "google.golang.org/grpc/status"
     "google.golang.org/protobuf/types/known/emptypb"
+    "google.golang.org/protobuf/proto" 
 )
 
 type DataServer struct {
@@ -21,12 +22,33 @@ func NewDataServer(mgr *manager.Manager) *DataServer {
 }
 
 func (s *DataServer) GetPolicy(ctx context.Context, req *pb.GetPolicyRequest) (*pb.WorkerPolicy, error) {
-    log.Printf("gRPC GetPolicy from worker %d (hash: %d)", req.WorkerId, req.PolicyHash)
-    policy := s.manager.GetWorkerPolicy(req.WorkerId)
-    if policy == nil {
-        return nil, status.Errorf(codes.NotFound, "no policy for worker %d", req.WorkerId)
+    log.Printf("gRPC GetPolicy from worker %d (hash: %d, version: %d)", 
+        req.WorkerId, req.PolicyHash, req.ConfigVersion)
+    
+    policyBytes, changed, err := s.manager.HandleGetPolicy(
+        req.WorkerId, 
+        req.PolicyHash, 
+        req.ConfigVersion,
+    )
+    
+    if err != nil {
+        log.Printf("Error getting policy for worker %d: %v", req.WorkerId, err)
+        return nil, status.Errorf(codes.Internal, "failed to get policy: %v", err)
     }
-    return policy, nil
+    
+    if !changed {
+        log.Printf("Policy unchanged for worker %d", req.WorkerId)
+        return nil, nil
+    }
+    
+    log.Printf("Policy changed for worker %d, sending full policy", req.WorkerId)
+    var fullPolicy pb.WorkerPolicy
+    if err := proto.Unmarshal(policyBytes, &fullPolicy); err != nil {
+        log.Printf("Failed to unmarshal policy for worker %d: %v", req.WorkerId, err)
+        return nil, status.Errorf(codes.Internal, "failed to unmarshal policy: %v", err)
+    }
+    
+    return &fullPolicy, nil
 }
 
 func (s *DataServer) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb.ClassifyResponse, error) {

@@ -79,8 +79,7 @@ message WorkerPolicy {
     repeated string allow_domains = 4;
     int32 min_trust_level = 5;
     uint64 config_version = 6;
-    uint64 policy_hash = 7;
-    google.protobuf.Struct extra = 8;
+    google.protobuf.Struct extra = 7;
 }
 
 message ClassifyRequest {

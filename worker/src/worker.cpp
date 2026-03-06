@@ -130,10 +130,8 @@ void Worker::SendPulse(PulseType type) {
 void Worker::requestPolicyFromController() {
   try {
     spdlog::info("Worker {} requests policy", worker_id);
-
     GetPolicyRequest req;
     req.set_worker_id(worker_id);
-    req.set_policy_hash(current_policy_hash);
     req.set_config_version(current_config_version);
 
     WorkerPolicy policy;
@@ -144,7 +142,11 @@ void Worker::requestPolicyFromController() {
       throw WorkerException("GetPolicy failed: " + status.error_message());
     }
 
-    current_policy_hash = policy.policy_hash();
+    if (policy.config_version() == 0) {
+        spdlog::info("Policy unchanged");
+        return;
+    }
+
     spdlog::info("Policy received");
 
   } catch (const std::exception &e) {

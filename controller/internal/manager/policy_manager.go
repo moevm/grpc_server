@@ -1,11 +1,9 @@
 package manager
 
 import (
-	"crypto/sha256"
-	"encoding/binary"
+	"sync"
 	"fmt"
 	"log"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 	"github.com/pelletier/go-toml"
 	pb "github.com/moevm/grpc_server/pkg/proto/communication"
@@ -30,6 +28,7 @@ type TOMLConfig struct {
 type PolicyManager struct {
 	config  *TOMLConfig
 	version uint64
+	mu      sync.RWMutex 
 }
 
 func NewPolicyManager() *PolicyManager {
@@ -39,13 +38,10 @@ func NewPolicyManager() *PolicyManager {
     }
 }
 
-func computeHash(policy *pb.WorkerPolicy) uint64 {
-	data, _ := proto.Marshal(policy)
-	hash := sha256.Sum256(data)
-	return binary.BigEndian.Uint64(hash[:8])
-}
-
 func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy {
+	pm.mu.RLock()                
+    defer pm.mu.RUnlock()  
+	
 	if pm.config == nil {
 		return &pb.WorkerPolicy{}
 	}
@@ -56,6 +52,7 @@ func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy 
 		BlockDomains:    make([]string, len(pm.config.Global.Rules.BlockDomains)),
 		AllowDomains:    make([]string, len(pm.config.Global.Rules.AllowDomains)),
 		MinTrustLevel:   pm.config.Global.Rules.MinTrustLevel,
+		ConfigVersion:   pm.version, 
 	}
 	copy(policy.BlockCategories, pm.config.Global.Rules.BlockCategories)
 	for k, v := range pm.config.Global.Rules.BlockByTrust {
@@ -121,11 +118,13 @@ func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy 
 			}
 		}
 	}
-	policy.PolicyHash = computeHash(policy)
 	return policy
 }
 
 func (pm *PolicyManager) UpdateConfig(configData []byte) {
+	pm.mu.Lock()
+    defer pm.mu.Unlock()
+
 	var cfg TOMLConfig
 	if err := toml.Unmarshal(configData, &cfg); err != nil {
 		log.Printf("Failed to parse TOML in UpdateConfig: %v", err)
