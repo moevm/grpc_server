@@ -12,9 +12,6 @@
 
 #define SOCKET_DIR "/run/controller/"
 #define MAIN_SOCKET_NAME "main.sock"
-#define POLICY_SOCKET_NAME "policy.sock"
-#define CLASSIFY_SOCKET_NAME "classify.sock"
-#define STATS_SOCKET_NAME "stats.sock"
 #define EXPECTED_PULSE_TIME 60
 #define MIN_PULSE_TIME 30
 #define MAX_PULSE_TIME 45

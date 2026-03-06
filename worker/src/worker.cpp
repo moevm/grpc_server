@@ -143,8 +143,8 @@ void Worker::requestPolicyFromController() {
     }
 
     if (policy.config_version() == 0) {
-        spdlog::info("Policy unchanged");
-        return;
+      spdlog::info("Policy unchanged");
+      return;
     }
 
     spdlog::info("Policy received");
