@@ -138,8 +138,10 @@ void Worker::requestPolicyFromController() {
     grpc::ClientContext context;
 
     auto status = stub_->GetPolicy(&context, req, &policy);
+
     if (!status.ok()) {
-      throw WorkerException("GetPolicy failed: " + status.error_message());
+      spdlog::error("GetPolicy failed: " + status.error_message());
+      return;
     }
 
     if (policy.config_version() == 0) {
@@ -150,9 +152,7 @@ void Worker::requestPolicyFromController() {
     spdlog::info("Policy received");
 
   } catch (const std::exception &e) {
-    SetState(WorkerState::ERROR);
-    throw WorkerException(std::string("requestPolicyFromController: ") +
-                          e.what());
+    spdlog::error("requestPolicyFromController exception: {}", e.what());
   }
 }
 
@@ -169,7 +169,8 @@ void Worker::classifyDomain(const std::string &domain) {
 
     auto status = stub_->Classify(&context, req, &resp);
     if (!status.ok()) {
-      throw WorkerException("Classify failed: " + status.error_message());
+      spdlog::error("Classify failed: " + status.error_message());
+      return;
     }
 
     std::string cat =
@@ -178,8 +179,7 @@ void Worker::classifyDomain(const std::string &domain) {
                  domain, cat, resp.trust_level());
 
   } catch (const std::exception &e) {
-    SetState(WorkerState::ERROR);
-    throw WorkerException(std::string("classifyDomain: ") + e.what());
+    spdlog::error(std::string("classifyDomain: ") + e.what());
   }
 }
 
@@ -196,7 +196,8 @@ void Worker::statsReport() {
 
     auto status = stub_->SendStats(&context, report, &response);
     if (!status.ok()) {
-      throw WorkerException("SendStats failed: " + status.error_message());
+      spdlog::error("SendStats failed: " + status.error_message());
+      return;
     }
 
     spdlog::info("Stats sent successfully");
@@ -206,8 +207,7 @@ void Worker::statsReport() {
   }
 }
 
-Worker::Worker() : listener_fd(-1), state(WorkerState::BOOTING) {
-  SendPulse(PULSE_REGISTER);
+Worker::Worker(uint64_t id) : worker_id(id), state(WorkerState::FREE) {
 
   std::string controller_addr = "localhost:50051";
   if (const char *env_addr = getenv("CONTROLLER_GRPC_ADDR")) {
@@ -218,50 +218,14 @@ Worker::Worker() : listener_fd(-1), state(WorkerState::BOOTING) {
   stub_ = DataService::NewStub(channel);
   spdlog::info("gRPC channel created to {}", controller_addr);
 
-  socket_path = std::string(SOCKET_DIR) + std::to_string(worker_id) + ".sock";
-  unlink(socket_path.c_str());
-
-  spdlog::info("worker_id: {}", worker_id);
-  spdlog::info("socket_path: {}", socket_path);
-  srand(worker_id); // for random pulse time generation
-
-  listener_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (listener_fd < 0) {
-    throw WorkerException("socket() failed");
-  }
-
-  sockaddr_un addr{.sun_family = AF_UNIX};
-  strncpy(addr.sun_path, socket_path.c_str(), sizeof(addr.sun_path) - 1);
-
-  if (bind(listener_fd, (sockaddr *)&addr, sizeof(addr)) < 0) {
-    close(listener_fd);
-    listener_fd = -1;
-    throw WorkerException("bind() failed");
-  }
-
-  if (listen(listener_fd, 100) < 0) {
-    close(listener_fd);
-    listener_fd = -1;
-    throw WorkerException("listen() failed");
-  }
-
-  SendPulse(PULSE_OK);
+  srand(time(nullptr));
   SetState(WorkerState::FREE);
   requestPolicyFromController();
 }
 
 Worker::~Worker() {
   SetState(WorkerState::SHUTTING_DOWN);
-
-  try {
-    SendPulse(PULSE_SHUTDOWN);
-  } catch (...) {
-  } // ignore errors cuz we don't care
-
-  if (listener_fd != -1)
-    close(listener_fd);
-
-  unlink(socket_path.c_str());
+  spdlog::info("Worker {} shutting down", worker_id);
 }
 
 int Worker::GetPulseTimeout() {
@@ -353,29 +317,30 @@ void Worker::HandleControlMessage(int client_fd) {
 }
 
 void Worker::MainLoop() {
+  using namespace std::chrono;
+
+  last_policy_time = steady_clock::now();
+  last_stats_time = steady_clock::now();
+
   while (GetState() != WorkerState::SHUTTING_DOWN) {
-    pollfd fds[1] = {{listener_fd, POLLIN, 0}};
-    int timeout = GetPulseTimeout();
+    auto now = steady_clock::now();
 
-    int res = poll(fds, 1, timeout > 0 ? timeout : 0);
-    if (res < 0) {
-      SetState(WorkerState::ERROR);
-      throw WorkerException("poll failed");
+    int64_t seconds_since_stats = (now - last_stats_time) / 1s;
+    if (seconds_since_stats >= stats_interval) {
+      std::thread([this]() { statsReport(); }).detach();
+      last_stats_time = now;
+      stats_interval =
+          MIN_STATS_TIME + (rand() % (MAX_STATS_TIME - MIN_STATS_TIME + 1));
     }
 
-    if (res == 0) {
-      SendPulse(PULSE_OK);
-      continue;
+    int64_t seconds_since_policy = (now - last_policy_time) / 1s;
+    if (seconds_since_policy >= policy_interval) {
+      std::thread([this]() { requestPolicyFromController(); }).detach();
+      last_policy_time = now;
+      policy_interval =
+          MIN_POLICY_TIME + (rand() % (MAX_POLICY_TIME - MIN_POLICY_TIME + 1));
     }
 
-    if (fds[0].revents & POLLIN) {
-      int client_fd = accept(listener_fd, nullptr, nullptr);
-      if (client_fd < 0) {
-        SetState(WorkerState::ERROR);
-        throw WorkerException("accept failed");
-      }
-      HandleControlMessage(client_fd);
-      close(client_fd);
-    }
+    std::this_thread::sleep_for(milliseconds(100));
   }
 }

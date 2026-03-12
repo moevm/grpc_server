@@ -16,6 +16,14 @@
 #define MIN_PULSE_TIME 30
 #define MAX_PULSE_TIME 45
 
+#define EXPECTED_POLICY_TIME 60
+#define MIN_POLICY_TIME 30
+#define MAX_POLICY_TIME 45
+
+#define EXPECTED_STATS_TIME 60
+#define MIN_STATS_TIME 30
+#define MAX_STATS_TIME 45
+
 enum class WorkerState {
   BOOTING,       // Инициализация
   FREE,          // Ожидает задачи
@@ -35,13 +43,18 @@ public:
 };
 
 class Worker {
+  uint64_t worker_id = 0;
   std::string socket_path;
   int listener_fd = -1;
-  uint64_t worker_id = 0;
+
   uint64_t current_task_id = 0;
   uint64_t current_config_version = 0;
   std::chrono::time_point<std::chrono::steady_clock> last_pulse_time;
+  std::chrono::time_point<std::chrono::steady_clock> last_policy_time;
+  std::chrono::time_point<std::chrono::steady_clock> last_stats_time;
   uint64_t pulse_interval = MIN_PULSE_TIME;
+  int64_t policy_interval = MIN_POLICY_TIME;
+  int64_t stats_interval = MIN_STATS_TIME;
 
   std::string fetch_data;
   std::string extra_data;
@@ -101,7 +114,7 @@ protected:
   }
 
 public:
-  Worker();
+  Worker(uint64_t id);
   ~Worker();
 
   inline uint64_t GetID() const { return worker_id; }

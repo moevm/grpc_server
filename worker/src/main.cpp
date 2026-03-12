@@ -20,12 +20,20 @@ protected:
   }
 
 public:
-  HashWorker(const char *gateway_address, const char *gateway_port)
-      : metrics_collector(gateway_address, gateway_port,
-                          ("worker-" + std::to_string(GetID())).c_str()) {}
+  HashWorker(const char *gateway_address, const char *gateway_port, uint64_t id)
+      : Worker(id),
+        metrics_collector(gateway_address, gateway_port,
+                          ("worker-" + std::to_string(id)).c_str()) {}
 };
 
 int main() {
+  const char *worker_id_str = getenv("WORKER_ID");
+  if (worker_id_str == nullptr) {
+    spdlog::error("WORKER_ID environment variable not set");
+    return 1;
+  }
+
+  uint64_t worker_id = std::stoull(worker_id_str);
   const char *gateway_address = getenv("METRICS_GATEWAY_ADDRESS");
   const char *gateway_port = getenv("METRICS_GATEWAY_PORT");
 
@@ -39,10 +47,9 @@ int main() {
                gateway_port);
 
   try {
-    HashWorker worker(gateway_address, gateway_port);
+    HashWorker worker(gateway_address, gateway_port, worker_id);
 
     bool test_mode = false;
-
     if (getenv("TEST_REQUEST_POLICY") != nullptr) {
       test_mode = true;
       spdlog::info("Test mode: requesting policy");
