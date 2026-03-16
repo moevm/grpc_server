@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
     af_xdp_port_start(port_in);
     af_xdp_port_start(port_out);
     
-    printf("Запущен бесконечный цикл. Пакеты проходят из порта с id=%u в порт с id=%u\n", port_in, port_out);
+    printf("An endless cycle has been started. Packets pass from port with id=%u to port with id=%u\n", port_in, port_out);
     
     while (1) {
         
