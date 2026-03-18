@@ -7,7 +7,6 @@ import (
 	"github.com/moevm/grpc_server/internal/config"
 	"github.com/moevm/grpc_server/internal/grpcserver"
 	"github.com/moevm/grpc_server/internal/manager"
-	pb "github.com/moevm/grpc_server/pkg/proto/file_service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	adminPb "github.com/moevm/grpc_server/pkg/proto/admin_service"
@@ -38,7 +37,6 @@ func main() {
 
 	service := grpc.NewServer(serverOpts...)
 	adminPb.RegisterAdminServiceServer(service, adminServer)
-	pb.RegisterFileServiceServer(service, grpcserver.NewServer(cfg.AllowedChars, mgr))
 	commPb.RegisterDataServiceServer(service, dataServer)  
 	reflection.Register(service)
 

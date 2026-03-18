@@ -22,12 +22,11 @@ func NewDataServer(mgr *manager.Manager) *DataServer {
 }
 
 func (s *DataServer) GetPolicy(ctx context.Context, req *pb.GetPolicyRequest) (*pb.WorkerPolicy, error) {
-    log.Printf("gRPC GetPolicy from worker %d (hash: %d, version: %d)", 
-        req.WorkerId, req.PolicyHash, req.ConfigVersion)
+    log.Printf("gRPC GetPolicy from worker %d ( version: %d)", 
+        req.WorkerId,req.ConfigVersion)
     
     policyBytes, changed, err := s.manager.HandleGetPolicy(
         req.WorkerId, 
-        req.PolicyHash, 
         req.ConfigVersion,
     )
     

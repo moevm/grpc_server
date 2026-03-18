@@ -6,7 +6,6 @@ go_library(
     importpath = "github.com/moevm/grpc_server/internal/manager",
     visibility = ["//visibility:public"],
     deps = [
-        "//internal/conn",
         "//pkg/proto/communication:communication_go_proto",
         "@org_golang_google_protobuf//proto",
         "@com_github_joho_godotenv//:go_default_library",
