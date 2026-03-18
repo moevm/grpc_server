@@ -36,8 +36,6 @@ cc_library(
     name = "worker_headers",
     hdrs = [
         "include/worker.hpp",
-        "include/md_calculator.hpp",
-        "include/file.hpp",
         "include/metrics_collector.hpp",
     ],
     srcs = [],
@@ -48,8 +46,6 @@ cc_binary(
     name = "worker",
     srcs = [
         "src/main.cpp",
-        "src/md_calculator.cpp",
-        "src/file.cpp",
         "src/worker.cpp",
         "src/metrics_collector.cpp",
     ],
