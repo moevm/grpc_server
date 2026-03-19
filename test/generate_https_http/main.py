@@ -29,7 +29,9 @@ class GenerateTrafficHttpHttps:
         else:
             self._stats[url][field] += 1
 
-    async def _request(self, url: str, client: httpx.AsyncClient, timeout: float = 10.0):
+    async def _request(
+        self, url: str, client: httpx.AsyncClient, timeout: float = 10.0
+    ):
         try:
             response = await client.get(url, timeout=timeout)
             self._inc_stats_field(url, response.status_code)
@@ -48,7 +50,7 @@ class GenerateTrafficHttpHttps:
     def load_config_file(self, file_path: str) -> bool:
 
         try:
-            with open(file_path, 'r') as config_file:
+            with open(file_path, "r") as config_file:
                 config = json.load(config_file)
                 self._config = config
 
@@ -80,8 +82,12 @@ class GenerateTrafficHttpHttps:
 
     def _print_stats(self):
         for url in self._stats:
-            print(f"Url {url} status codes:",
-                  ' '.join(f"{field}: {count}" for field, count in self._stats[url].items()))
+            print(
+                f"Url {url} status codes:",
+                " ".join(
+                    f"{field}: {count}" for field, count in self._stats[url].items()
+                ),
+            )
 
     def generate(self, max_concurrent_requests: int):
 
@@ -100,9 +106,19 @@ class GenerateTrafficHttpHttps:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', metavar='-c', required=True, type=str, help='config file')
-    parser.add_argument('--log', metavar='-l', required=True, type=str, help='logging level')
-    parser.add_argument('--max_concurent', metavar='m', required=True, type=int, help='max concurent requests')
+    parser.add_argument(
+        "--config", metavar="-c", required=True, type=str, help="config file"
+    )
+    parser.add_argument(
+        "--log", metavar="-l", required=True, type=str, help="logging level"
+    )
+    parser.add_argument(
+        "--max_concurent",
+        metavar="m",
+        required=True,
+        type=int,
+        help="max concurent requests",
+    )
     args = parser.parse_args()
 
     try:
@@ -114,7 +130,7 @@ def main():
     logging.basicConfig(
         level=level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt='%Y-%m-%d %H:%M:%S'
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     generator = GenerateTrafficHttpHttps()
@@ -128,8 +144,5 @@ def main():
     generator.generate(args.max_concurent)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-
-
