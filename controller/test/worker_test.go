@@ -30,9 +30,26 @@ func TestWorkerPolicyRequest(t *testing.T) {
 	ctrlBin := filepath.Join(root, "controller", "bazel-bin", "cmd", "grpc_server", "grpc_server_", "grpc_server")
 	workerBin := filepath.Join(root, "worker", "bazel-bin", "worker")
 
+	if _, err := os.Stat(ctrlBin); err != nil {
+		t.Skipf("Controller binary not found: %v", err)
+	}
+	if _, err := os.Stat(workerBin); err != nil {
+		t.Skipf("Worker binary not found: %v", err)
+	}
+
 	ctrl := exec.Command(ctrlBin)
-	ctrl.Start()
-	defer ctrl.Process.Kill()
+	
+	if err := ctrl.Start(); err != nil {
+		t.Fatalf("Failed to start controller: %v", err)
+	}
+	
+	defer func() {
+		if err := ctrl.Process.Kill(); err != nil {
+			t.Logf("Warning: failed to kill controller: %v", err)
+		}
+	}()
+
+	time.Sleep(1 * time.Second)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -56,9 +73,26 @@ func TestWorkerStatsReport(t *testing.T) {
 	ctrlBin := filepath.Join(root, "controller", "bazel-bin", "cmd", "grpc_server", "grpc_server_", "grpc_server")
 	workerBin := filepath.Join(root, "worker", "bazel-bin", "worker")
 
+	if _, err := os.Stat(ctrlBin); err != nil {
+		t.Skipf("Controller binary not found: %v", err)
+	}
+	if _, err := os.Stat(workerBin); err != nil {
+		t.Skipf("Worker binary not found: %v", err)
+	}
+
 	ctrl := exec.Command(ctrlBin)
-	ctrl.Start()
-	defer ctrl.Process.Kill()
+	
+	if err := ctrl.Start(); err != nil {
+		t.Fatalf("Failed to start controller: %v", err)
+	}
+	
+	defer func() {
+		if err := ctrl.Process.Kill(); err != nil {
+			t.Logf("Warning: failed to kill controller: %v", err)
+		}
+	}()
+
+	time.Sleep(1 * time.Second)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -82,9 +116,26 @@ func TestWorkerClassifyRequest(t *testing.T) {
 	ctrlBin := filepath.Join(root, "controller", "bazel-bin", "cmd", "grpc_server", "grpc_server_", "grpc_server")
 	workerBin := filepath.Join(root, "worker", "bazel-bin", "worker")
 
+	if _, err := os.Stat(ctrlBin); err != nil {
+		t.Skipf("Controller binary not found: %v", err)
+	}
+	if _, err := os.Stat(workerBin); err != nil {
+		t.Skipf("Worker binary not found: %v", err)
+	}
+
 	ctrl := exec.Command(ctrlBin)
-	ctrl.Start()
-	defer ctrl.Process.Kill()
+	
+	if err := ctrl.Start(); err != nil {
+		t.Fatalf("Failed to start controller: %v", err)
+	}
+	
+	defer func() {
+		if err := ctrl.Process.Kill(); err != nil {
+			t.Logf("Warning: failed to kill controller: %v", err)
+		}
+	}()
+
+	time.Sleep(1 * time.Second)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

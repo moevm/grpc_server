@@ -1,21 +1,21 @@
 package manager
 
 import (
-	"sync"
 	"fmt"
-	"log"
-	"google.golang.org/protobuf/types/known/structpb"
-	"github.com/pelletier/go-toml"
 	pb "github.com/moevm/grpc_server/pkg/proto/communication"
+	"github.com/pelletier/go-toml"
+	"google.golang.org/protobuf/types/known/structpb"
+	"log"
+	"sync"
 )
 
 type TOMLRules struct {
-	BlockCategories []string          `toml:"block_categories"`
-	BlockByTrust    map[string]int32  `toml:"block_by_trust"`
-	BlockDomains    []string          `toml:"block_domains"`
-	AllowDomains    []string          `toml:"allow_domains"`
-	MinTrustLevel   *int32             `toml:"min_trust_level"`
-	Extra map[string]interface{} 	  `toml:",remain"`
+	BlockCategories []string               `toml:"block_categories"`
+	BlockByTrust    map[string]int32       `toml:"block_by_trust"`
+	BlockDomains    []string               `toml:"block_domains"`
+	AllowDomains    []string               `toml:"allow_domains"`
+	MinTrustLevel   *int32                 `toml:"min_trust_level"`
+	Extra           map[string]interface{} `toml:",remain"`
 }
 
 type TOMLConfig struct {
@@ -28,20 +28,20 @@ type TOMLConfig struct {
 type PolicyManager struct {
 	config  *TOMLConfig
 	version uint64
-	mu      sync.RWMutex 
+	mu      sync.RWMutex
 }
 
 func NewPolicyManager() *PolicyManager {
-    return &PolicyManager{
+	return &PolicyManager{
 		version: 0,
-        config:  &TOMLConfig{},
-    }
+		config:  &TOMLConfig{},
+	}
 }
 
 func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy {
-	pm.mu.RLock()                
-    defer pm.mu.RUnlock()  
-	
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
 	if pm.config == nil {
 		return &pb.WorkerPolicy{}
 	}
@@ -51,7 +51,7 @@ func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy 
 		BlockByTrust:    make(map[string]int32, len(pm.config.Global.Rules.BlockByTrust)),
 		BlockDomains:    make([]string, len(pm.config.Global.Rules.BlockDomains)),
 		AllowDomains:    make([]string, len(pm.config.Global.Rules.AllowDomains)),
-		ConfigVersion:   pm.version, 
+		ConfigVersion:   pm.version,
 	}
 	copy(policy.BlockCategories, pm.config.Global.Rules.BlockCategories)
 	for k, v := range pm.config.Global.Rules.BlockByTrust {
@@ -77,11 +77,11 @@ func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy 
 				}
 			}
 		}
-		
+
 		for k, v := range filter.BlockByTrust {
 			policy.BlockByTrust[k] = v
 		}
-		
+
 		if len(filter.BlockDomains) > 0 {
 			existing := make(map[string]bool)
 			for _, d := range policy.BlockDomains {
@@ -93,7 +93,7 @@ func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy 
 				}
 			}
 		}
-		
+
 		if len(filter.AllowDomains) > 0 {
 			existing := make(map[string]bool)
 			for _, d := range policy.AllowDomains {
@@ -126,7 +126,7 @@ func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy 
 
 func (pm *PolicyManager) UpdateConfig(configData []byte) {
 	pm.mu.Lock()
-    defer pm.mu.Unlock()
+	defer pm.mu.Unlock()
 
 	var cfg TOMLConfig
 	if err := toml.Unmarshal(configData, &cfg); err != nil {

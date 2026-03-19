@@ -1,9 +1,9 @@
 package manager
 
 import (
-	"log"
-	"google.golang.org/protobuf/proto"
 	communication "github.com/moevm/grpc_server/pkg/proto/communication"
+	"google.golang.org/protobuf/proto"
+	"log"
 )
 
 type Manager struct {

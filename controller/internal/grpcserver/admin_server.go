@@ -9,7 +9,7 @@ import (
 type AdminServer struct {
 	pb.UnimplementedAdminServiceServer
 	configData []byte
-	manager    *manager.Manager 
+	manager    *manager.Manager
 }
 
 func NewAdminServer() *AdminServer {
@@ -22,7 +22,7 @@ func (s *AdminServer) SetManager(m *manager.Manager) {
 
 func (s *AdminServer) LoadConfig(ctx context.Context, req *pb.LoadConfigRequest) (*pb.LoadConfigResponse, error) {
 	s.configData = req.ConfigData
-	
+
 	if s.manager != nil {
 		s.manager.UpdateConfig(s.configData)
 	}
