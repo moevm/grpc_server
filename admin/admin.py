@@ -2,12 +2,34 @@ import argparse
 import grpc
 from dotenv import load_dotenv
 import os
+import sys
+import toml
 
 import admin_service_pb2
 import admin_service_pb2_grpc
 
 load_dotenv(".env")
 
+def validate_config(content: bytes) -> list[str]:
+    errors = []
+
+    try:
+        config = toml.loads(content.decode('utf-8'))
+    except Exception as e:
+        errors.append(f"Invalid TOML: {e}")
+        return errors
+
+    if not config:
+        errors.append("Config file is empty")
+        return errors
+
+    if 'filters' in config:
+        filter_names = set()
+        for filter_name in config['filters'].keys():
+            if filter_name in filter_names:
+                errors.append(f"Duplicate filter name: '{filter_name}'")
+            filter_names.add(filter_name)
+    
 class AdminClient:
     def __init__(self):
         self.host: str = os.environ["SERVER_HOST"]
@@ -18,6 +40,12 @@ class AdminClient:
     def load_config(self, toml_file: str) -> admin_service_pb2.LoadConfigResponse:
         with open(toml_file, "rb") as f:
             content: bytes = f.read()
+
+        errors = validate_config(content)
+
+        if errors:
+            error_msg = "\n".join(errors)
+            raise ValueError(f"Config validation failed:\n{error_msg}")
 
         request: admin_service_pb2.LoadConfigRequest = (admin_service_pb2.LoadConfigRequest(config_data=content))
         return self.stub.LoadConfig(request)

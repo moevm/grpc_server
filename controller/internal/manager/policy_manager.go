@@ -14,7 +14,7 @@ type TOMLRules struct {
 	BlockByTrust    map[string]int32  `toml:"block_by_trust"`
 	BlockDomains    []string          `toml:"block_domains"`
 	AllowDomains    []string          `toml:"allow_domains"`
-	MinTrustLevel   int32             `toml:"min_trust_level"`
+	MinTrustLevel   *int32             `toml:"min_trust_level"`
 	Extra map[string]interface{} 	  `toml:",remain"`
 }
 
@@ -51,7 +51,6 @@ func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy 
 		BlockByTrust:    make(map[string]int32, len(pm.config.Global.Rules.BlockByTrust)),
 		BlockDomains:    make([]string, len(pm.config.Global.Rules.BlockDomains)),
 		AllowDomains:    make([]string, len(pm.config.Global.Rules.AllowDomains)),
-		MinTrustLevel:   pm.config.Global.Rules.MinTrustLevel,
 		ConfigVersion:   pm.version, 
 	}
 	copy(policy.BlockCategories, pm.config.Global.Rules.BlockCategories)
@@ -60,6 +59,10 @@ func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy 
 	}
 	copy(policy.BlockDomains, pm.config.Global.Rules.BlockDomains)
 	copy(policy.AllowDomains, pm.config.Global.Rules.AllowDomains)
+
+	if pm.config.Global.Rules.MinTrustLevel != nil {
+		policy.MinTrustLevel = *pm.config.Global.Rules.MinTrustLevel
+	}
 
 	filterName := fmt.Sprintf("filter_%d", workerID)
 	if filter, ok := pm.config.Filters[filterName]; ok {
@@ -102,8 +105,8 @@ func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy 
 				}
 			}
 		}
-		if filter.MinTrustLevel != 0 {
-			policy.MinTrustLevel = filter.MinTrustLevel
+		if filter.MinTrustLevel != nil {
+			policy.MinTrustLevel = *filter.MinTrustLevel
 		}
 
 		if len(filter.Extra) > 0 {

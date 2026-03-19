@@ -21,7 +21,7 @@ func NewDataServer(mgr *manager.Manager) *DataServer {
     return &DataServer{manager: mgr}
 }
 
-func (s *DataServer) GetPolicy(ctx context.Context, req *pb.GetPolicyRequest) (*pb.WorkerPolicy, error) {
+func (s *DataServer) GetPolicy(ctx context.Context, req *pb.GetPolicyRequest) (*pb.GetPolicyResponse, error) {
     log.Printf("gRPC GetPolicy from worker %d ( version: %d)", 
         req.WorkerId,req.ConfigVersion)
     
@@ -37,7 +37,9 @@ func (s *DataServer) GetPolicy(ctx context.Context, req *pb.GetPolicyRequest) (*
     
     if !changed {
         log.Printf("Policy unchanged for worker %d", req.WorkerId)
-        return nil, nil
+        return &pb.GetPolicyResponse{
+            Result: pb.GetPolicyResponse_POLICY_UNCHANGED,
+        }, nil
     }
     
     log.Printf("Policy changed for worker %d, sending full policy", req.WorkerId)
@@ -47,7 +49,10 @@ func (s *DataServer) GetPolicy(ctx context.Context, req *pb.GetPolicyRequest) (*
         return nil, status.Errorf(codes.Internal, "failed to unmarshal policy: %v", err)
     }
     
-    return &fullPolicy, nil
+    return &pb.GetPolicyResponse{
+        Result: pb.GetPolicyResponse_POLICY_PROVIDED,
+        Policy: &fullPolicy,
+    }, nil
 }
 
 func (s *DataServer) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb.ClassifyResponse, error) {

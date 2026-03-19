@@ -1,11 +1,11 @@
 #include "../include/worker.hpp"
 
 #include "communication.grpc.pb.h"
+#include <cstdlib>
+#include <ctime>
 #include <grpcpp/grpcpp.h>
 #include <spdlog/spdlog.h>
 #include <thread>
-#include <cstdlib>
-#include <ctime> 
 
 void Worker::LogStateChange(WorkerState new_state) {
   const char *state_names[] = {"BOOTING", "FREE", "BUSY", "SHUTTING_DOWN",
@@ -29,25 +29,27 @@ void Worker::requestPolicyFromController() {
     req.set_worker_id(worker_id);
     req.set_config_version(current_config_version);
 
-    WorkerPolicy policy;
+    GetPolicyResponse resp;
     grpc::ClientContext context;
 
-    auto status = stub_->GetPolicy(&context, req, &policy);
+    auto status = stub_->GetPolicy(&context, req, &resp);
 
     if (!status.ok()) {
       spdlog::error("GetPolicy failed: " + status.error_message());
       return;
     }
 
-    if (policy.config_version() == 0) {
+    switch (resp.result()) {
+    case GetPolicyResponse::POLICY_PROVIDED:
+      spdlog::info("Policy received");
+      current_config_version = resp.policy().config_version();
+      break;
+    case GetPolicyResponse::POLICY_UNCHANGED:
       spdlog::info("Policy unchanged");
-      return;
+      break;
+    default:
+      spdlog::error("Unknown response result");
     }
-    else {
-      current_config_version = policy.config_version();
-    }
-
-    spdlog::info("Policy received");
 
   } catch (const std::exception &e) {
     spdlog::error("requestPolicyFromController exception: {}", e.what());

@@ -19,7 +19,11 @@ func NewManager() (*Manager, error) {
 func (m *Manager) HandleGetPolicy(workerID uint64, currentVersion uint64) ([]byte, bool, error) {
 	log.Printf("Worker %d requested policy", workerID)
 
-	if m.policyManager.version == currentVersion {
+	m.policyManager.mu.RLock()
+	currentPolicyVersion := m.policyManager.version
+	m.policyManager.mu.RUnlock()
+
+	if currentPolicyVersion == currentVersion {
 		log.Printf("Worker %d already has latest policy", workerID)
 		return nil, false, nil
 	}
