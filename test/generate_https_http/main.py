@@ -1,13 +1,10 @@
 import json
-import time
 import random
 import argparse
 import logging
 import asyncio
 import httpx
 import signal
-import sys
-
 
 class GenerateTrafficHttpHttps:
 
@@ -29,9 +26,7 @@ class GenerateTrafficHttpHttps:
         else:
             self._stats[url][field] += 1
 
-    async def _request(
-        self, url: str, client: httpx.AsyncClient, timeout: float = 10.0
-    ):
+    async def _request(self, url: str, client: httpx.AsyncClient, timeout: float = 10.0):
         try:
             response = await client.get(url, timeout=timeout)
             self._inc_stats_field(url, response.status_code)
@@ -84,9 +79,7 @@ class GenerateTrafficHttpHttps:
         for url in self._stats:
             print(
                 f"Url {url} status codes:",
-                " ".join(
-                    f"{field}: {count}" for field, count in self._stats[url].items()
-                ),
+                " ".join(f"{field}: {count}" for field, count in self._stats[url].items()),
             )
 
     def generate(self, max_concurrent_requests: int):
@@ -106,12 +99,8 @@ class GenerateTrafficHttpHttps:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config", metavar="-c", required=True, type=str, help="config file"
-    )
-    parser.add_argument(
-        "--log", metavar="-l", required=True, type=str, help="logging level"
-    )
+    parser.add_argument("--config", metavar="-c", required=True, type=str, help="config file")
+    parser.add_argument("--log", metavar="-l", required=True, type=str, help="logging level")
     parser.add_argument(
         "--max_concurent",
         metavar="m",
