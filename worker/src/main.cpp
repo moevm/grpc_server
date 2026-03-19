@@ -13,7 +13,8 @@ protected:
   }
 
 public:
-  FiltrWorker(const char *gateway_address, const char *gateway_port, uint64_t id)
+  FiltrWorker(const char *gateway_address, const char *gateway_port,
+              uint64_t id)
       : Worker(id),
         metrics_collector(gateway_address, gateway_port,
                           ("worker-" + std::to_string(id)).c_str()) {}
@@ -70,7 +71,6 @@ int main() {
     }
 
     worker.MainLoop();
-
 
   } catch (std::exception &e) {
     spdlog::error("unhandled exception {}: {}", typeid(e).name(), e.what());

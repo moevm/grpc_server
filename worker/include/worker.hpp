@@ -1,12 +1,11 @@
 #ifndef WORKER_HPP
 #define WORKER_HPP
 
-#include "communication.pb.h"
 #include "communication.grpc.pb.h"
+#include "communication.pb.h"
 #include <cstdint>
 #include <grpcpp/grpcpp.h>
 #include <memory>
-
 
 #define EXPECTED_POLICY_TIME 60
 #define MIN_POLICY_TIME 30
@@ -21,7 +20,6 @@ enum class WorkerState {
   SHUTTING_DOWN, // Завершение работы
 };
 
-
 class Worker {
   uint64_t worker_id = 0;
 
@@ -30,7 +28,6 @@ class Worker {
   std::chrono::time_point<std::chrono::steady_clock> last_stats_time;
   int64_t policy_interval = MIN_POLICY_TIME;
   int64_t stats_interval = MIN_STATS_TIME;
-
 
   std::unique_ptr<DataService::Stub> stub_;
 
