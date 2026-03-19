@@ -7,10 +7,10 @@ import (
 	"github.com/moevm/grpc_server/internal/config"
 	"github.com/moevm/grpc_server/internal/grpcserver"
 	"github.com/moevm/grpc_server/internal/manager"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 	adminPb "github.com/moevm/grpc_server/pkg/proto/admin_service"
 	commPb "github.com/moevm/grpc_server/pkg/proto/communication"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
@@ -22,7 +22,7 @@ func main() {
 	}
 
 	adminServer.SetManager(mgr)
-	
+
 	dataServer := grpcserver.NewDataServer(mgr)
 
 	lis, err := net.Listen("tcp", net.JoinHostPort(cfg.Host, cfg.Port))
@@ -37,7 +37,7 @@ func main() {
 
 	service := grpc.NewServer(serverOpts...)
 	adminPb.RegisterAdminServiceServer(service, adminServer)
-	commPb.RegisterDataServiceServer(service, dataServer)  
+	commPb.RegisterDataServiceServer(service, dataServer)
 	reflection.Register(service)
 
 	log.Printf("Server starting on %s:%s", cfg.Host, cfg.Port)

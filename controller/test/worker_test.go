@@ -38,11 +38,11 @@ func TestWorkerPolicyRequest(t *testing.T) {
 	}
 
 	ctrl := exec.Command(ctrlBin)
-	
+
 	if err := ctrl.Start(); err != nil {
 		t.Fatalf("Failed to start controller: %v", err)
 	}
-	
+
 	defer func() {
 		if err := ctrl.Process.Kill(); err != nil {
 			t.Logf("Warning: failed to kill controller: %v", err)
@@ -81,11 +81,11 @@ func TestWorkerStatsReport(t *testing.T) {
 	}
 
 	ctrl := exec.Command(ctrlBin)
-	
+
 	if err := ctrl.Start(); err != nil {
 		t.Fatalf("Failed to start controller: %v", err)
 	}
-	
+
 	defer func() {
 		if err := ctrl.Process.Kill(); err != nil {
 			t.Logf("Warning: failed to kill controller: %v", err)
@@ -124,11 +124,11 @@ func TestWorkerClassifyRequest(t *testing.T) {
 	}
 
 	ctrl := exec.Command(ctrlBin)
-	
+
 	if err := ctrl.Start(); err != nil {
 		t.Fatalf("Failed to start controller: %v", err)
 	}
-	
+
 	defer func() {
 		if err := ctrl.Process.Kill(); err != nil {
 			t.Logf("Warning: failed to kill controller: %v", err)
