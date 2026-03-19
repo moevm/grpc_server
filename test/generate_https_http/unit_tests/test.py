@@ -1,6 +1,5 @@
 import unittest
 import json
-import time
 import asyncio
 import httpx
 from pathlib import Path
@@ -55,11 +54,3 @@ class TestPythonTrafficGenerator(unittest.TestCase):
 
     def test_6_request_500(self):
         self._assert_request_status("https://httpbin.org/status/500", 500)
-
-
-
-
-
-
-
-
