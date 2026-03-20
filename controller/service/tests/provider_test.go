@@ -6,7 +6,7 @@ import (
 )
 
 func TestProviderLoadFromFile(t *testing.T) {
-	filename := "provider_test.json"
+	filename := "providers_test.json"
 	list := models.ProviderList{}
 
 	err := list.LoadFromFile(filename)
