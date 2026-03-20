@@ -24,7 +24,12 @@ func (s *AdminServer) LoadConfig(ctx context.Context, req *pb.LoadConfigRequest)
 	s.configData = req.ConfigData
 
 	if s.manager != nil {
-		s.manager.UpdateConfig(s.configData)
+		if err := s.manager.UpdateConfig(s.configData); err != nil {
+			return &pb.LoadConfigResponse{
+				Success:      false,
+				ErrorMessage: "failed to update config " + err.Error(),
+			}, nil
+		}
 	}
 
 	return &pb.LoadConfigResponse{

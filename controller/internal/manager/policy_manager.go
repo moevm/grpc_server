@@ -124,16 +124,17 @@ func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy 
 	return policy
 }
 
-func (pm *PolicyManager) UpdateConfig(configData []byte) {
+func (pm *PolicyManager) UpdateConfig(configData []byte) error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
 	var cfg TOMLConfig
 	if err := toml.Unmarshal(configData, &cfg); err != nil {
 		log.Printf("Failed to parse TOML in UpdateConfig: %v", err)
-		return
+		return err
 	}
 	pm.config = &cfg
 	pm.version++
 	log.Printf("Config updated to version %d", pm.version)
+	return nil
 }

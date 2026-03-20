@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"fmt"
 	communication "github.com/moevm/grpc_server/pkg/proto/communication"
 	"google.golang.org/protobuf/proto"
 	"log"
@@ -43,8 +44,9 @@ func (m *Manager) GetWorkerPolicy(workerID uint64) *communication.WorkerPolicy {
 	return m.policyManager.GetWorkerPolicyProto(workerID)
 }
 
-func (m *Manager) UpdateConfig(configData []byte) {
+func (m *Manager) UpdateConfig(configData []byte) error {
 	if m.policyManager != nil {
-		m.policyManager.UpdateConfig(configData)
+		return fmt.Errorf("policyManager is nil")
 	}
+	return m.policyManager.UpdateConfig(configData)
 }

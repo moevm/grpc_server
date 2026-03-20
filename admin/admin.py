@@ -29,6 +29,7 @@ def validate_config(content: bytes) -> list[str]:
             if filter_name in filter_names:
                 errors.append(f"Duplicate filter name: '{filter_name}'")
             filter_names.add(filter_name)
+    return errors
     
 class AdminClient:
     def __init__(self):
@@ -48,7 +49,12 @@ class AdminClient:
             raise ValueError(f"Config validation failed:\n{error_msg}")
 
         request: admin_service_pb2.LoadConfigRequest = (admin_service_pb2.LoadConfigRequest(config_data=content))
-        return self.stub.LoadConfig(request)
+        response = self.stub.LoadConfig(request)
+
+        if not response.success:
+            error_msg = response.error_message if hasattr(response, 'error_message') else "Unknown error"
+            raise Exception(f"Server error: {error_msg}")
+        return response
 
 def main():
     parser = argparse.ArgumentParser()
