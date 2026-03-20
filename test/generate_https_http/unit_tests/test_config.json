@@ -1,0 +1,8 @@
+{
+    "RPS": 5,
+    "root_urls": [
+        "http://4chan.org",
+        "https://www.reddit.com",
+        "https://www.yahoo.com"
+    ]
+}
