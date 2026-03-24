@@ -8,7 +8,8 @@
 
 
 int main(int argc, char** argv) {
-    uint16_t port_in, port_out;
+    struct af_xdp_port* port_in = NULL;
+    struct af_xdp_port* port_out = NULL;
     struct rte_mempool *mbuf_pool;
     unsigned mbuf_quantity_in_pool = 8192;
     unsigned cache_size_per_kernel = 250;
@@ -21,24 +22,28 @@ int main(int argc, char** argv) {
     
     mbuf_pool = rte_pktmbuf_pool_create("POOL", mbuf_quantity_in_pool, cache_size_per_kernel, priv_size, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
     
-    af_xdp_port_init("veth0", &port_in, mbuf_pool);
-    af_xdp_port_init("veth1", &port_out, mbuf_pool);
+    port_in = init_struct_af_xdp_port("veth0", mbuf_pool);
+    port_out = init_struct_af_xdp_port("veth1", mbuf_pool);
+
+    if (af_xdp_port_init(port_in) || af_xdp_port_init(port_out)) {
+            return 1;
+        }
     
-    af_xdp_port_start(port_in);
-    af_xdp_port_start(port_out);
+    af_xdp_port_start(port_in->port_id);
+    af_xdp_port_start(port_out->port_id);
     
-    printf("An endless cycle has been started. Packets pass from port with id=%u to port with id=%u\n", port_in, port_out);
+    printf("An endless cycle has been started. Packets pass from port with id=%u to port with id=%u\n", port_in->port_id, port_out->port_id);
     
     while (1) {
         
-        uint16_t nb_rx = rte_eth_rx_burst(port_in, queue_number, pkts, nb_pkts);
+        uint16_t nb_rx = rte_eth_rx_burst(port_in->port_id, queue_number, pkts, nb_pkts);
         for (int i = 0; i < nb_rx; i++) {         
-            rte_eth_tx_burst(port_out, queue_number, &pkts[i], 1);
+            rte_eth_tx_burst(port_in->port_id, queue_number, &pkts[i], 1);
         }
 
     }
 
-    af_xdp_port_close("veth0", port_in);
-    af_xdp_port_close("veth1", port_out);
+    af_xdp_port_close(port_in);
+    af_xdp_port_close(port_out);
     return 0;
 }
