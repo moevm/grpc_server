@@ -2,7 +2,7 @@ package tests
 
 import (
 	"reflect"
-	"task/internal/models"
+	"service/internal/models"
 	"testing"
 )
 

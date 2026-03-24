@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"service/internal/models"
 	"strings"
-	"task/internal/models"
 	"time"
 )
 

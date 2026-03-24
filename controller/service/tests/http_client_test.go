@@ -1,8 +1,8 @@
 package tests
 
 import (
-	"task/internal/client"
-	"task/internal/models"
+	"service/internal/client"
+	"service/internal/models"
 	"testing"
 	"time"
 )
@@ -78,7 +78,11 @@ func TestHttpClientRequest(t *testing.T) {
 					t.Errorf("Expected success but got error: %v", err)
 					return
 				}
-				defer resp.Body.Close()
+				err = resp.Body.Close()
+				if err != nil {
+					t.Errorf("Error to close body: %v", err)
+					return
+				}
 
 				if resp.StatusCode != 200 {
 					t.Errorf("Expected status 200, got %d", resp.StatusCode)

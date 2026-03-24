@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"task/internal/client"
-	"task/internal/models"
-	"task/internal/parser"
+	"service/internal/client"
+	"service/internal/models"
+	"service/internal/parser"
 	"time"
 )
 
@@ -63,7 +63,11 @@ func (s *Service) Check(group *models.Group, checkValue string, endpointName str
 			log.Printf("Error requesting %s: %v", providerName, err)
 			continue
 		}
-		defer resp.Body.Close()
+		err = resp.Body.Close()
+		if err != nil {
+			log.Printf("Error to close body: %v", err)
+			continue
+		}
 
 		if resp.StatusCode != http.StatusOK {
 			log.Printf("Provider %s returned %s", providerName, resp.Status)

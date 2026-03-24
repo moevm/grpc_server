@@ -1,18 +1,18 @@
 package models
 
 type Group struct {
-	name          string
-	categoriesIds []int
+	Name          string
+	CategoriesIds []int
 }
 
 func (s *Group) AddIds(ids ...int) {
-	s.categoriesIds = append(s.categoriesIds, ids...)
+	s.CategoriesIds = append(s.CategoriesIds, ids...)
 }
 
 func (s *Group) GetIds() []int {
-	return s.categoriesIds
+	return s.CategoriesIds
 }
 
 func (s *Group) GetName() string {
-	return s.name
+	return s.Name
 }

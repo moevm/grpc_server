@@ -1,7 +1,7 @@
 package tests
 
 import (
-	"task/internal/models"
+	"service/internal/models"
 	"testing"
 )
 

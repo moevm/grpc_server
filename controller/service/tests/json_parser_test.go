@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"reflect"
-	"task/internal/parser"
+	"service/internal/parser"
 	"testing"
 )
 
