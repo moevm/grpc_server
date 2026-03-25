@@ -5,8 +5,8 @@
 #include <stdint.h>
 #include <rte_mbuf.h>
 #include "../../include/dpdk_filter/af_xdp_port.h"
-#include "../../include/dpdk_filter/pars_pak.h"
-#include "../../include/dpdk_filter/filtr_pak.h"
+#include "../../include/dpdk_filter/pars_packets.h"
+#include "../../include/dpdk_filter/filtr_packets.h"
 #include <stdlib.h>
 #include <rte_ethdev.h>
 

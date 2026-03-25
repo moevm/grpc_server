@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Iinclude -O2 -msse4.2 -mpclmul -maes
 LDFLAGS = -lrte_eal -lrte_ethdev -lrte_mempool -lrte_mbuf -lrte_bus_vdev -lpthread -lnuma -ldl -lrte_net
 
-SRCS = src/dpdk_filter/main.c src/dpdk_filter/af_xdp_port.c src/dpdk_filter/filtr_pak.c src/dpdk_filter/pars_pak.c src/dpdk_filter/proc_pak.c
+SRCS = src/dpdk_filter/main.c src/dpdk_filter/af_xdp_port.c src/dpdk_filter/filtr_packets.c src/dpdk_filter/pars_packets.c src/dpdk_filter/proc_packets.c
 TARGET = main-x86
 
 all: $(TARGET)

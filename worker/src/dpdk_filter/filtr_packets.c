@@ -1,5 +1,5 @@
-#include "../../include/dpdk_filter/pars_pak.h"
-#include "../../include/dpdk_filter/filtr_pak.h"
+#include "../../include/dpdk_filter/pars_packets.h"
+#include "../../include/dpdk_filter/filtr_packets.h"
 
 
 bool check_domain(char* domain) {

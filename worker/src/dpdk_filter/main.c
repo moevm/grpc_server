@@ -3,7 +3,7 @@
 #include <rte_mbuf.h>
 #include <stdio.h>
 #include "../../include/dpdk_filter/af_xdp_port.h"
-#include "../../include/dpdk_filter/proc_pak.h"
+#include "../../include/dpdk_filter/proc_packets.h"
 #include <unistd.h>
 #include <rte_ip.h>
 #include <signal.h>
@@ -30,10 +30,18 @@ int main(int argc, char** argv) {
     uint16_t priv_size = 0;
     struct rte_mbuf* pkts[32];
     
-    rte_eal_init(argc, argv);
-    
+    int ret = rte_eal_init(argc, argv);
+    if (ret < 0) {
+        printf("[ERROR] EAL init failed: %s\n", rte_strerror(rte_errno));
+        return 1;
+    }
+
     mbuf_pool = rte_pktmbuf_pool_create("POOL", mbuf_quantity_in_pool, cache_size_per_kernel, priv_size, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
-    
+    if (!mbuf_pool) {
+        printf("[ERROR] Failed to create mbuf pool: %s\n", rte_strerror(rte_errno));
+        return -1;
+    }
+
     port_in = init_struct_af_xdp_port("veth0", mbuf_pool);
     port_out = init_struct_af_xdp_port("veth1", mbuf_pool);
 
@@ -41,8 +49,9 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    af_xdp_port_start(port_in->port_id);
-    af_xdp_port_start(port_out->port_id);
+    if (af_xdp_port_start(port_in->port_id) || af_xdp_port_start(port_out->port_id)) {
+        return 1;
+    }
     
     printf("An endless cycle has been started. Packets pass from port with id=%u to port with id=%u\n", port_in->port_id, port_out->port_id);
     
