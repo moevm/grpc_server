@@ -3,6 +3,7 @@
 #include <rte_mbuf.h>
 #include <stdio.h>
 #include "../../include/dpdk_filter/af_xdp_port.h"
+#include "../../include/dpdk_filter/proc_pak.h"
 #include <unistd.h>
 #include <rte_ip.h>
 
@@ -16,7 +17,7 @@ int main(int argc, char** argv) {
     uint16_t queue_number = 0;
     uint16_t nb_pkts = 32;
     uint16_t priv_size = 0;
-    struct rte_mbuf *pkts[32];
+    struct rte_mbuf* pkts[32];
     
     rte_eal_init(argc, argv);
     
@@ -26,8 +27,8 @@ int main(int argc, char** argv) {
     port_out = init_struct_af_xdp_port("veth1", mbuf_pool);
 
     if (af_xdp_port_init(port_in) || af_xdp_port_init(port_out)) {
-            return 1;
-        }
+        return 1;
+    }
     
     af_xdp_port_start(port_in->port_id);
     af_xdp_port_start(port_out->port_id);
@@ -36,10 +37,7 @@ int main(int argc, char** argv) {
     
     while (1) {
         
-        uint16_t nb_rx = rte_eth_rx_burst(port_in->port_id, queue_number, pkts, nb_pkts);
-        for (int i = 0; i < nb_rx; i++) {         
-            rte_eth_tx_burst(port_in->port_id, queue_number, &pkts[i], 1);
-        }
+        pakage_processing(port_in, port_out, queue_number, nb_pkts, pkts);
 
     }
 
