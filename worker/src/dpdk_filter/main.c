@@ -6,9 +6,20 @@
 #include "../../include/dpdk_filter/proc_pak.h"
 #include <unistd.h>
 #include <rte_ip.h>
+#include <signal.h>
 
+static volatile int running = 1;
+
+static void signal_handler(int signum) {
+    if (signum == SIGINT || signum == SIGTERM) {
+        printf("\n Signal %d received, shutting down.\n", signum);
+        running = 0;
+    }
+}
 
 int main(int argc, char** argv) {
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
     struct af_xdp_port* port_in = NULL;
     struct af_xdp_port* port_out = NULL;
     struct rte_mempool *mbuf_pool;
@@ -35,7 +46,7 @@ int main(int argc, char** argv) {
     
     printf("An endless cycle has been started. Packets pass from port with id=%u to port with id=%u\n", port_in->port_id, port_out->port_id);
     
-    while (1) {
+    while (running) {
         
         pakage_processing(port_in, port_out, queue_number, nb_pkts, pkts);
 
