@@ -8,6 +8,7 @@
 #include <rte_ip.h>
 #include <signal.h>
 
+
 static volatile int running = 1;
 
 static void signal_handler(int signum) {
@@ -42,9 +43,15 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+#ifdef VIRT_PORTS
+    printf("Using virtual ports: veth0/veth1\n");
     port_in = init_struct_af_xdp_port("veth0", mbuf_pool);
     port_out = init_struct_af_xdp_port("veth1", mbuf_pool);
-
+#else
+    printf("Using real ports: eth0/eth1\n");
+    port_in = init_struct_af_xdp_port("eth0", mbuf_pool);
+    port_out = init_struct_af_xdp_port("eth1", mbuf_pool);
+#endif
     if (af_xdp_port_init(port_in) || af_xdp_port_init(port_out)) {
         return 1;
     }
