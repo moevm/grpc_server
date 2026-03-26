@@ -1,16 +1,15 @@
+#include <errno.h>
+#include <rte_bus.h>
+#include <rte_bus_vdev.h>
+#include <rte_dev.h>
 #include <rte_eal.h>
 #include <rte_ethdev.h>
-#include <rte_mempool.h>
 #include <rte_mbuf.h>
+#include <rte_mempool.h>
 #include <stdio.h>
-#include <string.h>
-#include <errno.h>
-#include <unistd.h>
-#include <rte_bus_vdev.h>
-#include <string.h>
 #include <stdlib.h>
-#include <rte_dev.h>
-#include <rte_bus.h>
+#include <string.h>
+#include <unistd.h>
 
 #include "../../include/dpdk_filter/af_xdp_port.h"
 
@@ -18,118 +17,114 @@
 #define TX_RING_SIZE 1024
 
 int find_port_by_dev_name(const char *dev_name, uint16_t *port_id_dev) {
-    uint16_t count_ports = rte_eth_dev_count_avail();
-    struct rte_eth_dev_info dev_info;
-    char name[64];
-    
-    for (uint16_t port_id = 0; port_id < count_ports; port_id++) {
-        int ret = rte_eth_dev_info_get(port_id, &dev_info);
-        if (rte_eth_dev_get_name_by_port(port_id, name) == 0 &&
-            strcmp(name, dev_name) == 0) {
-            *port_id_dev = port_id; 
-            return 0;
-        }
+  uint16_t count_ports = rte_eth_dev_count_avail();
+  struct rte_eth_dev_info dev_info;
+  char name[64];
+
+  for (uint16_t port_id = 0; port_id < count_ports; port_id++) {
+    int ret = rte_eth_dev_info_get(port_id, &dev_info);
+    if (rte_eth_dev_get_name_by_port(port_id, name) == 0 &&
+        strcmp(name, dev_name) == 0) {
+      *port_id_dev = port_id;
+      return 0;
     }
+  }
+  return -1;
+}
+
+struct af_xdp_port *init_struct_af_xdp_port(const char *iface_name,
+                                            struct rte_mempool *mbuf_pool) {
+  struct af_xdp_port *port = calloc(1, sizeof(struct af_xdp_port));
+
+  snprintf(port->dev_args, sizeof(port->dev_args),
+           "iface=%s,start_queue=0,queue_count=1", iface_name);
+  snprintf(port->dev_name, sizeof(port->dev_name), "net_af_xdp_%s", iface_name);
+  strncpy(port->iface_name, iface_name, sizeof(port->iface_name) - 1);
+  port->iface_name[sizeof(port->iface_name) - 1] = '\0';
+  port->mbuf_pool = mbuf_pool;
+  port->port_id = -1;
+
+  return port;
+}
+
+int af_xdp_port_init(struct af_xdp_port *port) {
+  int ret;
+  struct rte_eth_conf port_conf = {0};
+  const char *dev_name = port->dev_name;
+  uint16_t port_id;
+
+  ret = rte_vdev_init(dev_name, port->dev_args);
+
+  if (ret < 0) {
+    printf("[ERROR] Failed to create vdev: %s\n", strerror(-ret));
+    return ret;
+  }
+
+  ret = find_port_by_dev_name(port->dev_name, &port_id);
+  if (ret) {
+    printf("no port was found that has the same vdev name. vdev = %s",
+           port->dev_name);
+    rte_vdev_uninit(dev_name);
     return -1;
+  }
+
+  port->port_id = port_id;
+
+  if (!rte_eth_dev_is_valid_port(port_id)) {
+    printf("[ERROR] Port %u is not valid\n", port_id);
+    rte_vdev_uninit(dev_name);
+    return -EINVAL;
+  }
+
+  ret = rte_eth_dev_configure(port_id, 1, 1, &port_conf);
+  if (ret < 0) {
+    printf("[ERROR] Failed to configure port: %s\n", strerror(-ret));
+    rte_vdev_uninit(dev_name);
+    return ret;
+  }
+
+  ret = rte_eth_rx_queue_setup(port_id, 0, RX_RING_SIZE,
+                               rte_eth_dev_socket_id(port_id), NULL,
+                               port->mbuf_pool);
+  if (ret < 0) {
+    printf("[ERROR] Failed to setup RX queue: %s\n", strerror(-ret));
+    rte_vdev_uninit(dev_name);
+    return ret;
+  }
+
+  ret = rte_eth_tx_queue_setup(port_id, 0, TX_RING_SIZE,
+                               rte_eth_dev_socket_id(port_id), NULL);
+
+  if (ret < 0) {
+    printf("[ERROR] Failed to setup TX queue: %s\n", strerror(-ret));
+    rte_vdev_uninit(dev_name);
+    return ret;
+  }
+
+  printf("Port %u initialized\n", port_id);
+  return 0;
 }
-
-struct af_xdp_port* init_struct_af_xdp_port(const char* iface_name, struct rte_mempool* mbuf_pool) {
-    struct af_xdp_port* port = calloc(1, sizeof(struct af_xdp_port));
-
-    snprintf(port->dev_args, sizeof(port->dev_args), "iface=%s,start_queue=0,queue_count=1", iface_name);
-    snprintf(port->dev_name, sizeof(port->dev_name), "net_af_xdp_%s", iface_name);
-    strncpy(port->iface_name, iface_name, sizeof(port->iface_name) - 1);
-    port->iface_name[sizeof(port->iface_name) - 1] = '\0';
-    port->mbuf_pool = mbuf_pool;
-    port->port_id = -1;
-    
-    return port;
-}
-
-int af_xdp_port_init(struct af_xdp_port* port) {
-    int ret;
-    struct rte_eth_conf port_conf = {0};
-    const char* dev_name = port->dev_name;
-    uint16_t port_id;
-    
-    ret = rte_vdev_init(dev_name, port->dev_args);
-    
-    if (ret < 0) {
-        printf("[ERROR] Failed to create vdev: %s\n", strerror(-ret));
-        return ret;
-    }
-
-    ret = find_port_by_dev_name(port->dev_name, &port_id);
-    if (ret) {
-        printf("no port was found that has the same vdev name. vdev = %s", port->dev_name);
-        rte_vdev_uninit(dev_name);
-        return -1;
-    }
-
-    port->port_id = port_id;
-
-    
-    
-
-    if (!rte_eth_dev_is_valid_port(port_id)) {
-        printf("[ERROR] Port %u is not valid\n", port_id);
-        rte_vdev_uninit(dev_name);
-        return -EINVAL;
-    }
-    
-    ret = rte_eth_dev_configure(port_id, 1, 1, &port_conf);
-    if (ret < 0) {
-        printf("[ERROR] Failed to configure port: %s\n", strerror(-ret));
-        rte_vdev_uninit(dev_name);
-        return ret;
-    }
-    
-    ret = rte_eth_rx_queue_setup(port_id, 0, RX_RING_SIZE, rte_eth_dev_socket_id(port_id), NULL, port->mbuf_pool);
-    if (ret < 0) {
-        printf("[ERROR] Failed to setup RX queue: %s\n", strerror(-ret));
-        rte_vdev_uninit(dev_name);
-        return ret;
-    }
-    
-    ret = rte_eth_tx_queue_setup(port_id, 0, TX_RING_SIZE, rte_eth_dev_socket_id(port_id), NULL);
-
-    if (ret < 0) {
-        printf("[ERROR] Failed to setup TX queue: %s\n", strerror(-ret));
-        rte_vdev_uninit(dev_name);
-        return ret;
-    }
-    
-    printf("Port %u initialized\n", port_id);
-    return 0;
-}
-
-
-
 
 int af_xdp_port_start(uint16_t port_id) {
-    int ret;
-    
-    ret = rte_eth_dev_start(port_id);
-    if (ret < 0) {
-        printf("[ERROR] Failed to start: %s\n", strerror(-ret));
-        return ret;
-    }
-    
-    rte_eth_promiscuous_enable(port_id);
-    
-    printf("Port %u started\n", port_id);
-    return 0;
+  int ret;
+
+  ret = rte_eth_dev_start(port_id);
+  if (ret < 0) {
+    printf("[ERROR] Failed to start: %s\n", strerror(-ret));
+    return ret;
+  }
+
+  rte_eth_promiscuous_enable(port_id);
+
+  printf("Port %u started\n", port_id);
+  return 0;
 }
 
+void af_xdp_port_close(struct af_xdp_port *port) {
+  uint16_t port_id = port->port_id;
+  rte_eth_dev_stop(port_id);
+  rte_eth_dev_close(port_id);
+  rte_vdev_uninit(port->dev_name);
 
-
-
-void af_xdp_port_close(struct af_xdp_port* port)
-{    
-    uint16_t port_id = port->port_id;
-    rte_eth_dev_stop(port_id);
-    rte_eth_dev_close(port_id);
-    rte_vdev_uninit(port->dev_name);
-    
-    printf("Port %u closed\n", port_id);
+  printf("Port %u closed\n", port_id);
 }
