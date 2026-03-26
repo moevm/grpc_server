@@ -1,0 +1,16 @@
+CC = gcc
+CFLAGS = -Iinclude -O2 -msse4.2 -mpclmul -maes
+LDFLAGS = -lrte_eal -lrte_ethdev -lrte_mempool -lrte_mbuf -lrte_bus_vdev -lpthread -lnuma -ldl
+
+SRCS = src/dpdk_filter/main.c src/dpdk_filter/af_xdp_port.c
+TARGET = main
+
+all: $(TARGET)
+
+$(TARGET): $(SRCS)
+	$(CC) $(CFLAGS) -o $(TARGET) $(SRCS) $(LDFLAGS)
+
+clean:
+	rm -f $(TARGET)
+
+.PHONY: all clean

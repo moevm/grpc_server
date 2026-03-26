@@ -3,9 +3,14 @@
 
 #include "communication.grpc.pb.h"
 #include "communication.pb.h"
+#include "dpdk_filter/af_xdp_port.h"
 #include <cstdint>
 #include <grpcpp/grpcpp.h>
 #include <memory>
+#include <rte_eal.h>
+#include <rte_ethdev.h>
+#include <rte_mbuf.h>
+#include <rte_mempool.h>
 
 #define EXPECTED_POLICY_TIME 60
 #define MIN_POLICY_TIME 30
@@ -29,6 +34,11 @@ class Worker {
   int64_t policy_interval = MIN_POLICY_TIME;
   int64_t stats_interval = MIN_STATS_TIME;
 
+  struct af_xdp_port *port_in = nullptr;
+  struct af_xdp_port *port_out = nullptr;
+  struct rte_mempool *mbuf_pool = nullptr;
+  bool dpdk_initialized = false;
+
   std::unique_ptr<DataService::Stub> stub_;
 
   WorkerState state;
@@ -39,6 +49,7 @@ public:
   Worker(uint64_t id);
   ~Worker();
 
+  void initDPDK(int argc, char **argv);
   inline uint64_t GetID() const { return worker_id; }
   void requestPolicyFromController();
   void classifyDomain(const std::string &domain);

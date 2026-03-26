@@ -1,5 +1,5 @@
 #include "../include/worker.hpp"
-
+#include "../include/dpdk_filter/proc_packets.h"
 #include "communication.grpc.pb.h"
 #include <cstdlib>
 #include <ctime>
@@ -20,6 +20,46 @@ void Worker::SetState(WorkerState new_state) {
     LogStateChange(new_state);
     state = new_state;
   }
+}
+
+void Worker::initDPDK(int argc, char **argv) {
+  unsigned mbuf_quantity_in_pool = 8192;
+  unsigned cache_size_per_kernel = 250;
+  uint16_t priv_size = 0;
+
+  int ret = rte_eal_init(argc, argv);
+  if (ret < 0) {
+    throw std::runtime_error("EAL init failed");
+  }
+
+  mbuf_pool = rte_pktmbuf_pool_create(
+      "POOL", mbuf_quantity_in_pool, cache_size_per_kernel, priv_size,
+      RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
+  if (!mbuf_pool) {
+    throw std::runtime_error("Failed to create mbuf pool");
+  }
+  const char *iface_in = getenv("DPDK_PORT_IN");
+  const char *iface_out = getenv("DPDK_PORT_OUT");
+
+  if (!iface_in || !iface_out) {
+    throw std::runtime_error("DPDK_PORT_IN and DPDK_PORT_OUT must be set");
+  }
+
+  port_in = init_struct_af_xdp_port(iface_in, mbuf_pool);
+  port_out = init_struct_af_xdp_port(iface_out, mbuf_pool);
+
+  if (af_xdp_port_init(port_in) || af_xdp_port_init(port_out)) {
+    throw std::runtime_error("Init ports");
+  }
+
+  if (af_xdp_port_start(port_in->port_id) ||
+      af_xdp_port_start(port_out->port_id)) {
+    throw std::runtime_error("Start ports");
+  }
+
+  dpdk_initialized = true;
+  spdlog::info("DPDK initialized: in_port={}, out_port={}", port_in->port_id,
+               port_out->port_id);
 }
 
 void Worker::requestPolicyFromController() {
@@ -134,7 +174,12 @@ void Worker::MainLoop() {
   last_policy_time = steady_clock::now();
   last_stats_time = steady_clock::now();
 
+  struct rte_mbuf *pkts[32];
+  uint16_t nb_pkts = 32;
+  uint16_t queue_number = 0;
   while (GetState() != WorkerState::SHUTTING_DOWN) {
+    pakage_processing(port_in, port_out, queue_number, nb_pkts, pkts);
+
     auto now = steady_clock::now();
 
     int64_t seconds_since_stats = (now - last_stats_time) / 1s;

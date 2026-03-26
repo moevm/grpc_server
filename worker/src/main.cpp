@@ -20,7 +20,7 @@ public:
                           ("worker-" + std::to_string(id)).c_str()) {}
 };
 
-int main() {
+int main(int argc, char **argv) {
   const char *worker_id_str = getenv("WORKER_ID");
   if (worker_id_str == nullptr) {
     spdlog::error("WORKER_ID environment variable not set");
@@ -33,7 +33,8 @@ int main() {
 
   if (gateway_address == nullptr || gateway_port == nullptr) {
     spdlog::error("Environment variables are not fully specified. "
-                  "Specify METRICS_GATEWAY_ADDRESS and METRICS_GATEWAY_PORT");
+                  "Specify METRICS_GATEWAY_ADDRESS and
+                  METRICS_GATEWAY_PORT");
     return 1;
   }
 
@@ -42,7 +43,7 @@ int main() {
 
   try {
     Worker worker(worker_id);
-
+    worker.initDPDK(argc, argv);
     bool test_mode = false;
     if (getenv("TEST_REQUEST_POLICY") != nullptr) {
       test_mode = true;
