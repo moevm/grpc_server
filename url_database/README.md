@@ -167,3 +167,36 @@ Successful response:
 | malicious | integer | Number of negative votes. |
 | whois | string | Whois information as returned from the pertinent whois server. |
 | whois_date | integer | Date of the last update of the whois record in VirusTotal. UTC timestamp. |
+
+## Yandex Safe Browsing
+Free subscribe:
+* Daily quota: available with Yandex.Webmaster API key
+
+Request method: GET
+Endpoint: https://sba.yandex.net/v4/threatLists?key={API_KEY}
+
+Successful response:
+| Field | Type | Description |
+|-------|------|-------------|
+| threatLists | array | List of available threat lists |
+| threatType | string | Type of threat. Values: `MALWARE`, `SOCIAL_ENGINEERING`, `UNWANTED_SOFTWARE`, `POTENTIALLY_HARMFUL_APPLICATION`, `THREAT_TYPE_KIDS_MODE`, `THREAT_TYPE_TURBO_APPS` |
+| platformType | string | Platform affected by the threat. Values: `WINDOWS`, `LINUX`, `ANDROID`, `OSX`, `IOS`, `CHROME`, `ANY_PLATFORM`, `ALL_PLATFORMS` |
+| threatEntryType | string | Type of object representing the threat. Values: `URL`, `EXECUTABLE`, `CHROME_EXTENSION` |
+
+
+Conclusion:
+For website category detection (Gambling, Games, Adult, etc.), the following services are recommended:
+
+Kaspersky Threat Intelligence Portal — high accuracy, color-coded threat zones, 2,000 requests/day
+VirusTotal — aggregates data from 70+ antivirus engines, detailed statistics, 500 requests/day
+SkyNS — Russian database with categories in Russian language, 10 requests/minute
+For website security checks (reputation, malware, phishing), it is advisable to use:
+
+Google Safe Browsing — authoritative source, used in Chrome browser
+Yandex Safe Browsing — relevant for Russian-language sites, accounts for local specifics
+Thus, for comprehensive analysis, it is recommended to combine both approaches:
+
+Kaspersky + VirusTotal + SkyNS — for category classification
+Google + Yandex — for security and reputation assessment
+
+
