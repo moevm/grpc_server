@@ -3,6 +3,7 @@
 
 #include <rte_mbuf.h>
 #include <stdint.h>
+#include "pars_packets.h"
 
 bool main_filtring(struct info_of_pakage *info_pac);
 
