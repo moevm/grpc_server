@@ -70,20 +70,18 @@ void parsing_pakage(struct rte_mbuf *packet, struct info_of_pakage *info_pac) {
       }
 
       if (*pos == 0 && domain_len > 0) {
-        info_pac->domain = malloc(domain_len + 1);
-        if (info_pac->domain) {
-          pos = dns_name_start;
-          char *dst = info_pac->domain;
-          while (*pos != 0) {
-            uint8_t label_len = *pos++;
-            if (dst != info_pac->domain)
-              *dst++ = '.';
-            memcpy(dst, pos, label_len);
-            dst += label_len;
-            pos += label_len;
-          }
-          *dst = '\0';
+
+        pos = dns_name_start;
+        char *dst = info_pac->domain;
+        while (*pos != 0) {
+          uint8_t label_len = *pos++;
+          if (dst != info_pac->domain)
+            *dst++ = '.';
+          memcpy(dst, pos, label_len);
+          dst += label_len;
+          pos += label_len;
         }
+        *dst = '\0';
       }
     }
   }

@@ -18,8 +18,14 @@ static void signal_handler(int signum) {
 }
 
 int main(int argc, char **argv) {
-  signal(SIGINT, signal_handler);
-  signal(SIGTERM, signal_handler);
+  if (signal(SIGINT, signal_handler) == SIG_ERR) {
+    printf("[ERROR] Failed to set SIGINT handler\n");
+    return 1;
+  }
+  if (signal(SIGTERM, signal_handler) == SIG_ERR) {
+    printf("[ERROR] Failed to set SIGTERM handler\n");
+    return 1;
+  }
   struct af_xdp_port *port_in = NULL;
   struct af_xdp_port *port_out = NULL;
   struct rte_mempool *mbuf_pool;
@@ -53,6 +59,10 @@ int main(int argc, char **argv) {
   port_in = init_struct_af_xdp_port("eth0", mbuf_pool);
   port_out = init_struct_af_xdp_port("eth1", mbuf_pool);
 #endif
+  if (!port_in || !port_out) {
+    return 1;
+  }
+
   if (af_xdp_port_init(port_in) || af_xdp_port_init(port_out)) {
     return 1;
   }
@@ -73,5 +83,8 @@ int main(int argc, char **argv) {
 
   af_xdp_port_close(port_in);
   af_xdp_port_close(port_out);
+
+  af_xdp_port_destroy(port_in);
+  af_xdp_port_destroy(port_out);
   return 0;
 }

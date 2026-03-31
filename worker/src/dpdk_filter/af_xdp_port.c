@@ -23,6 +23,14 @@ int find_port_by_dev_name(const char *dev_name, uint16_t *port_id_dev) {
 
   for (uint16_t port_id = 0; port_id < count_ports; port_id++) {
     int ret = rte_eth_dev_info_get(port_id, &dev_info);
+
+    if (ret) {
+      printf("[ERROR] Failed to retrieve the contextual information of an "
+             "Ethernet device: %s\n",
+             strerror(-ret));
+      return ret;
+    }
+
     if (rte_eth_dev_get_name_by_port(port_id, name) == 0 &&
         strcmp(name, dev_name) == 0) {
       *port_id_dev = port_id;
@@ -35,6 +43,10 @@ int find_port_by_dev_name(const char *dev_name, uint16_t *port_id_dev) {
 struct af_xdp_port *init_struct_af_xdp_port(const char *iface_name,
                                             struct rte_mempool *mbuf_pool) {
   struct af_xdp_port *port = calloc(1, sizeof(struct af_xdp_port));
+  if (!port) {
+    printf("[ERROR] Failed to allocate memory for struct af_xdp_port\n");
+    return NULL;
+  }
 
   snprintf(port->dev_args, sizeof(port->dev_args),
            "iface=%s,start_queue=0,queue_count=1", iface_name);
@@ -114,17 +126,51 @@ int af_xdp_port_start(uint16_t port_id) {
     return ret;
   }
 
-  rte_eth_promiscuous_enable(port_id);
+  ret = rte_eth_promiscuous_enable(port_id);
+  if (ret) {
+    printf("[ERROR] Failed to enable receipt in promiscuous mode for an "
+           "Ethernet device: %s\n",
+           strerror(-ret));
+    return ret;
+  }
 
   printf("Port %u started\n", port_id);
   return 0;
 }
 
-void af_xdp_port_close(struct af_xdp_port *port) {
-  uint16_t port_id = port->port_id;
-  rte_eth_dev_stop(port_id);
-  rte_eth_dev_close(port_id);
-  rte_vdev_uninit(port->dev_name);
+void af_xdp_port_destroy(struct af_xdp_port *port) {
+  if (!port)
+    return;
+  free(port);
+}
 
+void af_xdp_port_close(struct af_xdp_port *port) {
+
+  if (!port)
+    return;
+
+  int ret;
+  uint16_t port_id = port->port_id;
+
+  ret = rte_eth_dev_stop(port_id);
+  if (ret) {
+    printf("[ERROR] Failed to stop an Ethernet device: %s\n", strerror(-ret));
+    return;
+  }
+
+  ret = rte_eth_dev_close(port_id);
+  if (ret) {
+    printf("[ERROR] Failed to close a stopped Ethernet device: %s\n",
+           strerror(-ret));
+    return;
+  }
+
+  ret = rte_vdev_uninit(port->dev_name);
+  if (ret) {
+    printf("[ERROR] Failed to uninitialize a driver: %s\n", strerror(-ret));
+    return;
+  }
+
+  port->port_id = -1;
   printf("Port %u closed\n", port_id);
 }
