@@ -25,6 +25,8 @@ int af_xdp_port_start(uint16_t port_id);
 
 void af_xdp_port_close(struct af_xdp_port *port);
 
+void af_xdp_port_destroy(struct af_xdp_port *port);
+
 int find_port_by_dev_name(const char *dev_name, uint16_t *port_id_dev);
 
 #ifdef __cplusplus

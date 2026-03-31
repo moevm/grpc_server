@@ -9,10 +9,12 @@ void pakage_processing(struct af_xdp_port *port_in,
 
   for (int i = 0; i < nb_rx; i++) {
 
-    struct info_of_pakage *info_pac = calloc(1, sizeof(struct info_of_pakage));
-    parsing_pakage(pkts[i], info_pac);
+    struct info_of_pakage info_pac;
+    memset(&info_pac, 0, sizeof(info_pac));
 
-    bool skip_packet = main_filtring(info_pac);
+    parsing_pakage(pkts[i], &info_pac);
+
+    bool skip_packet = main_filtring(&info_pac);
 
     if (!skip_packet) {
 
@@ -20,7 +22,6 @@ void pakage_processing(struct af_xdp_port *port_in,
           rte_eth_tx_burst(port_out->port_id, queue_number, &pkts[i], 1);
 
       if (ret < 1) {
-
         printf("[ERROR] Failed to send packet\n");
         // PLUG (to be added later) - need to add processing for this case
         rte_pktmbuf_free(pkts[i]);
@@ -28,7 +29,5 @@ void pakage_processing(struct af_xdp_port *port_in,
     } else {
       rte_pktmbuf_free(pkts[i]);
     }
-
-    free(info_pac);
   }
 }

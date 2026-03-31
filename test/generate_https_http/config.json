@@ -1,0 +1,15 @@
+{
+    "RPS": 4,
+    "root_urls": [
+        "http://4chan.org",
+        "https://www.reddit.com",
+        "https://www.yahoo.com",
+        "http://www.cnn.com",
+        "http://www.ebay.com",
+        "https://wikipedia.org",
+        "https://youtube.com",
+        "https://github.com",
+        "https://medium.com",
+        "https://thepiratebay.org"
+    ]
+}
