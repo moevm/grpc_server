@@ -1,16 +1,23 @@
 CC = gcc
-CFLAGS = -Iinclude -O2 -msse4.2 -mpclmul -maes
-LDFLAGS = -lrte_eal -lrte_ethdev -lrte_mempool -lrte_mbuf -lrte_bus_vdev -lpthread -lnuma -ldl -lrte_hash
+CFLAGS_BASE = -Iinclude -O2 -msse4.2 -mpclmul -maes
+LDFLAGS = -lrte_eal -lrte_ethdev -lrte_mempool -lrte_mbuf -lrte_bus_vdev -lpthread -lnuma -ldl -lrte_net
 
-SRCS = src/dpdk_filter/main.c src/dpdk_filter/af_xdp_port.c src/dpdk_filter/dns_parser.c src/dpdk_filter/dns_cache.c
-TARGET = main-x86
+SRCS = src/dpdk_filter/main.c src/dpdk_filter/af_xdp_port.c src/dpdk_filter/filtr_packets.c src/dpdk_filter/pars_packets.c src/dpdk_filter/proc_packets.c
 
-all: $(TARGET)
+TARGET_REAL = main-x86
+TARGET_VIRT = main-x86-virt
 
-$(TARGET): $(SRCS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(SRCS) $(LDFLAGS)
+all: $(TARGET_REAL)
+
+$(TARGET_REAL): $(SRCS)
+	$(CC) $(CFLAGS_BASE) -o $(TARGET_REAL) $(SRCS) $(LDFLAGS)
+
+virt: $(TARGET_VIRT)
+
+$(TARGET_VIRT): $(SRCS)
+	$(CC) $(CFLAGS_BASE) -DVIRT_PORTS -o $(TARGET_VIRT) $(SRCS) $(LDFLAGS)
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET_REAL) $(TARGET_VIRT)
 
-.PHONY: all clean
+.PHONY: all clean virt

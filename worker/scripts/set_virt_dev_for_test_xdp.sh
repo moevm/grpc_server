@@ -8,8 +8,3 @@ sudo ip link set veth1 up
 
 sudo ip addr add 10.0.0.1/24 dev veth0
 sudo ip addr add 10.0.0.2/24 dev veth1
-
-make -f Makefile.main clean
-make -f Makefile.main
-
-sudo ./main
