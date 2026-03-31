@@ -9,8 +9,8 @@ bazel_dep(name = "protobuf", version = "29.0")
 bazel_dep(name = "gazelle", version = "0.41.0")
 bazel_dep(name = "platforms", version = "0.0.10")
 
-go = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
-go.download(version = "1.23.7")
+go = use_extension("@rules_go//go:extensions.bzl", "go")
+go.register_toolchains(version = "1.23.7", goos = "linux", goarch = ["amd64", "riscv64"])
 
 gazelle = use_extension("@gazelle//:extensions.bzl", "gazelle")
 gazelle.go_repository_default_config(
@@ -20,11 +20,17 @@ gazelle.go_repository_default_config(
 
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_mod = "//:go.mod")
+
 use_repo(
     go_deps,
     "com_github_joho_godotenv",
-    "com_github_pelletier_go_toml",
     "com_github_stretchr_testify",
+    "com_github_pelletier_go_toml",
     "org_golang_google_grpc",
     "org_golang_google_protobuf",
+    "org_golang_x_net",
+    "org_golang_x_sys",
+    "org_golang_x_text",
+    "org_golang_google_genproto_googleapis_rpc",
 )
+
