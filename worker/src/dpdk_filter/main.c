@@ -1,13 +1,8 @@
 #include "../../include/dpdk_filter/af_xdp_port.h"
+#include "../../include/dpdk_filter/dns_cache.h"
 #include "../../include/dpdk_filter/proc_packets.h"
 #include <rte_eal.h>
 #include <rte_ethdev.h>
-#include <rte_mbuf.h>
-#include <stdio.h>
-#include "../../include/dpdk_filter/af_xdp_port.h"
-#include "../../include/dpdk_filter/dns_cache.h"
-#include "../../include/dpdk_filter/dns_parser.h"
-#include <unistd.h>
 #include <rte_ip.h>
 #include <rte_mbuf.h>
 #include <signal.h>
@@ -55,6 +50,7 @@ int main(int argc, char **argv) {
     printf("[ERROR] Failed to create mbuf pool: %s\n", rte_strerror(rte_errno));
     return -1;
   }
+  init_dns_cache();
 
 #ifdef VIRT_PORTS
   printf("Using virtual ports: veth0/veth1\n");
@@ -86,6 +82,9 @@ int main(int argc, char **argv) {
 
     pakage_processing(port_in, port_out, queue_number, nb_pkts, pkts);
   }
+
+  // function for save cache info if need
+  free_dns_cache();
 
   af_xdp_port_close(port_in);
   af_xdp_port_close(port_out);

@@ -1,4 +1,5 @@
 #include "../../include/dpdk_filter/proc_packets.h"
+#include "../../include/dpdk_filter/dns_cache.h"
 
 void pakage_processing(struct af_xdp_port *port_in,
                        struct af_xdp_port *port_out, uint16_t queue_number,
@@ -14,20 +15,49 @@ void pakage_processing(struct af_xdp_port *port_in,
 
     parsing_pakage(pkts[i], &info_pac);
 
-    bool skip_packet = main_filtring(&info_pac);
+    struct node_cache *cached_node = NULL;
+    int ret = lookup_dns_cache(info_pac.domain, &cached_node);
 
-    if (!skip_packet) {
+    if (ret >= 0 && cached_node) {
 
-      uint16_t ret =
-          rte_eth_tx_burst(port_out->port_id, queue_number, &pkts[i], 1);
+      package_sending_decision(cached_node->solution_is_send, pkts[i], port_out,
+                               queue_number);
+    } else if (ret == -ENOENT) {
+      // function to send domen to controller and given category
 
-      if (ret < 1) {
-        printf("[ERROR] Failed to send packet\n");
-        // PLUG (to be added later) - need to add processing for this case
-        rte_pktmbuf_free(pkts[i]);
+      bool solution_is_send = main_filtring(
+          &info_pac); // here also to send a category and maybe level of trust
+
+      package_sending_decision(solution_is_send, pkts[i], port_out,
+                               queue_number);
+
+      struct node_cache *new_node = calloc(1, sizeof(struct node_cache));
+      if (!new_node) {
+        printf("[ERROR] Failed to allocate memory for struct node_cache\n");
       }
+      new_node->solution_is_send = solution_is_send;
+      // NEED TO FILL THE STRUCTURE WITH CATEGORIES
+      add_to_dns_cache(info_pac.domain, new_node);
     } else {
-      rte_pktmbuf_free(pkts[i]);
+      printf(
+          "[ERROR] Failed to search a key-value pair in the hash table: %s\n",
+          strerror(-ret));
     }
   }
+}
+
+void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
+                              struct af_xdp_port *port_out,
+                              uint16_t queue_number) {
+  if (solution_is_send) {
+    uint16_t ret = rte_eth_tx_burst(port_out->port_id, queue_number, pkt, 1);
+
+    if (ret < 1) {
+      printf("[ERROR] Failed to send packet\n");
+      // PLUG (to be added later) - need to add processing for this case
+      rte_pktmbuf_free(pkt);
+    }
+    return;
+  }
+  rte_pktmbuf_free(pkt);
 }
