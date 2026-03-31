@@ -45,7 +45,7 @@ func (m *Manager) GetWorkerPolicy(workerID uint64) *communication.WorkerPolicy {
 }
 
 func (m *Manager) UpdateConfig(configData []byte) error {
-	if m.policyManager != nil {
+	if m.policyManager == nil {
 		return fmt.Errorf("policyManager is nil")
 	}
 	return m.policyManager.UpdateConfig(configData)
