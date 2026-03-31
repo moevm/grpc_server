@@ -1,0 +1,39 @@
+CC = riscv64-linux-gnu-gcc
+
+DPDK_PREFIX = ./dpdk-riscv-install
+PKG_CONFIG = env PKG_CONFIG_LIBDIR=$(DPDK_PREFIX)/lib/pkgconfig pkg-config
+
+CFLAGS_BASE = -Iinclude -O2 $(shell $(PKG_CONFIG) --cflags libdpdk)
+
+LDFLAGS = -L$(DPDK_PREFIX)/lib \
+          -Wl,--start-group \
+          -lrte_eal -lrte_ethdev -lrte_mempool -lrte_mbuf \
+          -lrte_bus_vdev \
+          -lrte_ring -lrte_telemetry -lrte_kvargs \
+          -lrte_net \
+          -lrte_log -ldl \
+          -Wl,--end-group \
+          -latomic
+          
+
+SRCS = src/dpdk_filter/main.c src/dpdk_filter/af_xdp_port.c \
+       src/dpdk_filter/filtr_packets.c src/dpdk_filter/pars_packets.c \
+       src/dpdk_filter/proc_packets.c
+
+TARGET_REAL = main-riscv
+TARGET_VIRT = main-riscv-virt
+
+all: $(TARGET_REAL)
+
+$(TARGET_REAL): $(SRCS)
+	$(CC) $(CFLAGS_BASE) -o $(TARGET_REAL) $(SRCS) $(LDFLAGS)
+
+virt: $(TARGET_VIRT)
+
+$(TARGET_VIRT): $(SRCS)
+	$(CC) $(CFLAGS_BASE) -DVIRT_PORTS -o $(TARGET_VIRT) $(SRCS) $(LDFLAGS)
+
+clean:
+	rm -f $(TARGET_REAL) $(TARGET_VIRT)
+
+.PHONY: all clean virt
