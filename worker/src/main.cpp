@@ -33,8 +33,7 @@ int main(int argc, char **argv) {
 
   if (gateway_address == nullptr || gateway_port == nullptr) {
     spdlog::error("Environment variables are not fully specified. "
-                  "Specify METRICS_GATEWAY_ADDRESS and
-                  METRICS_GATEWAY_PORT");
+                  "Specify METRICS_GATEWAY_ADDRESS and METRICS_GATEWAY_PORT");
     return 1;
   }
 

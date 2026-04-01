@@ -37,7 +37,6 @@ class Worker {
   struct af_xdp_port *port_in = nullptr;
   struct af_xdp_port *port_out = nullptr;
   struct rte_mempool *mbuf_pool = nullptr;
-  bool dpdk_initialized = false;
 
   std::unique_ptr<DataService::Stub> stub_;
 

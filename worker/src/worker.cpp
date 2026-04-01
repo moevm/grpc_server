@@ -5,7 +5,17 @@
 #include <ctime>
 #include <grpcpp/grpcpp.h>
 #include <spdlog/spdlog.h>
+#include <signal.h>
 #include <thread>
+
+static volatile bool stop_flag = false;
+
+static void signal_handler(int signum) {  
+  if (signum == SIGINT || signum == SIGTERM) {
+    spdlog::info("Signal {} received, shutting down.", signum);
+    stop_flag = true;
+  }
+}
 
 void Worker::LogStateChange(WorkerState new_state) {
   const char *state_names[] = {"BOOTING", "FREE", "BUSY", "SHUTTING_DOWN",
@@ -57,7 +67,6 @@ void Worker::initDPDK(int argc, char **argv) {
     throw std::runtime_error("Start ports");
   }
 
-  dpdk_initialized = true;
   spdlog::info("DPDK initialized: in_port={}, out_port={}", port_in->port_id,
                port_out->port_id);
 }
@@ -157,6 +166,9 @@ Worker::Worker(uint64_t id) : worker_id(id), state(WorkerState::FREE) {
       grpc::CreateChannel(controller_addr, grpc::InsecureChannelCredentials());
   stub_ = DataService::NewStub(channel);
   spdlog::info("gRPC channel created to {}", controller_addr);
+  signal(SIGINT, signal_handler);
+  signal(SIGTERM, signal_handler);
+  spdlog::info("Signal handlers registered");
 
   srand(time(nullptr));
   SetState(WorkerState::FREE);
@@ -164,8 +176,15 @@ Worker::Worker(uint64_t id) : worker_id(id), state(WorkerState::FREE) {
 }
 
 Worker::~Worker() {
-  SetState(WorkerState::SHUTTING_DOWN);
   spdlog::info("Worker {} shutting down", worker_id);
+
+  if (port_in && port_out) {
+    af_xdp_port_close(port_in);
+    af_xdp_port_close(port_out);
+    af_xdp_port_destroy(port_in);
+    af_xdp_port_destroy(port_out);
+    spdlog::info("DPDK ports closed");
+  }
 }
 
 void Worker::MainLoop() {
@@ -177,7 +196,7 @@ void Worker::MainLoop() {
   struct rte_mbuf *pkts[32];
   uint16_t nb_pkts = 32;
   uint16_t queue_number = 0;
-  while (GetState() != WorkerState::SHUTTING_DOWN) {
+  while (!stop_flag && GetState() != WorkerState::SHUTTING_DOWN) {
     pakage_processing(port_in, port_out, queue_number, nb_pkts, pkts);
 
     auto now = steady_clock::now();
@@ -200,4 +219,8 @@ void Worker::MainLoop() {
 
     std::this_thread::sleep_for(milliseconds(100));
   }
+
+  if (stop_flag) {
+        SetState(WorkerState::SHUTTING_DOWN);
+    }
 }

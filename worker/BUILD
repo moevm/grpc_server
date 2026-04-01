@@ -19,7 +19,7 @@ generate_cc(
     name = "communication_cc_grpc_gen",
     srcs = [":communication_proto"],
     plugin = "@grpc//src/compiler:grpc_cpp_plugin",
-    well_known_protos = True,
+    well_known_protos = False,
     generate_mocks = True,
 )
 
