@@ -4,13 +4,13 @@
 #include <cstdlib>
 #include <ctime>
 #include <grpcpp/grpcpp.h>
-#include <spdlog/spdlog.h>
 #include <signal.h>
+#include <spdlog/spdlog.h>
 #include <thread>
 
 static volatile bool stop_flag = false;
 
-static void signal_handler(int signum) {  
+static void signal_handler(int signum) {
   if (signum == SIGINT || signum == SIGTERM) {
     spdlog::info("Signal {} received, shutting down.", signum);
     stop_flag = true;
@@ -221,6 +221,6 @@ void Worker::MainLoop() {
   }
 
   if (stop_flag) {
-        SetState(WorkerState::SHUTTING_DOWN);
-    }
+    SetState(WorkerState::SHUTTING_DOWN);
+  }
 }
