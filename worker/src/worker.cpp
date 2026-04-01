@@ -1,15 +1,11 @@
 #include "../include/worker.hpp"
 
-#include <arpa/inet.h>
-#include <cerrno>
-#include <endian.h>
-#include <poll.h>
+#include "communication.grpc.pb.h"
+#include <cstdlib>
+#include <ctime>
+#include <grpcpp/grpcpp.h>
 #include <spdlog/spdlog.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <thread>
-#include <unistd.h>
 
 void Worker::LogStateChange(WorkerState new_state) {
   const char *state_names[] = {"BOOTING", "FREE", "BUSY", "SHUTTING_DOWN",
@@ -26,265 +22,137 @@ void Worker::SetState(WorkerState new_state) {
   }
 }
 
-void Worker::ReadExact(int fd, void *buf, size_t n) {
-  size_t total = 0;
-  ssize_t r;
-
-  while (total < n) {
-    r = read(fd, (char *)buf + total, n - total);
-    if (r < 0) {
-      if (errno == EINTR) {
-        continue;
-      }
-      throw WorkerException(std::string("ReadExact failed with error ") +
-                            strerror(errno));
-    } else if (r == 0) {
-      throw WorkerException("ReadExact failed with Premature EOF");
-    }
-    total += r;
-  }
-}
-
-void Worker::WriteExact(int fd, const void *buf, size_t n) {
-  size_t total = 0;
-  ssize_t w;
-  while (total < n) {
-    w = write(fd, (const char *)buf + total, n - total);
-    if (w < 0) {
-      if (errno == EINTR) {
-        continue;
-      }
-      throw WorkerException(std::string("WriteExact failed with error ") +
-                            strerror(errno));
-    }
-    total += w;
-  }
-}
-
-void Worker::ReadMessage(int fd, std::string &msg) {
-  uint64_t length_le64 = 0;
-  Worker::ReadExact(fd, length_le64);
-  uint64_t length = le64toh(length_le64);
-  msg.resize(length);
-  Worker::ReadExact(fd, (void *)msg.data(), length);
-}
-
-void Worker::WriteMessage(int fd, const std::string &msg) {
-  uint64_t length_le64 = htole64(msg.size());
-  Worker::WriteExact(fd, length_le64);
-  Worker::WriteExact(fd, msg.data(), msg.size());
-}
-
-void Worker::SendPulse(PulseType type) {
-  int main_fd = 0;
+void Worker::requestPolicyFromController() {
   try {
-    WorkerPulse pulse;
-    pulse.set_type(type);
-    pulse.set_worker_id(worker_id);
-    pulse.set_task_id(current_task_id);
-    pulse.set_next_pulse(EXPECTED_PULSE_TIME);
+    spdlog::info("Worker {} requests policy", worker_id);
+    GetPolicyRequest req;
+    req.set_worker_id(worker_id);
+    req.set_config_version(current_config_version);
 
-    spdlog::info("Sending pulse... {{{}}}", pulse.ShortDebugString());
+    GetPolicyResponse resp;
+    grpc::ClientContext context;
 
-    main_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (main_fd < 0)
-      throw WorkerException(std::string("socket: ") + strerror(errno));
+    auto status = stub_->GetPolicy(&context, req, &resp);
 
-    sockaddr_un addr{.sun_family = AF_UNIX};
-    strncpy(addr.sun_path, SOCKET_DIR MAIN_SOCKET_NAME,
-            sizeof(addr.sun_path) - 1);
-
-    if (connect(main_fd, (sockaddr *)&addr, sizeof(addr))) {
-      throw WorkerException(std::string("connect: ") + strerror(errno));
+    if (!status.ok()) {
+      spdlog::error("GetPolicy failed: " + status.error_message());
+      return;
     }
 
-    WriteProtoMessage(main_fd, pulse);
-    spdlog::info("OK. Waiting for response");
-
-    pulse_interval =
-        MIN_PULSE_TIME + (rand() % (MAX_PULSE_TIME - MIN_PULSE_TIME + 1));
-    last_pulse_time = std::chrono::steady_clock::now();
-
-    PulseResponse response;
-    ReadProtoMessage(main_fd, response);
-
-    if (response.error() != CTRL_ERR_OK) {
-      throw WorkerException(ControllerError_Name(response.error()));
-    }
-    close(main_fd);
-
-    if (type == PULSE_REGISTER) {
-      worker_id = response.worker_id();
+    switch (resp.result()) {
+    case GetPolicyResponse::POLICY_PROVIDED:
+      spdlog::info("Policy received");
+      current_config_version = resp.policy().config_version();
+      break;
+    case GetPolicyResponse::POLICY_UNCHANGED:
+      spdlog::info("Policy unchanged");
+      break;
+    default:
+      spdlog::error("Unknown response result");
     }
 
-    spdlog::info("Received {{{}}}", response.ShortDebugString());
   } catch (const std::exception &e) {
-    close(main_fd);
-    SetState(WorkerState::ERROR);
-    throw WorkerException(std::string("SendPulse: ") + e.what());
+    spdlog::error("requestPolicyFromController exception: {}", e.what());
   }
 }
 
-Worker::Worker() : listener_fd(-1), state(WorkerState::BOOTING) {
-  SendPulse(PULSE_REGISTER);
+void Worker::classifyDomain(const std::string &domain) {
+  try {
+    spdlog::info("Worker {} classifying domain '{}'", worker_id, domain);
 
-  socket_path = std::string(SOCKET_DIR) + std::to_string(worker_id) + ".sock";
-  unlink(socket_path.c_str());
+    ClassifyRequest req;
+    req.set_worker_id(worker_id);
+    req.set_domain(domain);
 
-  spdlog::info("worker_id: {}", worker_id);
-  spdlog::info("socket_path: {}", socket_path);
-  srand(worker_id); // for random pulse time generation
+    ClassifyResponse resp;
+    grpc::ClientContext context;
 
-  listener_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (listener_fd < 0) {
-    throw WorkerException("socket() failed");
+    auto status = stub_->Classify(&context, req, &resp);
+    if (!status.ok()) {
+      spdlog::error("Classify failed: " + status.error_message());
+      return;
+    }
+
+    std::string cat =
+        resp.categories_size() > 0 ? resp.categories(0) : "unknown";
+    spdlog::info("Domain '{}' classified as category '{}' with trust level {}",
+                 domain, cat, resp.trust_level());
+
+  } catch (const std::exception &e) {
+    spdlog::error(std::string("classifyDomain: ") + e.what());
   }
+}
 
-  sockaddr_un addr{.sun_family = AF_UNIX};
-  strncpy(addr.sun_path, socket_path.c_str(), sizeof(addr.sun_path) - 1);
+void Worker::statsReport() {
+  try {
+    spdlog::info("Worker {} send stats", worker_id);
 
-  if (bind(listener_fd, (sockaddr *)&addr, sizeof(addr)) < 0) {
-    close(listener_fd);
-    listener_fd = -1;
-    throw WorkerException("bind() failed");
+    StatsReport report;
+    report.set_worker_id(worker_id);
+    report.set_time(time(nullptr));
+
+    grpc::ClientContext context;
+    google::protobuf::Empty response;
+
+    auto status = stub_->SendStats(&context, report, &response);
+    if (!status.ok()) {
+      spdlog::error("SendStats failed: " + status.error_message());
+      return;
+    }
+
+    spdlog::info("Stats sent successfully");
+
+  } catch (const std::exception &e) {
+    spdlog::error("statsReport failed: {}", e.what());
   }
+}
 
-  if (listen(listener_fd, 100) < 0) {
-    close(listener_fd);
-    listener_fd = -1;
-    throw WorkerException("listen() failed");
+Worker::Worker(uint64_t id) : worker_id(id), state(WorkerState::FREE) {
+
+  std::string controller_addr = "localhost:50051";
+  if (const char *env_addr = getenv("CONTROLLER_GRPC_ADDR")) {
+    controller_addr = env_addr;
   }
+  auto channel =
+      grpc::CreateChannel(controller_addr, grpc::InsecureChannelCredentials());
+  stub_ = DataService::NewStub(channel);
+  spdlog::info("gRPC channel created to {}", controller_addr);
 
-  SendPulse(PULSE_OK);
+  srand(time(nullptr));
   SetState(WorkerState::FREE);
+  requestPolicyFromController();
 }
 
 Worker::~Worker() {
   SetState(WorkerState::SHUTTING_DOWN);
-
-  try {
-    SendPulse(PULSE_SHUTDOWN);
-  } catch (...) {
-  } // ignore errors cuz we don't care
-
-  if (listener_fd != -1)
-    close(listener_fd);
-
-  unlink(socket_path.c_str());
-}
-
-int Worker::GetPulseTimeout() {
-  using namespace std::chrono;
-  return (pulse_interval -
-          duration_cast<seconds>(steady_clock::now() - last_pulse_time)
-              .count()) *
-         1000;
-}
-
-void Worker::HandleRestartControlMessage(WorkerResponse &resp) {
-  SetState(WorkerState::SHUTTING_DOWN);
-  resp.set_error(WORKER_ERR_OK);
-}
-
-void Worker::HandleFetchControlMessage(WorkerResponse &resp) {
-  if (fetch_data.size() == 0) {
-    resp.set_error(WORKER_ERR_NO_FETCH);
-    return;
-  }
-
-  extra_data = std::move(fetch_data);
-  SetState(WorkerState::FREE);
-}
-
-void Worker::ProcessTask_Static(Worker *worker, const std::vector<char> &data) {
-  worker->SetState(WorkerState::BUSY);
-  worker->ProcessTask(data);
-  worker->SetState(WorkerState::FREE);
-}
-
-void Worker::HandleSetTaskControlMessage(const ControlMsg &msg,
-                                         WorkerResponse &resp,
-                                         const std::vector<char> &extra) {
-  if (GetState() != WorkerState::FREE) {
-    resp.set_error(WORKER_ERR_BUSY);
-    return;
-  }
-
-  current_task_id = msg.task_id();
-  std::thread(ProcessTask_Static, this, extra).detach();
-}
-
-void Worker::HandleGetStatusControlMessage(WorkerResponse &resp) {}
-
-void Worker::HandleControlMessage(int client_fd) {
-  WorkerResponse response;
-  response.set_task_id(current_task_id);
-  response.set_error(WORKER_ERR_OK);
-
-  try {
-    ControlMsg msg;
-    ReadProtoMessage(client_fd, msg);
-
-    spdlog::info("Recieved {{{}}}", msg.ShortDebugString());
-
-    std::vector<char> extra(msg.extra_size());
-    ReadExact(client_fd, extra.data(), extra.size());
-
-    switch (msg.type()) {
-    case CTRL_RESTART:
-      HandleRestartControlMessage(response);
-      break;
-    case CTRL_FETCH:
-      HandleFetchControlMessage(response);
-      break;
-    case CTRL_SET_TASK:
-      HandleSetTaskControlMessage(msg, response, extra);
-      break;
-    case CTRL_GET_STATUS:
-      HandleGetStatusControlMessage(response);
-      break;
-    default:
-      response.set_error(WORKER_ERR_FAILED);
-      break;
-    }
-  } catch (const std::exception &e) {
-    response.set_error(WORKER_ERR_FAILED);
-  }
-
-  response.set_extra_size(extra_data.size());
-  WriteProtoMessage(client_fd, response);
-
-  if (extra_data.size() != 0) {
-    WriteExact(client_fd, extra_data.data(), extra_data.size());
-    extra_data.clear();
-  }
-  spdlog::info("Sent {{{}}}", response.ShortDebugString());
+  spdlog::info("Worker {} shutting down", worker_id);
 }
 
 void Worker::MainLoop() {
+  using namespace std::chrono;
+
+  last_policy_time = steady_clock::now();
+  last_stats_time = steady_clock::now();
+
   while (GetState() != WorkerState::SHUTTING_DOWN) {
-    pollfd fds[1] = {{listener_fd, POLLIN, 0}};
-    int timeout = GetPulseTimeout();
+    auto now = steady_clock::now();
 
-    int res = poll(fds, 1, timeout > 0 ? timeout : 0);
-    if (res < 0) {
-      SetState(WorkerState::ERROR);
-      throw WorkerException("poll failed");
+    int64_t seconds_since_stats = (now - last_stats_time) / 1s;
+    if (seconds_since_stats >= stats_interval) {
+      std::thread([this]() { statsReport(); }).detach();
+      last_stats_time = now;
+      stats_interval =
+          MIN_STATS_TIME + (rand() % (MAX_STATS_TIME - MIN_STATS_TIME + 1));
     }
 
-    if (res == 0) {
-      SendPulse(PULSE_OK);
-      continue;
+    int64_t seconds_since_policy = (now - last_policy_time) / 1s;
+    if (seconds_since_policy >= policy_interval) {
+      std::thread([this]() { requestPolicyFromController(); }).detach();
+      last_policy_time = now;
+      policy_interval =
+          MIN_POLICY_TIME + (rand() % (MAX_POLICY_TIME - MIN_POLICY_TIME + 1));
     }
 
-    if (fds[0].revents & POLLIN) {
-      int client_fd = accept(listener_fd, nullptr, nullptr);
-      if (client_fd < 0) {
-        SetState(WorkerState::ERROR);
-        throw WorkerException("accept failed");
-      }
-      HandleControlMessage(client_fd);
-      close(client_fd);
-    }
+    std::this_thread::sleep_for(milliseconds(100));
   }
 }
