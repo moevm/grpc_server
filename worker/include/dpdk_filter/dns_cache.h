@@ -1,19 +1,26 @@
 #ifndef DNS_HASH_H
 #define DNS_HASH_H
 
+#include <rte_cycles.h>
+#include <rte_errno.h>
 #include <rte_hash.h>
 #include <rte_jhash.h>
 #include <rte_malloc.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #define CACHE_SIZE 1024
 #define DOMAIN_MAX_LEN 260
 #define MAX_CATEGORIES 100
 #define CATEGORY_MAX_LEN 64
+#define DNS_CACHE_DEFAULT_TTL (7 * 24 * 60 * 60)
 
 struct node_cache {
   char categories[MAX_CATEGORIES][CATEGORY_MAX_LEN];
   bool solution_is_send;
+  uint64_t timestamp;
+  uint32_t ttl_seconds;
+  char *key_domain;
 };
 
 void init_dns_cache(void);

@@ -12,6 +12,7 @@ LDFLAGS = -L$(DPDK_PREFIX)/lib \
           -lrte_ring -lrte_telemetry -lrte_kvargs \
           -lrte_net \
           -lrte_log -ldl \
+          -lrte_hash \
           -Wl,--end-group \
           -latomic
           

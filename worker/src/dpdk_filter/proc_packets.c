@@ -1,6 +1,23 @@
 #include "../../include/dpdk_filter/proc_packets.h"
 #include "../../include/dpdk_filter/dns_cache.h"
 
+void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
+                              struct af_xdp_port *port_out,
+                              uint16_t queue_number) {
+  if (solution_is_send) {
+    struct rte_mbuf *tx_pkt[1] = {pkt};
+    uint16_t ret = rte_eth_tx_burst(port_out->port_id, queue_number, tx_pkt, 1);
+
+    if (ret < 1) {
+      printf("[ERROR] Failed to send packet\n");
+      // PLUG (to be added later) - need to add processing for this case
+      rte_pktmbuf_free(pkt);
+    }
+    return;
+  }
+  rte_pktmbuf_free(pkt);
+}
+
 void pakage_processing(struct af_xdp_port *port_in,
                        struct af_xdp_port *port_out, uint16_t queue_number,
                        uint16_t nb_pkts, struct rte_mbuf **pkts) {
@@ -14,6 +31,11 @@ void pakage_processing(struct af_xdp_port *port_in,
     memset(&info_pac, 0, sizeof(info_pac));
 
     parsing_pakage(pkts[i], &info_pac);
+    if (info_pac.domain[0] == '\0') {
+      printf("[INFO] Packet without dns request\n");
+      package_sending_decision(true, pkts[i], port_out, queue_number);
+      continue;
+    }
 
     struct node_cache *cached_node = NULL;
     int ret = lookup_dns_cache(info_pac.domain, &cached_node);
@@ -31,9 +53,12 @@ void pakage_processing(struct af_xdp_port *port_in,
       package_sending_decision(solution_is_send, pkts[i], port_out,
                                queue_number);
 
-      struct node_cache *new_node = calloc(1, sizeof(struct node_cache));
+      struct node_cache *new_node =
+          rte_calloc("struct_node_cache", 1, sizeof(struct node_cache),
+                     RTE_CACHE_LINE_SIZE);
       if (!new_node) {
         printf("[ERROR] Failed to allocate memory for struct node_cache\n");
+        continue;
       }
       new_node->solution_is_send = solution_is_send;
       // NEED TO FILL THE STRUCTURE WITH CATEGORIES
@@ -44,20 +69,4 @@ void pakage_processing(struct af_xdp_port *port_in,
           strerror(-ret));
     }
   }
-}
-
-void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
-                              struct af_xdp_port *port_out,
-                              uint16_t queue_number) {
-  if (solution_is_send) {
-    uint16_t ret = rte_eth_tx_burst(port_out->port_id, queue_number, pkt, 1);
-
-    if (ret < 1) {
-      printf("[ERROR] Failed to send packet\n");
-      // PLUG (to be added later) - need to add processing for this case
-      rte_pktmbuf_free(pkt);
-    }
-    return;
-  }
-  rte_pktmbuf_free(pkt);
 }
