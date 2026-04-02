@@ -8,7 +8,7 @@ GW="10.0.0.254"
 echo "setup: $N hosts"
 
 sysctl -w vm.drop_caches=3
-echo 64 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+echo 1024 >/sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
 echo "[+] hugepages: $(cat /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages)"
 
 ip link add $BRIDGE type bridge
