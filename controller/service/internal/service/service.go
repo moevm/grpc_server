@@ -37,21 +37,27 @@ func NewService(categoryFile, providerFile string) (*Service, error) {
 	}, nil
 }
 
-func (s *Service) Check(group *models.Group, checkValue string, endpointName string) (bool, error) {
-	expectedMappings := make(map[string][]string)
+func (s *Service) Check(checkValue string, endpointName string) ([]int, error) {
+	type CategoryInfo struct {
+		ID       int
+		Mappings []string
+	}
 
-	for _, id := range group.GetIds() {
-		category, ok := s.categories.GetCategory(id)
-		if !ok {
-			return false, fmt.Errorf("category %d not found", id)
-		}
+	providerCategories := make(map[string][]CategoryInfo)
 
-		for provider, values := range category.Mappings {
-			expectedMappings[provider] = append(expectedMappings[provider], values...)
+	for _, category := range s.categories.Categories {
+
+		for provider, mappings := range category.Mappings {
+			providerCategories[provider] = append(providerCategories[provider], CategoryInfo{
+				ID:       category.ID,
+				Mappings: mappings,
+			})
 		}
 	}
 
-	for providerName, expected := range expectedMappings {
+	foundIDs := make(map[int]bool)
+
+	for providerName, categories := range providerCategories {
 		provider, ok := s.providers.GetProvider(providerName)
 		if !ok {
 			log.Printf("Warning: Provider %s not found", providerName)
@@ -63,11 +69,7 @@ func (s *Service) Check(group *models.Group, checkValue string, endpointName str
 			log.Printf("Error requesting %s: %v", providerName, err)
 			continue
 		}
-		err = resp.Body.Close()
-		if err != nil {
-			log.Printf("Error to close body: %v", err)
-			continue
-		}
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			log.Printf("Provider %s returned %s", providerName, resp.Status)
@@ -87,13 +89,21 @@ func (s *Service) Check(group *models.Group, checkValue string, endpointName str
 			continue
 		}
 
-		if s.hasIntersection(expected, actual) {
-			return true, nil
+		for _, catInfo := range categories {
+			if s.hasIntersection(catInfo.Mappings, actual) {
+				foundIDs[catInfo.ID] = true
+				log.Printf("Category %d found via %s (matching %v with %v)",
+					catInfo.ID, providerName, catInfo.Mappings, actual)
+			}
 		}
-
 	}
 
-	return false, nil
+	result := make([]int, 0, len(foundIDs))
+	for id := range foundIDs {
+		result = append(result, id)
+	}
+
+	return result, nil
 }
 
 func (s *Service) hasIntersection(a, b []string) bool {
