@@ -13,6 +13,7 @@ void pakage_processing(struct af_xdp_port *port_in,
     memset(&info_pac, 0, sizeof(info_pac));
 
     parsing_pakage(pkts[i], &info_pac);
+    printf("[PKT] port = %hu; domain = %s\n", ntohs(info_pac.number_port), info_pac.domain);
 
     bool skip_packet = main_filtring(&info_pac);
 

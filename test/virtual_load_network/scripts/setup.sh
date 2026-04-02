@@ -4,6 +4,7 @@ N=${1:-3}
 BRIDGE="br0"
 SUBNET="10.0.0"
 GW="10.0.0.254"
+DNS="8.8.8.8"
 
 echo "setup: $N hosts"
 
@@ -42,7 +43,7 @@ for i in $(seq 1 $N); do
         --network=none \
         --name $NAME \
         --cap-add NET_ADMIN \
-        --dns ${GW} \
+        --dns $DNS \
         traffic-gen
 
     ip link add $VETH type veth peer name $BR_VETH
