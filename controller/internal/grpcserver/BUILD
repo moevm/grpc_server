@@ -9,6 +9,7 @@ go_library(
     importpath = "github.com/moevm/grpc_server/internal/grpcserver",
     visibility = ["//visibility:public"],
     deps = [
+        "//service/internal/service",
         "//internal/manager",
         "//pkg/proto/admin_service:admin_service_go_proto",
         "//pkg/proto/communication:communication_go_proto",
