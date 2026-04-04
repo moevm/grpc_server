@@ -67,13 +67,15 @@ cc_binary(
         "@curl//:curl",
     ],
     copts = [
-        "-std=c++17",
         "-mssse3",
         "-msse4.2",
         "-mpclmul",
         "-maes",
         "-I$(GENDIR)/..",
         "-I/usr/include",
+    ],
+    cxxopts = [
+        "-std=c++17",  
     ],
     linkopts = [
         "-L/usr/local/openssl/lib",
