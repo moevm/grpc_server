@@ -9,7 +9,7 @@ import (
 type Category struct {
 	ID          int                 `json:"id"`
 	Name        string              `json:"name"`
-	RiskLevel   int                 `json:"risk_level"`
+	TrustLevel  int                 `json:"trust_level"`
 	Description string              `json:"description"`
 	Mappings    map[string][]string `json:"mappings"`
 }
