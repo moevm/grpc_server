@@ -3,7 +3,7 @@
     "kaspersky": {
       "base_url": "https://opentip.kaspersky.com/api/v1",
       "headers": {
-        "x-api-key": "KM3wxfz4TVCUx8mpeBiXhg=="
+        "x-api-key": "${env:KASPERSKY_API_KEY}"
       },
       "endpoints": {
         "domain": {
@@ -28,7 +28,7 @@
     "virustotal": {
       "base_url": "https://www.virustotal.com/api/v3",
       "headers": {
-        "x-apikey": "{api_key}"
+        "x-apikey": "${env:VIRUSTOTAL_API_KEY}"
       },
       "endpoints": {
         "domain": {
