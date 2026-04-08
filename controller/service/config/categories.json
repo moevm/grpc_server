@@ -2,549 +2,101 @@
   "categories": [
     {
       "id": 1,
-      "name": "Advertising",
-      "risk_level": 4,
-      "description": "Sites with advertisements, banners, pop-ups",
+      "name": "Adult Content",
+      "risk_level": 5,
+      "description": "Pornography and adult entertainment",
       "mappings": {
-        "kaspersky": ["Advertisements"],
-        "virustotal": ["advertising"]
+        "kaspersky": ["CATEGORY_PORNO_AND_EROTICS"]
       }
     },
     {
       "id": 2,
-      "name": "Alcohol and Tobacco",
-      "risk_level": 2,
-      "description": "Sale and promotion of alcohol and tobacco products",
-      "mappings": {
-        "kaspersky": ["Alcohol", "Tobacco"],
-        "virustotal": ["alcohol", "tobacco", "smoking"],
-        "skydns": ["6"]
-      }
-    },
-    {
-      "id": 3,
-      "name": "Anonymizers",
-      "risk_level": 5,
-      "description": "Sites for anonymous browsing, bypassing blocks",
-      "mappings": {
-        "kaspersky": ["Anonymizers", "Proxy"],
-        "virustotal": ["anonymizer", "proxy", "vpn"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 4,
-      "name": "Art",
-      "risk_level": 1,
-      "description": "Museums, galleries, theaters, photography",
-      "mappings": {
-        "kaspersky": ["Arts", "Culture"],
-        "virustotal": ["art", "culture", "museum"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 5,
-      "name": "Business",
-      "risk_level": 1,
-      "description": "Corporate sites, business services",
-      "mappings": {
-        "kaspersky": ["Business", "Corporate"],
-        "virustotal": ["business", "corporate", "company"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 6,
-      "name": "Transportation",
-      "risk_level": 1,
-      "description": "Vehicles, manufacturers, dealers, auto communities",
-      "mappings": {
-        "kaspersky": ["Transportation", "Cars"],
-        "virustotal": ["transport", "automotive", "cars"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 7,
-      "name": "Chats",
-      "risk_level": 3,
-      "description": "Real-time communication",
-      "mappings": {
-        "kaspersky": ["Chat", "IRC"],
-        "virustotal": ["chat", "messaging"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 8,
-      "name": "Kids Sites",
-      "risk_level": 1,
-      "description": "Websites for children",
-      "mappings": {
-        "kaspersky": ["Kids", "Children"],
-        "virustotal": ["kids", "children"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 9,
-      "name": "Forums",
-      "risk_level": 2,
-      "description": "Forums, bulletin boards",
-      "mappings": {
-        "kaspersky": ["Forums", "Bulletin Boards"],
-        "virustotal": ["forum", "discussion"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 10,
-      "name": "Compromised Sites",
-      "risk_level": 5,
-      "description": "Sites compromised by attackers",
-      "mappings": {
-        "kaspersky": ["Compromised", "Hacked"],
-        "virustotal": ["compromised", "hacked"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 11,
-      "name": "Computers and Technology",
-      "risk_level": 1,
-      "description": "IT news, reviews, software, hardware",
-      "mappings": {
-        "kaspersky": ["Technology", "Computers"],
-        "virustotal": ["technology", "computers", "software"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 12,
-      "name": "Criminal Activity",
-      "risk_level": 3,
-      "description": "Hacking, fraud, illegal activities",
-      "mappings": {
-        "kaspersky": ["Criminal", "Hacking"],
-        "virustotal": ["criminal", "illegal", "hacking"],
-        "skydns": ["3", "6"]
-      }
-    },
-    {
-      "id": 13,
-      "name": "Dating Sites",
-      "risk_level": 3,
-      "description": "Dating, relationships",
-      "mappings": {
-        "kaspersky": ["Dating", "Personals"],
-        "virustotal": ["dating"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 14,
-      "name": "File Sharing",
-      "risk_level": 4,
-      "description": "File download sites",
-      "mappings": {
-        "kaspersky": ["Download", "File Sharing"],
-        "virustotal": ["download", "file sharing"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 15,
-      "name": "Education",
-      "risk_level": 1,
-      "description": "Educational institutions, learning",
-      "mappings": {
-        "kaspersky": ["Education", "Learning"],
-        "virustotal": ["education", "university", "school"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 16,
-      "name": "Entertainment",
-      "risk_level": 2,
-      "description": "Movies, music, videos, celebrities",
-      "mappings": {
-        "kaspersky": ["Entertainment", "Movies", "Music"],
-        "virustotal": ["entertainment", "movies", "music"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 17,
-      "name": "Finance",
-      "risk_level": 2,
-      "description": "Banks, investments, finance",
-      "mappings": {
-        "kaspersky": ["Finance", "Banking"],
-        "virustotal": ["finance", "banking", "investment"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 18,
       "name": "Gambling",
       "risk_level": 4,
-      "description": "Casinos, lotteries, bookmakers",
+      "description": "Online casinos, betting, lotteries",
       "mappings": {
         "kaspersky": ["CATEGORY_LOTTERIES", "CATEGORY_BETTING"]
       }
     },
     {
-      "id": 19,
-      "name": "Games",
-      "risk_level": 2,
-      "description": "Computer games",
-      "mappings": {
-        "kaspersky": ["Games", "Gaming"],
-        "virustotal": ["games", "gaming"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 20,
-      "name": "Government",
-      "risk_level": 1,
-      "description": "Government websites",
-      "mappings": {
-        "kaspersky": ["Government"],
-        "virustotal": ["government", "military"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 21,
-      "name": "Hate and Intolerance",
-      "risk_level": 2,
-      "description": "Discrimination, extremism",
-      "mappings": {
-        "kaspersky": ["Hate", "Discrimination"],
-        "virustotal": ["hate"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 22,
-      "name": "Health",
-      "risk_level": 2,
-      "description": "Medicine, health, fitness",
-      "mappings": {
-        "kaspersky": ["Health", "Medicine"],
-        "virustotal": ["health", "medical", "fitness"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 23,
+      "id": 3,
       "name": "Drugs",
-      "risk_level": 2,
-      "description": "Information about drugs",
-      "mappings": {
-        "kaspersky": ["Drugs"],
-        "virustotal": ["drugs"],
-        "skydns": ["6"]
-      }
-    },
-    {
-      "id": 24,
-      "name": "Jobs",
-      "risk_level": 1,
-      "description": "Job search, vacancies",
-      "mappings": {
-        "kaspersky": ["Jobs", "Career"],
-        "virustotal": ["jobs", "career"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 25,
-      "name": "Military",
-      "risk_level": 3,
-      "description": "Military organizations",
-      "mappings": {
-        "kaspersky": ["Military"],
-        "virustotal": ["military"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 26,
-      "name": "Media",
-      "risk_level": 4,
-      "description": "Streaming video, music",
-      "mappings": {
-        "kaspersky": ["Streaming", "Media"],
-        "virustotal": ["streaming", "media"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 27,
-      "name": "News",
-      "risk_level": 1,
-      "description": "News sites",
-      "mappings": {
-        "kaspersky": ["News"],
-        "virustotal": ["news"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 28,
-      "name": "Non-Profits",
-      "risk_level": 2,
-      "description": "Non-profit organizations",
-      "mappings": {
-        "kaspersky": ["Non-profit", "NGO"],
-        "virustotal": ["non-profit", "ngo"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 29,
-      "name": "Nudity",
-      "risk_level": 2,
-      "description": "Partial or complete nudity",
-      "mappings": {
-        "kaspersky": ["Nudity"],
-        "virustotal": ["nudity"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 30,
-      "name": "Personal Sites",
-      "risk_level": 3,
-      "description": "Personal blogs, websites",
-      "mappings": {
-        "kaspersky": ["Personal", "Blogs"],
-        "virustotal": ["personal", "blog"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 31,
-      "name": "Phishing",
       "risk_level": 5,
-      "description": "Fraudulent sites",
+      "description": "Illegal substances",
       "mappings": {
-        "kaspersky": ["Phishing"],
-        "virustotal": ["phishing"],
-        "skydns": ["3"]
+        "kaspersky": ["CATEGORY_DRUGS"]
       }
     },
     {
-      "id": 32,
-      "name": "Politics",
-      "risk_level": 1,
-      "description": "Political parties, propaganda",
-      "mappings": {
-        "kaspersky": ["Politics"],
-        "virustotal": ["politics"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 33,
-      "name": "Pornography",
+      "id": 4,
+      "name": "Violence",
       "risk_level": 5,
-      "description": "Adult content",
+      "description": "Violent content",
       "mappings": {
-        "kaspersky": ["Pornography", "Adult"],
-        "virustotal": ["porn", "adult"],
-        "skydns": []
+        "kaspersky": ["CATEGORY_VIOLENCE"]
       }
     },
     {
-      "id": 34,
-      "name": "Real Estate",
-      "risk_level": 2,
-      "description": "Sale, rental of real estate",
-      "mappings": {
-        "kaspersky": ["Real Estate"],
-        "virustotal": ["real estate"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 35,
-      "name": "Religion",
-      "risk_level": 2,
-      "description": "Religious sites",
-      "mappings": {
-        "kaspersky": ["Religion"],
-        "virustotal": ["religion"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 36,
-      "name": "Restaurants",
-      "risk_level": 1,
-      "description": "Food, recipes, restaurants",
-      "mappings": {
-        "kaspersky": ["Food", "Restaurants"],
-        "virustotal": ["food", "restaurants"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 37,
-      "name": "Search Engines",
-      "risk_level": 1,
-      "description": "Search engines",
-      "mappings": {
-        "kaspersky": ["Search"],
-        "virustotal": ["search"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 38,
-      "name": "Shopping",
-      "risk_level": 2,
-      "description": "Online stores",
-      "mappings": {
-        "kaspersky": ["Shopping"],
-        "virustotal": ["shopping"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 39,
-      "name": "Social Networks",
-      "risk_level": 3,
-      "description": "Social networks",
-      "mappings": {
-        "kaspersky": ["Social", "Social Networks"],
-        "virustotal": ["social", "social media"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 40,
-      "name": "Spam",
+      "id": 5,
+      "name": "Weapons",
       "risk_level": 5,
-      "description": "Spam sites",
+      "description": "Firearms, explosives",
       "mappings": {
-        "kaspersky": ["Spam"],
-        "virustotal": ["spam"],
-        "skydns": []
+        "kaspersky": ["CATEGORY_WEAPONS"]
       }
     },
     {
-      "id": 41,
-      "name": "Sports",
-      "risk_level": 1,
-      "description": "Sports sites",
-      "mappings": {
-        "kaspersky": ["Sports"],
-        "virustotal": ["sports"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 42,
+      "id": 6,
       "name": "Malware",
       "risk_level": 5,
-      "description": "Viruses, malicious programs",
+      "description": "Viruses and malicious software",
       "mappings": {
-        "kaspersky": ["Malware"],
-        "virustotal": ["malware"],
-        "skydns": ["3"]
+        "kaspersky": ["CATEGORY_MALWARE"]
       }
     },
     {
-      "id": 43,
-      "name": "Stock Market",
+      "id": 7,
+      "name": "Social media",
       "risk_level": 2,
-      "description": "Securities trading",
+      "description": "Social media",
       "mappings": {
-        "kaspersky": ["Stock"],
-        "virustotal": ["stock"],
-        "skydns": []
+        "kaspersky": ["CATEGORY_INTERNET_COMMUNICATION_MEDIA", "CATEGORY_SOCIAL_NETS"]
       }
     },
     {
-      "id": 44,
-      "name": "Translators",
-      "risk_level": 1,
-      "description": "Online translators",
+      "id": 8,
+      "name": "Hate Speech",
+      "risk_level": 5,
+      "description": "Discrimination, extremism",
       "mappings": {
-        "kaspersky": ["Translators"],
-        "virustotal": ["translate"],
-        "skydns": []
+        "kaspersky": ["CATEGORY_EXTREMISM_RACISM", "CATEGORY_HATE_AND_DISCRIMINATION"]
       }
     },
     {
-      "id": 45,
-      "name": "Travel",
-      "risk_level": 1,
-      "description": "Tourism, hotels, air tickets",
-      "mappings": {
-        "kaspersky": ["Travel"],
-        "virustotal": ["travel", "tourism"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 46,
-      "name": "Violence",
-      "risk_level": 2,
-      "description": "Scenes of violence",
-      "mappings": {
-        "kaspersky": ["Violence"],
-        "virustotal": ["violence"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 47,
-      "name": "Weapons",
-      "risk_level": 2,
-      "description": "Sale and reviews of weapons",
-      "mappings": {
-        "kaspersky": ["Weapons"],
-        "virustotal": ["weapons"],
-        "skydns": []
-      }
-    },
-    {
-      "id": 48,
-      "name": "Webmail",
+      "id": 9,
+      "name": "Anonymizers",
       "risk_level": 4,
-      "description": "Email services",
+      "description": "VPN, proxies to bypass blocks",
       "mappings": {
-        "kaspersky": ["Webmail"],
-        "virustotal": ["webmail"],
-        "skydns": []
+        "kaspersky": ["CATEGORY_ANONYMIZERS"]
       }
     },
     {
-      "id": 49,
-      "name": "General",
+      "id": 10,
+      "name": "Alcohol and Tobacco",
       "risk_level": 3,
-      "description": "Uncategorized sites",
+      "description": "Sale of alcohol and tobacco",
       "mappings": {
-        "kaspersky": ["General", "Unknown"],
-        "virustotal": [],
-        "skydns": []
+        "kaspersky": ["CATEGORY_ALCOHOL"]
       }
     },
     {
-      "id": 50,
-      "name": "Leisure",
-      "risk_level": 2,
-      "description": "Hobbies, interests",
+      "id": 11,
+      "name": "Online shop",
+      "risk_level": 1,
+      "description": "Online shop",
       "mappings": {
-        "kaspersky": ["Leisure", "Hobbies"],
-        "virustotal": ["leisure", "hobby"],
-        "skydns": []
+        "kaspersky": ["CATEGORY_ONLINE_SHOPS"]
       }
     }
   ]

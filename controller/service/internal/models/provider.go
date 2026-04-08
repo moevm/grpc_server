@@ -29,11 +29,25 @@ func (p *Provider) GetEndpoint(name string) (Endpoint, bool) {
 	return endpoint, ok
 }
 
+func interpolateEnvVars(data []byte) []byte {
+	re := regexp.MustCompile(`\${env:([^}]+)}`)
+	return re.ReplaceAllFunc(data, func(match []byte) []byte {
+		varName := string(re.FindSubmatch(match)[1])
+		if envValue := os.Getenv(varName); envValue != "" {
+			return []byte(envValue)
+		}
+		return []byte("")
+	})
+}
+
 func (pl *ProviderList) LoadFromFile(filename string) error {
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return fmt.Errorf("reading providers: %w", err)
 	}
+
+    interpolatedData := interpolateEnvVars(data)
+
 	return json.Unmarshal(data, pl)
 }
 
