@@ -23,7 +23,7 @@ func main() {
 
 	adminServer.SetManager(mgr)
 
-	dataServer, err := grpcserver.NewDataServer(mgr, "service/config/categories.json", "service/config/providers.json")
+	dataServer, err := grpcserver.NewDataServer(mgr, "internal/service/config/categories.json", "internal/service/config/providers.json")
 
 	if err != nil {
 		log.Fatalf("Failed to create data server: %v", err)

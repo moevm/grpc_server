@@ -1,7 +1,7 @@
 package tests
 
 import (
-	"service/internal/models"
+	"github.com/moevm/grpc_server/internal/service/models"
 	"testing"
 )
 

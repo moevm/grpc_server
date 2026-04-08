@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/moevm/grpc_server/internal/service/models"
 	"net/http"
-	"service/internal/models"
 	"strings"
 	"time"
 )

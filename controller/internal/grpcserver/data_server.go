@@ -11,12 +11,12 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"service/internal/service" 
+	"github.com/moevm/grpc_server/internal/service/service"
 )
 
 type DataServer struct {
 	pb.UnimplementedDataServiceServer
-	manager *manager.Manager
+	manager    *manager.Manager
 	classifier *service.Service
 }
 
@@ -79,7 +79,7 @@ func (s *DataServer) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb
 		}, nil
 	}
 
-	if len(categoryIDs) > 0{
+	if len(categoryIDs) > 0 {
 		categories := make([]string, 0, len(categoryIDs))
 		maxRiskLevel := 0
 
@@ -90,7 +90,7 @@ func (s *DataServer) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb
 			}
 			if riskLevel > maxRiskLevel {
 				maxRiskLevel = riskLevel
-			} 
+			}
 		}
 
 		trustLevel := int32(maxRiskLevel)

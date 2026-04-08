@@ -1,8 +1,8 @@
 package tests
 
 import (
+	"github.com/moevm/grpc_server/internal/service/models"
 	"reflect"
-	"service/internal/models"
 	"testing"
 )
 
