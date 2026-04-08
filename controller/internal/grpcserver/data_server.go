@@ -81,19 +81,19 @@ func (s *DataServer) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb
 
 	if len(categoryIDs) > 0 {
 		categories := make([]string, 0, len(categoryIDs))
-		maxRiskLevel := 0
+		minTrustLevel := 0
 
 		for _, id := range categoryIDs {
-			name, riskLevel := s.classifier.GetCategory(id)
+			name, trustLevel := s.classifier.GetCategory(id)
 			if name != "" {
 				categories = append(categories, name)
 			}
-			if riskLevel > maxRiskLevel {
-				maxRiskLevel = riskLevel
+			if trustLevel < minTrustLevel {
+				minTrustLevel = trustLevel
 			}
 		}
 
-		trustLevel := int32(maxRiskLevel)
+		trustLevel := int32(minTrustLevel)
 		return &pb.ClassifyResponse{
 			Categories: categories,
 			TrustLevel: trustLevel,

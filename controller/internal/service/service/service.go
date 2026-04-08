@@ -3,13 +3,14 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
+	"time"
+
 	"github.com/joho/godotenv"
 	"github.com/moevm/grpc_server/internal/service/client"
 	"github.com/moevm/grpc_server/internal/service/models"
 	"github.com/moevm/grpc_server/internal/service/parser"
-	"log"
-	"net/http"
-	"time"
 )
 
 type Service struct {
@@ -129,7 +130,7 @@ func (s *Service) hasIntersection(a, b []string) bool {
 func (s *Service) GetCategory(id int) (string, int) {
 	for _, category := range s.categories.Categories {
 		if category.ID == id {
-			return category.Name, category.RiskLevel
+			return category.Name, category.TrustLevel
 		}
 	}
 	return "", 0
