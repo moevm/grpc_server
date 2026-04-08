@@ -1,9 +1,9 @@
 package tests
 
 import (
+	"github.com/moevm/grpc_server/internal/service/client"
+	"github.com/moevm/grpc_server/internal/service/models"
 	"os"
-	"service/internal/client"
-	"service/internal/models"
 	"testing"
 	"time"
 

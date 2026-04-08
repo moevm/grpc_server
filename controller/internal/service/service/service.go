@@ -3,11 +3,12 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/joho/godotenv"
+	"github.com/moevm/grpc_server/internal/service/client"
+	"github.com/moevm/grpc_server/internal/service/models"
+	"github.com/moevm/grpc_server/internal/service/parser"
 	"log"
 	"net/http"
-	"service/internal/client"
-	"service/internal/models"
-	"service/internal/parser"
 	"time"
 )
 
@@ -20,7 +21,7 @@ type Service struct {
 
 func NewService(categoryFile, providerFile string) (*Service, error) {
 
-    if err := godotenv.Load(); err != nil {
+	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: .env file not found, using system environment variables")
 	}
 
@@ -75,7 +76,7 @@ func (s *Service) Check(checkValue string, endpointName string) ([]int, error) {
 			continue
 		}
 
-	    resp.Body.Close()
+		resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			log.Printf("Provider %s returned %s", providerName, resp.Status)
@@ -125,11 +126,11 @@ func (s *Service) hasIntersection(a, b []string) bool {
 	return false
 }
 
-func (s *Service) GetCategory (id int) (string, int) {
+func (s *Service) GetCategory(id int) (string, int) {
 	for _, category := range s.categories.Categories {
 		if category.ID == id {
-            return category.Name, category.RiskLevel
-        }
+			return category.Name, category.RiskLevel
+		}
 	}
 	return "", 0
 }
