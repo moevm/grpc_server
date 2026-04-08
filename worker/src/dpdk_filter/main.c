@@ -19,6 +19,8 @@ static void signal_handler(int signum) {
 }
 
 int main(int argc, char **argv) {
+  //since BASE_POLICY is filled when initializing worker, let’s initialize here
+  struct BASE_POLICY policy;
   if (signal(SIGINT, signal_handler) == SIG_ERR) {
     printf("[ERROR] Failed to set SIGINT handler\n");
     return 1;
@@ -80,7 +82,7 @@ int main(int argc, char **argv) {
 
   while (running) {
 
-    pakage_processing(port_in, port_out, queue_number, nb_pkts, pkts);
+    pakage_processing(port_in, port_out, queue_number, nb_pkts, pkts, &policy);
   }
 
   // function for save cache info if need

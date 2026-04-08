@@ -8,20 +8,13 @@
 #include <rte_malloc.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <sqlite3.h>
 
-#define CACHE_SIZE 1024
-#define DOMAIN_MAX_LEN 260
-#define MAX_CATEGORIES 100
-#define CATEGORY_MAX_LEN 64
-#define DNS_CACHE_DEFAULT_TTL (7 * 24 * 60 * 60)
+#include "../../include/dpdk_filter/constants.h"
+#include "../../include/dpdk_filter/types.h"
 
-struct node_cache {
-  char categories[MAX_CATEGORIES][CATEGORY_MAX_LEN];
-  bool solution_is_send;
-  uint64_t timestamp;
-  uint32_t ttl_seconds;
-  char *key_domain;
-};
+
+
 
 void init_dns_cache(void);
 int lookup_dns_cache(const char *domain, struct node_cache **return_node);

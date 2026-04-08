@@ -1,0 +1,13 @@
+#ifndef CONSTANTS_H
+#define CONSTANTS_H
+
+
+#define MAX_CATEGORIES_BY_TRUST_LVL 64
+#define MAX_DOMAINS 64
+#define CACHE_SIZE 1024
+#define DOMAIN_MAX_LEN 260
+#define MAX_CATEGORIES 100
+#define CATEGORY_MAX_LEN 64
+#define DNS_CACHE_DEFAULT_TTL (7 * 24 * 60 * 60)
+
+#endif

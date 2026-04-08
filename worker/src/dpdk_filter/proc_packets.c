@@ -20,7 +20,7 @@ void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
 
 void pakage_processing(struct af_xdp_port *port_in,
                        struct af_xdp_port *port_out, uint16_t queue_number,
-                       uint16_t nb_pkts, struct rte_mbuf **pkts) {
+                       uint16_t nb_pkts, struct rte_mbuf **pkts, struct BASE_POLICY* policy) {
 
   uint16_t nb_rx =
       rte_eth_rx_burst(port_in->port_id, queue_number, pkts, nb_pkts);
@@ -45,10 +45,10 @@ void pakage_processing(struct af_xdp_port *port_in,
       package_sending_decision(cached_node->solution_is_send, pkts[i], port_out,
                                queue_number);
     } else if (ret == -ENOENT) {
-      // function to send domen to controller and given category
 
-      bool solution_is_send = main_filtring(
-          &info_pac); // here also to send a category and maybe level of trust
+      struct requested_classification req_clas;
+
+      bool solution_is_send = main_filtring(&req_clas, policy, info_pac.domain);
 
       package_sending_decision(solution_is_send, pkts[i], port_out,
                                queue_number);
