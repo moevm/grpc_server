@@ -1,8 +1,9 @@
 package tests
 
 import (
-	"github.com/moevm/grpc_server/internal/service/models"
 	"testing"
+
+	"github.com/moevm/grpc_server/internal/service/models"
 )
 
 var testCategories = models.CategoryList{
@@ -10,7 +11,7 @@ var testCategories = models.CategoryList{
 		{
 			ID:          1,
 			Name:        "Phishing",
-			RiskLevel:   5,
+			TrustLevel:  5,
 			Description: "Фишинговые сайты",
 			Mappings: map[string][]string{
 				"kaspersky":  {"Phishing", "Fraud"},
@@ -21,7 +22,7 @@ var testCategories = models.CategoryList{
 		{
 			ID:          2,
 			Name:        "Malware",
-			RiskLevel:   5,
+			TrustLevel:  5,
 			Description: "Вредоносное ПО",
 			Mappings: map[string][]string{
 				"kaspersky":  {"Malware", "Virus"},
