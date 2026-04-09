@@ -1,4 +1,4 @@
-#include "../../include/dpdk_filter/af_xdp_port.h"
+#include "../../include/dpdk_filter/net_port.h"
 #include "../../include/dpdk_filter/dns_cache.h"
 #include "../../include/dpdk_filter/proc_packets.h"
 #include <rte_eal.h>
@@ -18,6 +18,19 @@ static void signal_handler(int signum) {
   }
 }
 
+void forward_tap_to_out(struct net_port *port_exception, struct net_port *port_in, uint16_t queue_number) {
+    struct rte_mbuf *tap_pkts[32];
+    uint16_t nb_tap = rte_eth_rx_burst(port_exception->port_id, queue_number, tap_pkts, 32);
+    for (int i = 0; i < nb_tap; i++) {
+        int ret = rte_eth_tx_burst(port_in->port_id, queue_number, &tap_pkts[i], 1);
+        if (ret < 1) {
+          printf("[ERROR] Failed to send packet\n");
+          // PLUG (to be added later) - need to add processing for this case
+          rte_pktmbuf_free(tap_pkts[i]);
+        }
+    }
+}
+
 int main(int argc, char **argv) {
   //since BASE_POLICY is filled when initializing worker, let’s initialize here
   struct BASE_POLICY policy;
@@ -29,8 +42,12 @@ int main(int argc, char **argv) {
     printf("[ERROR] Failed to set SIGTERM handler\n");
     return 1;
   }
-  struct af_xdp_port *port_in = NULL;
-  struct af_xdp_port *port_out = NULL;
+
+  
+
+  struct net_port *port_in = NULL;
+  struct net_port *port_out = NULL;
+  struct net_port *port_exception = NULL;
   struct rte_mempool *mbuf_pool;
   unsigned mbuf_quantity_in_pool = 8192;
   unsigned cache_size_per_kernel = 250;
@@ -63,17 +80,28 @@ int main(int argc, char **argv) {
   port_in = init_struct_af_xdp_port("eth0", mbuf_pool);
   port_out = init_struct_af_xdp_port("eth1", mbuf_pool);
 #endif
-  if (!port_in || !port_out) {
+
+  port_exception = init_struct_tap_port("tap0", mbuf_pool);
+
+
+  if (!port_in || !port_out || !port_exception) {
     return 1;
   }
 
-  if (af_xdp_port_init(port_in) || af_xdp_port_init(port_out)) {
+  if (net_port_init(port_in) || net_port_init(port_out) || net_port_init(port_exception)) {
     return 1;
   }
 
-  if (af_xdp_port_start(port_in->port_id) ||
-      af_xdp_port_start(port_out->port_id)) {
+  if (net_port_start(port_in->port_id) ||
+      net_port_start(port_out->port_id) ||
+      net_port_start(port_exception->port_id)) {
     return 1;
+  }
+
+  ret = system("sudo ip link set tap0 up && "
+                    "sudo ip addr add 10.0.3.1/24 dev tap0");
+  if(ret) {
+    printf("[ERROR] Failed to set tap0 up\n");
   }
 
   printf("An endless cycle has been started. Packets pass from port with id=%u "
@@ -81,17 +109,19 @@ int main(int argc, char **argv) {
          port_in->port_id, port_out->port_id);
 
   while (running) {
-
-    pakage_processing(port_in, port_out, queue_number, nb_pkts, pkts, &policy);
+    forward_tap_to_out(port_exception, port_in, queue_number);
+    pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts, pkts, &policy);
   }
 
   // function for save cache info if need
   free_dns_cache();
 
-  af_xdp_port_close(port_in);
-  af_xdp_port_close(port_out);
+  net_port_close(port_in);
+  net_port_close(port_out);
+  net_port_close(port_exception);
 
-  af_xdp_port_destroy(port_in);
-  af_xdp_port_destroy(port_out);
+  net_port_destroy(port_in);
+  net_port_destroy(port_out);
+  net_port_destroy(port_exception);
   return 0;
 }

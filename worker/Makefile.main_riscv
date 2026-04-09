@@ -13,13 +13,12 @@ LDFLAGS = -L$(DPDK_PREFIX)/lib \
           -lrte_net \
           -lrte_log -ldl \
           -lrte_hash \
+          -sqlite3 \
           -Wl,--end-group \
           -latomic
           
 
-SRCS = src/dpdk_filter/main.c src/dpdk_filter/af_xdp_port.c \
-       src/dpdk_filter/filtr_packets.c src/dpdk_filter/pars_packets.c \
-       src/dpdk_filter/proc_packets.c src/dpdk_filter/dns_cache.c
+SRCS = src/dpdk_filter/main.c src/dpdk_filter/net_port.c src/dpdk_filter/filtr_packets.c src/dpdk_filter/pars_packets.c src/dpdk_filter/proc_packets.c src/dpdk_filter/dns_cache.c
 
 TARGET_REAL = main-riscv
 TARGET_VIRT = main-riscv-virt

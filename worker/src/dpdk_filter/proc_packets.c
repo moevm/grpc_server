@@ -1,8 +1,10 @@
 #include "../../include/dpdk_filter/proc_packets.h"
 #include "../../include/dpdk_filter/dns_cache.h"
 
+const uint16_t LIST_EXCEPTION_PORTS[LEN_LIST_EXCEPTION_PORTS] = {22};
+
 void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
-                              struct af_xdp_port *port_out,
+                              struct net_port *port_out,
                               uint16_t queue_number) {
   if (solution_is_send) {
     struct rte_mbuf *tx_pkt[1] = {pkt};
@@ -18,8 +20,19 @@ void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
   rte_pktmbuf_free(pkt);
 }
 
-void pakage_processing(struct af_xdp_port *port_in,
-                       struct af_xdp_port *port_out, uint16_t queue_number,
+
+bool check_is_exception(uint16_t number_port) {
+  for (int i = 0; i < LEN_LIST_EXCEPTION_PORTS; i++) {
+    if (number_port == LIST_EXCEPTION_PORTS[i]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+
+void pakage_processing(struct net_port *port_in,
+                       struct net_port *port_out, struct net_port *port_exception, uint16_t queue_number,
                        uint16_t nb_pkts, struct rte_mbuf **pkts, struct BASE_POLICY* policy) {
 
   uint16_t nb_rx =
@@ -34,6 +47,11 @@ void pakage_processing(struct af_xdp_port *port_in,
     if (info_pac.domain[0] == '\0') {
       printf("[INFO] Packet without dns request\n");
       package_sending_decision(true, pkts[i], port_out, queue_number);
+      continue;
+    }
+
+    if(check_is_exception(info_pac.number_port) == true) {
+      package_sending_decision(true, pkts[i], port_exception, queue_number);
       continue;
     }
 

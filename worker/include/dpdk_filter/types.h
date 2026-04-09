@@ -5,6 +5,13 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+struct net_port {
+  uint16_t port_id;
+  char iface_name[32];
+  char dev_name[64];
+  char dev_args[256];
+  struct rte_mempool *mbuf_pool;
+};
 struct info_of_pakage {
   uint16_t ethernet_type_host;
   uint16_t ethernet_type_protocol;

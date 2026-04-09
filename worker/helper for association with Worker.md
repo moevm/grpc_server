@@ -20,3 +20,7 @@ struct BASE_POLICY {
     char allow_domains[MAX_DOMAINS][MAX_LEN_DOMEIN];
     int min_trust_level;
 }
+
+
+
+Добавлен tap порт, по которому проходят пакеты исключений в ядро, обрабатываются и ответ отсылается на входящий порт (port_in) 
