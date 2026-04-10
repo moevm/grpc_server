@@ -1,0 +1,103 @@
+{
+  "categories": [
+    {
+      "id": 1,
+      "name": "Adult Content",
+      "risk_level": 5,
+      "description": "Pornography and adult entertainment",
+      "mappings": {
+        "kaspersky": ["CATEGORY_PORNO_AND_EROTICS"]
+      }
+    },
+    {
+      "id": 2,
+      "name": "Gambling",
+      "risk_level": 4,
+      "description": "Online casinos, betting, lotteries",
+      "mappings": {
+        "kaspersky": ["CATEGORY_LOTTERIES", "CATEGORY_BETTING"]
+      }
+    },
+    {
+      "id": 3,
+      "name": "Drugs",
+      "risk_level": 5,
+      "description": "Illegal substances",
+      "mappings": {
+        "kaspersky": ["CATEGORY_DRUGS"]
+      }
+    },
+    {
+      "id": 4,
+      "name": "Violence",
+      "risk_level": 5,
+      "description": "Violent content",
+      "mappings": {
+        "kaspersky": ["CATEGORY_VIOLENCE"]
+      }
+    },
+    {
+      "id": 5,
+      "name": "Weapons",
+      "risk_level": 5,
+      "description": "Firearms, explosives",
+      "mappings": {
+        "kaspersky": ["CATEGORY_WEAPONS"]
+      }
+    },
+    {
+      "id": 6,
+      "name": "Malware",
+      "risk_level": 5,
+      "description": "Viruses and malicious software",
+      "mappings": {
+        "kaspersky": ["CATEGORY_MALWARE"]
+      }
+    },
+    {
+      "id": 7,
+      "name": "Social media",
+      "risk_level": 2,
+      "description": "Social media",
+      "mappings": {
+        "kaspersky": ["CATEGORY_INTERNET_COMMUNICATION_MEDIA", "CATEGORY_SOCIAL_NETS"]
+      }
+    },
+    {
+      "id": 8,
+      "name": "Hate Speech",
+      "risk_level": 5,
+      "description": "Discrimination, extremism",
+      "mappings": {
+        "kaspersky": ["CATEGORY_EXTREMISM_RACISM", "CATEGORY_HATE_AND_DISCRIMINATION"]
+      }
+    },
+    {
+      "id": 9,
+      "name": "Anonymizers",
+      "risk_level": 4,
+      "description": "VPN, proxies to bypass blocks",
+      "mappings": {
+        "kaspersky": ["CATEGORY_ANONYMIZERS"]
+      }
+    },
+    {
+      "id": 10,
+      "name": "Alcohol and Tobacco",
+      "risk_level": 3,
+      "description": "Sale of alcohol and tobacco",
+      "mappings": {
+        "kaspersky": ["CATEGORY_ALCOHOL"]
+      }
+    },
+    {
+      "id": 11,
+      "name": "Online shop",
+      "risk_level": 1,
+      "description": "Online shop",
+      "mappings": {
+        "kaspersky": ["CATEGORY_ONLINE_SHOPS"]
+      }
+    }
+  ]
+}
