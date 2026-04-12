@@ -3,13 +3,10 @@
 
 #include <rte_mbuf.h>
 #include <stdint.h>
+#include "../../include/dpdk_filter/constants.h"
+#include "../../include/dpdk_filter/types.h"
 
-struct info_of_pakage {
-  uint16_t ethernet_type_host;
-  uint16_t ethernet_type_protocol;
-  uint16_t number_port;
-  char domain[260];
-};
+
 
 void parsing_pakage(struct rte_mbuf *paket, struct info_of_pakage *info_pac);
 
