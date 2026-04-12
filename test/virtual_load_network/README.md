@@ -7,7 +7,7 @@
 sudo apt-get install -y meson ninja-build python3-pyelftools libbpf-dev
 git clone https://github.com/DPDK/dpdk.git
 cd dpdk
-meson setup -Denable_drivers=net/af_xdp build
+meson setup -Denable_drivers=net/af_xdp,net/tap build
 ninja -C build
 sudo ninja -C build install
 ```
