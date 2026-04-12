@@ -62,7 +62,15 @@ int main(int argc, char **argv) {
       test_mode = true;
       spdlog::info("Test mode: classifying domain '{}'", domain);
       std::this_thread::sleep_for(std::chrono::seconds(1));
-      worker.classifyDomain(domain);
+      struct requested_classification req_clas;
+      memset(&req_clas, 0, sizeof(req_clas));
+      bool success = worker.classifyDomain(domain, &req_clas);
+      if (success) {
+        spdlog::info("Classification successful: trust_level={}",
+                     req_clas.get_trust_level);
+      } else {
+        spdlog::error("Classification failed");
+      }
     }
 
     if (test_mode) {

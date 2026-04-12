@@ -38,10 +38,13 @@ cc_library(
     hdrs = [
         "include/worker.hpp",
         "include/metrics_collector.hpp",
-        "include/dpdk_filter/af_xdp_port.h",
+        "include/dpdk_filter/net_port.h",
+        "include/dpdk_filter/dns_cache.h",
         "include/dpdk_filter/filtr_packets.h",
         "include/dpdk_filter/pars_packets.h",
         "include/dpdk_filter/proc_packets.h",
+        "include/dpdk_filter/types.h",
+        "include/dpdk_filter/constants.h",
     ],
     srcs = [],
     visibility = ["//visibility:public"],
@@ -52,8 +55,9 @@ cc_binary(
     srcs = [
         "src/main.cpp",
         "src/worker.cpp",
+        "src/dpdk_filter/dns_cache.c",
         "src/metrics_collector.cpp",
-        "src/dpdk_filter/af_xdp_port.c", 
+        "src/dpdk_filter/net_port.c", 
         "src/dpdk_filter/filtr_packets.c",
         "src/dpdk_filter/pars_packets.c",
         "src/dpdk_filter/proc_packets.c",
@@ -97,6 +101,7 @@ cc_binary(
         "-lrte_kvargs",
         "-lrte_log",
         "-lrte_net",
+        "-lrte_hash", 
         
         "-lnuma",
         "-ldl",

@@ -2,11 +2,24 @@
 #include "../include/dpdk_filter/proc_packets.h"
 #include "communication.grpc.pb.h"
 #include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <grpcpp/grpcpp.h>
 #include <signal.h>
 #include <spdlog/spdlog.h>
 #include <thread>
+
+Worker *g_worker = nullptr;
+
+extern "C" bool
+worker_classify_domain(const char *domain,
+                       struct requested_classification *out_req) {
+  if (!g_worker) {
+    fprintf(stderr, "worker_classify_domain: g_worker is null\n");
+    return false;
+  }
+  return g_worker->classifyDomain(std::string(domain), out_req);
+}
 
 static volatile bool stop_flag = false;
 
@@ -57,18 +70,44 @@ void Worker::initDPDK(int argc, char **argv) {
 
   port_in = init_struct_af_xdp_port(iface_in, mbuf_pool);
   port_out = init_struct_af_xdp_port(iface_out, mbuf_pool);
+  port_exception = init_struct_tap_port("tap0", mbuf_pool);
 
-  if (af_xdp_port_init(port_in) || af_xdp_port_init(port_out)) {
+  if (net_port_init(port_in) || net_port_init(port_out) ||
+      net_port_init(port_exception)) {
     throw std::runtime_error("Init ports");
   }
 
-  if (af_xdp_port_start(port_in->port_id) ||
-      af_xdp_port_start(port_out->port_id)) {
+  if (net_port_start(port_in->port_id) || net_port_start(port_out->port_id) ||
+      net_port_start(port_exception->port_id)) {
     throw std::runtime_error("Start ports");
   }
 
+  int tap_ret = system(
+      "sudo ip link set tap0 up && sudo ip addr add 10.0.3.1/24 dev tap0");
+  if (tap_ret)
+    spdlog::warn("Failed to configure tap0");
+
+  init_dns_cache();
+
   spdlog::info("DPDK initialized: in_port={}, out_port={}", port_in->port_id,
                port_out->port_id);
+}
+
+void Worker::forward_to_out(struct net_port *incoming_port,
+                            struct net_port *outgoing_port,
+                            uint16_t queue_number) {
+  struct rte_mbuf *tap_pkts[32];
+  uint16_t nb_tap =
+      rte_eth_rx_burst(incoming_port->port_id, queue_number, tap_pkts, 32);
+  for (int i = 0; i < nb_tap; i++) {
+    int ret =
+        rte_eth_tx_burst(outgoing_port->port_id, queue_number, &tap_pkts[i], 1);
+    if (ret < 1) {
+      spdlog::warn("Failed to send packet");
+      // PLUG (to be added later) - need to add processing for this case
+      rte_pktmbuf_free(tap_pkts[i]);
+    }
+  }
 }
 
 void Worker::requestPolicyFromController() {
@@ -89,15 +128,63 @@ void Worker::requestPolicyFromController() {
     }
 
     switch (resp.result()) {
-    case GetPolicyResponse::POLICY_PROVIDED:
+    case GetPolicyResponse::POLICY_PROVIDED: {
       spdlog::info("Policy received");
+      const auto &pol = resp.policy();
       current_config_version = resp.policy().config_version();
+      std::lock_guard<std::mutex> lock(policy_mutex);
+      memset(&current_policy, 0, sizeof(current_policy));
+
+      int block_cat_count = pol.block_categories_size();
+      for (int i = 0; i < block_cat_count; ++i) {
+        strncpy(current_policy.locked_categories[i],
+                pol.block_categories(i).c_str(), CATEGORY_MAX_LEN - 1);
+        current_policy.locked_categories[i][CATEGORY_MAX_LEN - 1] = '\0';
+      }
+
+      int trust_map_count = pol.block_by_trust_size();
+      int idx = 0;
+      for (const auto &[category, min_trust] : pol.block_by_trust()) {
+        if (idx >= MAX_CATEGORIES_BY_TRUST_LVL)
+          break;
+
+        strncpy(
+            current_policy.categories_with_lvl[idx].locked_by_trust_category,
+            category.c_str(), CATEGORY_MAX_LEN - 1);
+        current_policy.categories_with_lvl[idx]
+            .locked_by_trust_category[CATEGORY_MAX_LEN - 1] = '\0';
+
+        current_policy.categories_with_lvl[idx].trust_lvl = min_trust;
+
+        idx++;
+      }
+
+      int block_dom_count = pol.block_domains_size();
+      for (int i = 0; i < block_dom_count; ++i) {
+        strncpy(current_policy.block_domains[i], pol.block_domains(i).c_str(),
+                DOMAIN_MAX_LEN - 1);
+        current_policy.block_domains[i][DOMAIN_MAX_LEN - 1] = '\0';
+      }
+
+      int allow_dom_count = pol.allow_domains_size();
+      for (int i = 0; i < allow_dom_count; ++i) {
+        strncpy(current_policy.allow_domains[i], pol.allow_domains(i).c_str(),
+                DOMAIN_MAX_LEN - 1);
+        current_policy.allow_domains[i][DOMAIN_MAX_LEN - 1] = '\0';
+      }
+
+      current_policy.min_trust_level = pol.min_trust_level();
+
+      current_config_version = pol.config_version();
       break;
-    case GetPolicyResponse::POLICY_UNCHANGED:
+    }
+    case GetPolicyResponse::POLICY_UNCHANGED: {
       spdlog::info("Policy unchanged");
       break;
-    default:
+    }
+    default: {
       spdlog::error("Unknown response result");
+    }
     }
 
   } catch (const std::exception &e) {
@@ -105,7 +192,8 @@ void Worker::requestPolicyFromController() {
   }
 }
 
-void Worker::classifyDomain(const std::string &domain) {
+bool Worker::classifyDomain(const std::string &domain,
+                            struct requested_classification *out_req) {
   try {
     spdlog::info("Worker {} classifying domain '{}'", worker_id, domain);
 
@@ -119,7 +207,7 @@ void Worker::classifyDomain(const std::string &domain) {
     auto status = stub_->Classify(&context, req, &resp);
     if (!status.ok()) {
       spdlog::error("Classify failed: " + status.error_message());
-      return;
+      return false;
     }
 
     std::string cat =
@@ -127,8 +215,16 @@ void Worker::classifyDomain(const std::string &domain) {
     spdlog::info("Domain '{}' classified as category '{}' with trust level {}",
                  domain, cat, resp.trust_level());
 
+    out_req->get_trust_level = resp.trust_level();
+    int cat_count = std::min(resp.categories_size(), MAX_CATEGORIES);
+    for (int i = 0; i < cat_count; ++i) {
+      strncpy(out_req->get_categories[i], resp.categories(i).c_str(),
+              CATEGORY_MAX_LEN - 1);
+    }
+    return true;
   } catch (const std::exception &e) {
     spdlog::error(std::string("classifyDomain: ") + e.what());
+    return false;
   }
 }
 
@@ -157,7 +253,7 @@ void Worker::statsReport() {
 }
 
 Worker::Worker(uint64_t id) : worker_id(id), state(WorkerState::FREE) {
-
+  g_worker = this;
   std::string controller_addr = "localhost:50051";
   if (const char *env_addr = getenv("CONTROLLER_GRPC_ADDR")) {
     controller_addr = env_addr;
@@ -179,10 +275,15 @@ Worker::~Worker() {
   spdlog::info("Worker {} shutting down", worker_id);
 
   if (port_in && port_out) {
-    af_xdp_port_close(port_in);
-    af_xdp_port_close(port_out);
-    af_xdp_port_destroy(port_in);
-    af_xdp_port_destroy(port_out);
+    free_dns_cache();
+
+    net_port_close(port_in);
+    net_port_close(port_out);
+    net_port_close(port_exception);
+
+    net_port_destroy(port_in);
+    net_port_destroy(port_out);
+    net_port_destroy(port_exception);
     spdlog::info("DPDK ports closed");
   }
 }
@@ -197,7 +298,10 @@ void Worker::MainLoop() {
   uint16_t nb_pkts = 32;
   uint16_t queue_number = 0;
   while (!stop_flag && GetState() != WorkerState::SHUTTING_DOWN) {
-    pakage_processing(port_in, port_out, queue_number, nb_pkts, pkts);
+    forward_to_out(port_exception, port_in, queue_number);
+    pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts,
+                      pkts, &current_policy);
+    forward_to_out(port_out, port_in, queue_number);
 
     auto now = steady_clock::now();
 

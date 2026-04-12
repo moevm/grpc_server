@@ -41,16 +41,17 @@ int find_port_by_dev_name(const char *dev_name, uint16_t *port_id_dev) {
 }
 
 struct net_port *init_struct_tap_port(const char *tap_iface_name,
-                                            struct rte_mempool *mbuf_pool) {
+                                      struct rte_mempool *mbuf_pool) {
 
   struct net_port *port = calloc(1, sizeof(struct net_port));
-  if (!port) { 
+  if (!port) {
     printf("[ERROR] Failed to allocate memory for struct net_port\n");
     return NULL;
   }
 
-  snprintf(port->dev_args, sizeof(port->dev_args),"iface=%s", tap_iface_name);
-  snprintf(port->dev_name, sizeof(port->dev_name), "net_tap_%s", tap_iface_name);
+  snprintf(port->dev_args, sizeof(port->dev_args), "iface=%s", tap_iface_name);
+  snprintf(port->dev_name, sizeof(port->dev_name), "net_tap_%s",
+           tap_iface_name);
   strncpy(port->iface_name, tap_iface_name, sizeof(port->iface_name) - 1);
   port->iface_name[sizeof(port->iface_name) - 1] = '\0';
   port->mbuf_pool = mbuf_pool;
@@ -59,9 +60,8 @@ struct net_port *init_struct_tap_port(const char *tap_iface_name,
   return port;
 }
 
-
 struct net_port *init_struct_af_xdp_port(const char *iface_name,
-                                            struct rte_mempool *mbuf_pool) {
+                                         struct rte_mempool *mbuf_pool) {
   struct net_port *port = calloc(1, sizeof(struct net_port));
   if (!port) {
     printf("[ERROR] Failed to allocate memory for struct net_port\n");

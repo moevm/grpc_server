@@ -6,15 +6,12 @@
 #include <rte_hash.h>
 #include <rte_jhash.h>
 #include <rte_malloc.h>
+#include <sqlite3.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <sqlite3.h>
 
 #include "../../include/dpdk_filter/constants.h"
 #include "../../include/dpdk_filter/types.h"
-
-
-
 
 void init_dns_cache(void);
 int lookup_dns_cache(const char *domain, struct node_cache **return_node);

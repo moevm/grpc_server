@@ -1,5 +1,5 @@
-#include "../../include/dpdk_filter/net_port.h"
 #include "../../include/dpdk_filter/dns_cache.h"
+#include "../../include/dpdk_filter/net_port.h"
 #include "../../include/dpdk_filter/proc_packets.h"
 #include <rte_eal.h>
 #include <rte_ethdev.h>
@@ -18,21 +18,24 @@ static void signal_handler(int signum) {
   }
 }
 
-void forward_to_out(struct net_port *incoming_port, struct net_port *outgoing_port, uint16_t queue_number) {
-    struct rte_mbuf *tap_pkts[32];
-    uint16_t nb_tap = rte_eth_rx_burst(incoming_port->port_id, queue_number, tap_pkts, 32);
-    for (int i = 0; i < nb_tap; i++) {
-        int ret = rte_eth_tx_burst(outgoing_port->port_id, queue_number, &tap_pkts[i], 1);
-        if (ret < 1) {
-          printf("[ERROR] Failed to send packet\n");
-          // PLUG (to be added later) - need to add processing for this case
-          rte_pktmbuf_free(tap_pkts[i]);
-        }
+void forward_to_out(struct net_port *incoming_port,
+                    struct net_port *outgoing_port, uint16_t queue_number) {
+  struct rte_mbuf *tap_pkts[32];
+  uint16_t nb_tap =
+      rte_eth_rx_burst(incoming_port->port_id, queue_number, tap_pkts, 32);
+  for (int i = 0; i < nb_tap; i++) {
+    int ret =
+        rte_eth_tx_burst(outgoing_port->port_id, queue_number, &tap_pkts[i], 1);
+    if (ret < 1) {
+      printf("[ERROR] Failed to send packet\n");
+      // PLUG (to be added later) - need to add processing for this case
+      rte_pktmbuf_free(tap_pkts[i]);
     }
+  }
 }
 
 int main(int argc, char **argv) {
-  //since BASE_POLICY is filled when initializing worker, let’s initialize here
+  // since BASE_POLICY is filled when initializing worker, let’s initialize here
   struct BASE_POLICY policy;
   if (signal(SIGINT, signal_handler) == SIG_ERR) {
     printf("[ERROR] Failed to set SIGINT handler\n");
@@ -42,8 +45,6 @@ int main(int argc, char **argv) {
     printf("[ERROR] Failed to set SIGTERM handler\n");
     return 1;
   }
-
-  
 
   struct net_port *port_in = NULL;
   struct net_port *port_out = NULL;
@@ -83,24 +84,23 @@ int main(int argc, char **argv) {
 
   port_exception = init_struct_tap_port("tap0", mbuf_pool);
 
-
   if (!port_in || !port_out || !port_exception) {
     return 1;
   }
 
-  if (net_port_init(port_in) || net_port_init(port_out) || net_port_init(port_exception)) {
+  if (net_port_init(port_in) || net_port_init(port_out) ||
+      net_port_init(port_exception)) {
     return 1;
   }
 
-  if (net_port_start(port_in->port_id) ||
-      net_port_start(port_out->port_id) ||
+  if (net_port_start(port_in->port_id) || net_port_start(port_out->port_id) ||
       net_port_start(port_exception->port_id)) {
     return 1;
   }
 
   ret = system("sudo ip link set tap0 up && "
-                    "sudo ip addr add 10.0.3.1/24 dev tap0");
-  if(ret) {
+               "sudo ip addr add 10.0.3.1/24 dev tap0");
+  if (ret) {
     printf("[ERROR] Failed to set tap0 up\n");
   }
 
@@ -110,7 +110,8 @@ int main(int argc, char **argv) {
 
   while (running) {
     forward_to_out(port_exception, port_in, queue_number);
-    pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts, pkts, &policy);
+    pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts,
+                      pkts, &policy);
     forward_to_out(port_out, port_in, queue_number);
   }
 
