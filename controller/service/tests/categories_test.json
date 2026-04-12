@@ -1,0 +1,36 @@
+{
+  "categories": [
+    {
+      "id": 1,
+      "name": "Advertising",
+      "risk_level": 4,
+      "description": "Sites with advertisements, banners, pop-ups",
+      "mappings": {
+        "kaspersky": ["Advertisements"],
+        "virustotal": ["advertising"]
+      }
+    },
+    {
+      "id": 2,
+      "name": "Alcohol and Tobacco",
+      "risk_level": 2,
+      "description": "Sale and promotion of alcohol and tobacco products",
+      "mappings": {
+        "kaspersky": ["Alcohol", "Tobacco"],
+        "virustotal": ["alcohol", "tobacco", "smoking"],
+        "skydns": ["6"]
+      }
+    },
+    {
+      "id": 3,
+      "name": "Anonymizers",
+      "risk_level": 5,
+      "description": "Sites for anonymous browsing, bypassing blocks",
+      "mappings": {
+        "kaspersky": ["Anonymizers", "Proxy"],
+        "virustotal": ["anonymizer", "proxy", "vpn"],
+        "skydns": []
+      }
+    }
+  ]
+}
