@@ -6,8 +6,6 @@
 #include "pars_packets.h"
 #include <rte_mbuf.h>
 #include <stdint.h>
-#include "../../include/dpdk_filter/constants.h"
-#include "../../include/dpdk_filter/types.h"
 
 bool check_is_block(char domain[DOMAIN_MAX_LEN],
                     char block_domains[MAX_DOMAINS][DOMAIN_MAX_LEN]);
