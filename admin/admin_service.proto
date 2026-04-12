@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package admin_service;
+
+option go_package = "github.com/moevm/grpc_server/pkg/proto/admin_service";
+
+service AdminService {
+    rpc LoadConfig(LoadConfigRequest) returns (LoadConfigResponse) {}
+}
+
+message LoadConfigRequest {
+    bytes config_data = 1;
+}
+
+message LoadConfigResponse {
+    bool success = 1;
+    string error_message = 2;
+}

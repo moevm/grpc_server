@@ -7,18 +7,23 @@ import (
 	"github.com/moevm/grpc_server/internal/config"
 	"github.com/moevm/grpc_server/internal/grpcserver"
 	"github.com/moevm/grpc_server/internal/manager"
-	pb "github.com/moevm/grpc_server/pkg/proto/file_service"
+	adminPb "github.com/moevm/grpc_server/pkg/proto/admin_service"
+	commPb "github.com/moevm/grpc_server/pkg/proto/communication"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
 func main() {
 	cfg := config.Load()
-
+	adminServer := grpcserver.NewAdminServer()
 	mgr, err := manager.NewManager()
 	if err != nil {
 		log.Fatalf("manager.NewManager(): %v", err)
 	}
+
+	adminServer.SetManager(mgr)
+
+	dataServer := grpcserver.NewDataServer(mgr)
 
 	lis, err := net.Listen("tcp", net.JoinHostPort(cfg.Host, cfg.Port))
 	if err != nil {
@@ -31,7 +36,8 @@ func main() {
 	}
 
 	service := grpc.NewServer(serverOpts...)
-	pb.RegisterFileServiceServer(service, grpcserver.NewServer(cfg.AllowedChars, mgr))
+	adminPb.RegisterAdminServiceServer(service, adminServer)
+	commPb.RegisterDataServiceServer(service, dataServer)
 	reflection.Register(service)
 
 	log.Printf("Server starting on %s:%s", cfg.Host, cfg.Port)
