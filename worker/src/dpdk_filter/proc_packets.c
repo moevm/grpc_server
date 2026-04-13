@@ -20,7 +20,6 @@ void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
   rte_pktmbuf_free(pkt);
 }
 
-
 bool check_is_exception(uint16_t number_port) {
   for (int i = 0; i < LEN_LIST_EXCEPTION_PORTS; i++) {
     if (number_port == LIST_EXCEPTION_PORTS[i]) {
@@ -30,10 +29,10 @@ bool check_is_exception(uint16_t number_port) {
   return false;
 }
 
-
-void pakage_processing(struct net_port *port_in,
-                       struct net_port *port_out, struct net_port *port_exception, uint16_t queue_number,
-                       uint16_t nb_pkts, struct rte_mbuf **pkts, struct BASE_POLICY* policy) {
+void pakage_processing(struct net_port *port_in, struct net_port *port_out,
+                       struct net_port *port_exception, uint16_t queue_number,
+                       uint16_t nb_pkts, struct rte_mbuf **pkts,
+                       struct BASE_POLICY *policy) {
 
   uint16_t nb_rx =
       rte_eth_rx_burst(port_in->port_id, queue_number, pkts, nb_pkts);
@@ -51,7 +50,7 @@ void pakage_processing(struct net_port *port_in,
       continue;
     }
 
-    if(check_is_exception(info_pac.number_port) == true) {
+    if (check_is_exception(info_pac.number_port) == true) {
       package_sending_decision(true, pkts[i], port_exception, queue_number);
       continue;
     }
