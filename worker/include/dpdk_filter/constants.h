@@ -1,6 +1,7 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
+#include <stdint.h>
 
 #define MAX_CATEGORIES_BY_TRUST_LVL 64
 #define MAX_DOMAINS 64
@@ -10,6 +11,6 @@
 #define CATEGORY_MAX_LEN 64
 #define DNS_CACHE_DEFAULT_TTL (7 * 24 * 60 * 60)
 #define LEN_LIST_EXCEPTION_PORTS 1
-extern const uint16_t  LIST_EXCEPTION_PORTS[LEN_LIST_EXCEPTION_PORTS];
+extern const uint16_t LIST_EXCEPTION_PORTS[LEN_LIST_EXCEPTION_PORTS];
 
 #endif
