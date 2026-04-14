@@ -98,7 +98,6 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-
   printf("An endless cycle has been started. Packets pass from port with id=%u "
          "to port with id=%u\n",
          port_in->port_id, port_out->port_id);
