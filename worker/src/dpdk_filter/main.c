@@ -98,9 +98,6 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  if (ret) {
-    printf("[ERROR] Failed to set tap0 up\n");
-  }
 
   printf("An endless cycle has been started. Packets pass from port with id=%u "
          "to port with id=%u\n",
