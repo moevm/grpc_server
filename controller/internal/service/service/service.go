@@ -77,7 +77,7 @@ func (s *Service) Check(checkValue string, endpointName string) ([]int, error) {
 			continue
 		}
 
-		resp.Body.Close()
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			log.Printf("Provider %s returned %s", providerName, resp.Status)

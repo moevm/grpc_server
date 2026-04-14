@@ -34,7 +34,7 @@ var testCategories = models.CategoryList{
 }
 
 func TestCategoryLoadFromFile(t *testing.T) {
-	filename := "categories_test.json"
+	filename := "../config/categories.json"
 	list := models.CategoryList{}
 
 	err := list.LoadFromFile(filename)
