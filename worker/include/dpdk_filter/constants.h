@@ -1,7 +1,7 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-#include <stdint.h> 
+#include <stdint.h>
 
 #define MAX_CATEGORIES_BY_TRUST_LVL 64
 #define MAX_DOMAINS 64
