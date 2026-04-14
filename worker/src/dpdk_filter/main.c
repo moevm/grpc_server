@@ -98,8 +98,6 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  ret = system("sudo ip link set tap0 up && "
-               "sudo ip addr add 10.0.3.1/24 dev tap0");
   if (ret) {
     printf("[ERROR] Failed to set tap0 up\n");
   }
@@ -108,14 +106,22 @@ int main(int argc, char **argv) {
          "to port with id=%u\n",
          port_in->port_id, port_out->port_id);
 
+  uint64_t timer_check_counter = 0;
+  const uint64_t timer_check_interval = 10000;
+
   while (running) {
     forward_to_out(port_exception, port_in, queue_number);
     pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts,
                       pkts, &policy);
     forward_to_out(port_out, port_in, queue_number);
+
+    if (++timer_check_counter >= timer_check_interval) {
+      rte_timer_manage();
+      timer_check_counter = 0;
+    }
   }
 
-  // function for save cache info if need
+  save_all_cache_to_sqlite();
   free_dns_cache();
 
   net_port_close(port_in);

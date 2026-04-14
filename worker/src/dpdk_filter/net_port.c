@@ -49,7 +49,8 @@ struct net_port *init_struct_tap_port(const char *tap_iface_name,
     return NULL;
   }
 
-  snprintf(port->dev_args, sizeof(port->dev_args), "iface=%s", tap_iface_name);
+  snprintf(port->dev_args, sizeof(port->dev_args), "iface=%s, remote=%s",
+           tap_iface_name, tap_iface_name);
   snprintf(port->dev_name, sizeof(port->dev_name), "net_tap_%s",
            tap_iface_name);
   strncpy(port->iface_name, tap_iface_name, sizeof(port->iface_name) - 1);
