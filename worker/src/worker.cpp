@@ -82,11 +82,6 @@ void Worker::initDPDK(int argc, char **argv) {
     throw std::runtime_error("Start ports");
   }
 
-  int tap_ret = system(
-      "sudo ip link set tap0 up && sudo ip addr add 10.0.3.1/24 dev tap0");
-  if (tap_ret)
-    spdlog::warn("Failed to configure tap0");
-
   init_dns_cache();
 
   spdlog::info("DPDK initialized: in_port={}, out_port={}", port_in->port_id,

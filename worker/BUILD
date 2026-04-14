@@ -102,6 +102,8 @@ cc_binary(
         "-lrte_log",
         "-lrte_net",
         "-lrte_hash", 
+        "-lrte_timer",      
+        "-lsqlite3",        
         
         "-lnuma",
         "-ldl",
