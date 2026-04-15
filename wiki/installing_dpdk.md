@@ -13,3 +13,25 @@ ninja -C build
 sudo ninja -C build install
 sudo ldconfig
 ```
+
+## Environment
+The `worker/scripts/setup-riscv-env.sh` script automatically downloads (if necessary) and builds DPDK 23.11 for the RISC-V architecture.
+
+```bash
+./worker/scripts/setup-riscv-env.sh
+```
+
+## SQLite
+If the target architecture is RISC-V, SQLite must be built with a cross compiler.
+
+```bash
+wget https://www.sqlite.org/2024/sqlite-autoconf-3460100.tar.gz
+tar -xzf sqlite-autoconf-3460100.tar.gz
+cd sqlite-autoconf-3460100
+
+./configure --host=riscv64-linux-gnu --prefix=/path/to/sqlite3-riscv-install
+make -j$(nproc)
+make install
+```
+
+After installation, the subdirectories include/ and lib/ with the necessary files will appear in the specified prefix.
