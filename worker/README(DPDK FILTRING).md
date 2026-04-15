@@ -1,80 +1,51 @@
-# Драйвера dpdk
-DPDK должен быть собран с  драйверами net/af_xdp net/tap
-
-
-# Кросс-компиляция 
-
-## Окружение
-Скрипт `scripts/setup-riscv-env.sh` автоматически скачивает (при необходимости) и собирает DPDK 23.11 для архитектуры RISC-V.
-
-```bash
-./scripts/setup-riscv-env.sh
-```
-
-## SQLite
-Если целевая архитектура — RISC-V, SQLite необходимо собрать кросс-компилятором.
-
-```bash
-wget https://www.sqlite.org/2024/sqlite-autoconf-3460100.tar.gz
-tar -xzf sqlite-autoconf-3460100.tar.gz
-cd sqlite-autoconf-3460100
-
-./configure --host=riscv64-linux-gnu --prefix=/path/to/sqlite3-riscv-install
-make -j$(nproc)
-make install
-```
-
-После установки в указанном prefix появятся подкаталоги include/ и lib/ с необходимыми файлами.
+# installing_dpdk.md
+Setting up the environment for cross-compilation and installing dpdk is described in "installing_dpdk.md" on the wiki.
 
 
 
-# Создание пары veth и TAP-устройства
+# Create a pair of veth and TAP device
 
 ```bash
 sudo ./scripts/set_virt_dev_for_test_xdp.sh
 ```
-Скрипт создаёт пару veth0 - veth1
-
+The script creates a pair veth0 - veth1
 
 ```bash
 sudo ./scripts/set_tap_dev.sh
 ```
-Скрипт создаёт TAP-устройство tap0
+The script creates a TAP device tap0
 
 
-
-# Сборка проекта
-Для реальных портов (eth0/eth1):
+# Project assembly
+For real ports (eth0/eth1 + tap0):
 ```bash
 make -f Makefile.main_riscv all
 ```
 
-Для виртуальных портов (veth0/veth1 + tap0):
+For virtual ports (veth0/veth1 + tap0):
 ```bash
 make -f Makefile.main_riscv virt
 ```
-Определение макроса -DVIRT_PORTS переключает программу на использование виртуальных интерфейсов.
+Defining the -DVIRT_PORTS macro switches the program to use virtual interfaces.
 
-
-Перед запуском рекомендуется выполнить скрипт настройки виртуальных устройств:
+Before starting, it is recommended to run the virtual device configuration script:
 ```bash
 sudo ./scripts/set_virt_dev_for_test_xdp.sh
 ```
 
 
-# Очистка
+# Clean
 ```bash
 make -f Makefile.main_riscv clean
 ```
 
-# Запуск
-Программа требует прав суперпользователя (для работы с DPDK и XDP):
+# Launch
+The program requires superuser rights (to work with DPDK and XDP):
 ```bash
 sudo ./main-riscv-virt
 ```
 
 
-# Примечания
-Кэш DNS автоматически сохраняется в cache.db (SQLite) и восстанавливается при перезапуске.
-
-Периодическое сохранение кэша происходит каждый час с помощью таймеров DPDK.
+# Notes
+The DNS cache is automatically saved to cache.db (SQLite) and restored on restart.
+Periodic saving of the cache occurs every hour using DPDK timers.
