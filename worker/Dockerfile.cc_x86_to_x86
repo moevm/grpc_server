@@ -1,4 +1,4 @@
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:22.04
 
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -16,16 +16,21 @@ RUN apt-get update && apt-get install -y \
     libnuma-dev \
     pkg-config \
     libcurl4-openssl-dev \
-    libbpf-dev \          
+    libbpf-dev \
     gcc \
     g++ \
     m4 \
     libpcap-dev \
     libsqlite3-dev \
+    libstdc++6 \
+    libgcc-s1 \
+    libssl3 \
+    libcurl4 \
+    numactl \
+    sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install pyelftools
-
 
 RUN wget https://github.com/bazelbuild/bazel/releases/download/8.2.1/bazel-8.2.1-linux-x86_64 \
     && chmod +x bazel-8.2.1-linux-x86_64 \
@@ -53,20 +58,10 @@ COPY ./communication.proto ./
 COPY ./toolchains ./toolchains
 COPY ./platforms ./platforms
 
-
-RUN bazel build //:worker 
-FROM ubuntu:22.04
-
-RUN apt-get update && apt-get install -y \
-    libstdc++6 \
-    libgcc-s1 \
-    libssl3 \
-    libcurl4 \
-    libprotobuf-dev \
-    numactl \
-    sqlite3 \
-    && rm -rf /var/lib/apt/lists/*
+RUN bazel build //:worker
 
 WORKDIR /data
 
-ENTRYPOINT ["/usr/local/bin/worker"]
+RUN ldconfig
+
+ENTRYPOINT ["/app/bazel-bin/worker"]
