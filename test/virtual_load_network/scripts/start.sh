@@ -12,48 +12,199 @@ if [ -f .env ]; then
     set +a
 fi
 
-NUM_HOSTS="${NUM_HOSTS:-3}"
-SUBNET="${SUBNET:-10.0.0}"
-GATEWAY="${GATEWAY:-10.0.0.254}"
+SUBNET1="${SUBNET1:-10.0.0}"
+SUBNET2="${SUBNET2:-10.0.1}"
+INET_SUBNET="${INET_SUBNET:-10.0.3}"
+BRIDGE1="${BRIDGE1:-br-testnet1}"
+BRIDGE2="${BRIDGE2:-br-testnet2}"
+INET_BRIDGE="${INET_BRIDGE:-br-inet}"
+MGMT_SUBNET="${MGMT_SUBNET:-10.0.2}"
+MGMT_BRIDGE="${MGMT_BRIDGE:-br-mgmt}"
 HUGEPAGES="${HUGEPAGES:-1024}"
-FILTER_PATH="${FILTER_PATH:-../../worker/main-x86-virt}"
-BRIDGE_IFACE="${BRIDGE_IFACE:-br-testnet}"
+QEMU_IMAGE="${QEMU_IMAGE:-ubuntu-24.04.4-preinstalled-server-riscv64.img}"
+QEMU_MEMORY="${QEMU_MEMORY:-4G}"
+QEMU_CPUS="${QEMU_CPUS:-2}"
+FILTER_RISCV_BIN="${FILTER_RISCV_BIN:-../../worker/main-riscv}"
+CONTROLLER_BIN="${CONTROLLER_BIN:-../../controller/bin/grpc_server}"
+FILTER1_MAC="52:54:00:f1:00:01"
+FILTER2_MAC="52:54:00:f2:00:01"
 
 "$SCRIPT_DIR/stop.sh" 2>/dev/null || true
 
-sysctl -w vm.drop_caches=3 > /dev/null
-echo "$HUGEPAGES" > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+sysctl -w vm.drop_caches=3 >/dev/null
+echo "$HUGEPAGES" >/sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
 
 docker compose up -d --build
 
-for i in $(seq 1 10); do
-    ip link show "$BRIDGE_IFACE" &>/dev/null && break
-    sleep 0.5
+for BRIDGE in "$BRIDGE1" "$BRIDGE2"; do
+    for i in $(seq 1 10); do
+        ip link show "$BRIDGE" &>/dev/null && break
+        sleep 0.5
+    done
+    if ! ip link show "$BRIDGE" &>/dev/null; then
+        echo "Bridge $BRIDGE not found"
+        exit 1
+    fi
 done
 
-if ! ip link show "$BRIDGE_IFACE" &>/dev/null; then
-    echo "Bridge interface $BRIDGE_IFACE not found"
-    exit 1
+sysctl -w net.ipv4.ip_forward=1 >/dev/null
+
+ip link add "$INET_BRIDGE" type bridge 2>/dev/null || true
+ip link set "$INET_BRIDGE" up
+ip addr add "${INET_SUBNET}.254/24" dev "$INET_BRIDGE" 2>/dev/null || true
+
+iptables -t nat -A POSTROUTING -s ${INET_SUBNET}.0/24 ! -d ${INET_SUBNET}.0/24 -j MASQUERADE
+iptables -I FORWARD -i "$INET_BRIDGE" -j ACCEPT
+iptables -I FORWARD -o "$INET_BRIDGE" -j ACCEPT
+
+ip link add "$MGMT_BRIDGE" type bridge 2>/dev/null || true
+ip link set "$MGMT_BRIDGE" up
+ip addr add "${MGMT_SUBNET}.254/24" dev "$MGMT_BRIDGE" 2>/dev/null || true
+
+SHARED_DIR="$PROJECT_DIR/shared"
+mkdir -p "$SHARED_DIR"
+
+if [ -f "$FILTER_RISCV_BIN" ]; then
+    cp "$FILTER_RISCV_BIN" "$SHARED_DIR/filter"
+fi
+if [ -f "$CONTROLLER_BIN" ]; then
+    cp "$CONTROLLER_BIN" "$SHARED_DIR/controller"
 fi
 
-ip link delete veth0 2>/dev/null || true
-ip link add veth0 type veth peer name veth1
-ip link set veth0 up
-ip link set veth1 up
-
-tc qdisc add dev "$BRIDGE_IFACE" clsact
-tc filter add dev "$BRIDGE_IFACE" egress matchall action mirred egress mirror dev veth1
-tc filter add dev "$BRIDGE_IFACE" ingress matchall action mirred egress mirror dev veth1
-
-sysctl -w net.ipv4.ip_forward=1 > /dev/null
-iptables -t nat -A POSTROUTING -s ${SUBNET}.0/24 ! -d ${SUBNET}.0/24 -j MASQUERADE
-iptables -I FORWARD -i "$BRIDGE_IFACE" -j ACCEPT
-iptables -I FORWARD -o "$BRIDGE_IFACE" -j ACCEPT
-
-if [ ! -x "$FILTER_PATH" ]; then
-    echo "Filter binary not found: $FILTER_PATH"
-    echo "Build: cd worker && make -f Makefile.main_x86 virt"
-    exit 1
+DPDK_SYSROOT="$PROJECT_DIR/../../worker/dpdk-riscv-install"
+if [ -d "$DPDK_SYSROOT/lib" ]; then
+    mkdir -p "$SHARED_DIR/lib/bpf"
+    cp "$DPDK_SYSROOT"/lib/*.so* "$SHARED_DIR/lib/"
+    cp "$DPDK_SYSROOT"/lib/bpf/*.o "$SHARED_DIR/lib/bpf/" 2>/dev/null || true
+fi
+LIBXDP_DEB="libxdp1_1.4.2-1ubuntu4_riscv64.deb"
+if [ ! -f "$SHARED_DIR/$LIBXDP_DEB" ]; then
+    wget -q -P "$SHARED_DIR" "http://ports.ubuntu.com/ubuntu-ports/pool/main/x/xdp-tools/$LIBXDP_DEB"
 fi
 
-LD_LIBRARY_PATH=/usr/local/lib exec "$FILTER_PATH" --no-pci --
+mkdir -p "$SHARED_DIR/internal/service/config"
+cp ../../controller/internal/service/config/categories.json "$SHARED_DIR/internal/service/config/"
+cp ../../controller/internal/service/config/providers.json "$SHARED_DIR/internal/service/config/"
+if [ -d "$PROJECT_DIR/configs" ]; then
+    cp -r "$PROJECT_DIR/configs" "$SHARED_DIR/"
+fi
+
+gen_cloud_init_iso() {
+    local VM_NAME="$1"
+    local VM_TYPE="$2"
+    local MGMT_IP="$3"
+    local GATEWAY_IP="${4:-}"
+    local CI_DIR="$PROJECT_DIR/cloud-init-${VM_NAME}"
+    local CI_TMPL="$PROJECT_DIR/configs/cloud-init"
+
+    mkdir -p "$CI_DIR"
+    sed "s/VM_NAME/${VM_NAME}/g" "$CI_TMPL/meta-data" > "$CI_DIR/meta-data"
+    sed "s/VM_NAME/${VM_NAME}/g" "$CI_TMPL/${VM_TYPE}-user-data" > "$CI_DIR/user-data"
+    sed -e "s/MGMT_IP/${MGMT_IP}/g" -e "s/GATEWAY_IP/${GATEWAY_IP}/g" \
+        "$CI_TMPL/${VM_TYPE}-network-config" > "$CI_DIR/network-config"
+
+    mkisofs -o "$PROJECT_DIR/cloud-init-${VM_NAME}.iso" \
+        -V cidata -J -r "$CI_DIR" > /dev/null 2>&1
+
+    rm -rf "$CI_DIR"
+}
+
+start_controller() {
+    qemu-system-riscv64 \
+        -machine virt,acpi=off -m "$QEMU_MEMORY" -smp cpus="$QEMU_CPUS" \
+        -display none -serial "file:/tmp/qemu-controller.log" \
+        -name "controller" \
+        -pidfile "/tmp/qemu-controller.pid" \
+        -kernel /usr/lib/u-boot/qemu-riscv64_smode/uboot.elf \
+        -netdev tap,id=net0,ifname="tap-ctrl",script=no,downscript=no \
+        -device virtio-net-device,netdev=net0 \
+        -device virtio-rng-pci \
+        -drive "file=${CTRL_OVERLAY},format=qcow2,if=virtio" \
+        -drive "file=$PROJECT_DIR/cloud-init-controller.iso,format=raw,if=virtio" \
+        -virtfs "local,path=$SHARED_DIR,mount_tag=host_share,security_model=mapped-xattr" \
+        -daemonize ||
+        {
+            echo "Failed to start controller"
+            exit 1
+        }
+}
+
+start_filter_vm() {
+    local VM_NAME="$1"
+    local TAP_IN="$2"
+    local TAP_OUT="$3"
+    local TAP_MGMT="$4"
+    local BRIDGE_IN="$5"
+    local MGMT_IP="$6"
+    local ETH0_MAC="$7"
+
+    local OVERLAY="$PROJECT_DIR/${VM_NAME}.qcow2"
+    if [ ! -f "$OVERLAY" ]; then
+        qemu-img create -f qcow2 -b "$(realpath "$QEMU_IMAGE")" -F raw "$OVERLAY" >/dev/null
+        gen_cloud_init_iso "$VM_NAME" "filter" "$MGMT_IP"
+    fi
+
+    ip tuntap add dev "$TAP_IN" mode tap 2>/dev/null || true
+    ip link set "$TAP_IN" master "$BRIDGE_IN"
+    ip link set "$TAP_IN" up
+
+    ip tuntap add dev "$TAP_OUT" mode tap 2>/dev/null || true
+    ip link set "$TAP_OUT" master "$INET_BRIDGE"
+    ip link set "$TAP_OUT" up
+
+    ip tuntap add dev "$TAP_MGMT" mode tap 2>/dev/null || true
+    ip link set "$TAP_MGMT" master "$MGMT_BRIDGE"
+    ip link set "$TAP_MGMT" up
+
+    qemu-system-riscv64 \
+        -machine virt,acpi=off -m "$QEMU_MEMORY" -smp cpus="$QEMU_CPUS" \
+        -display none -serial "file:/tmp/qemu-${VM_NAME}.log" \
+        -name "$VM_NAME" \
+        -pidfile "/tmp/qemu-${VM_NAME}.pid" \
+        -kernel /usr/lib/u-boot/qemu-riscv64_smode/uboot.elf \
+        -netdev tap,id=net0,ifname="$TAP_IN",script=no,downscript=no \
+        -device virtio-net-device,netdev=net0,mac="$ETH0_MAC" \
+        -netdev tap,id=net1,ifname="$TAP_OUT",script=no,downscript=no \
+        -device virtio-net-device,netdev=net1 \
+        -netdev tap,id=net2,ifname="$TAP_MGMT",script=no,downscript=no \
+        -device virtio-net-device,netdev=net2 \
+        -device virtio-rng-pci \
+        -drive "file=${OVERLAY},format=qcow2,if=virtio" \
+        -drive "file=$PROJECT_DIR/cloud-init-${VM_NAME}.iso,format=raw,if=virtio" \
+        -virtfs "local,path=$SHARED_DIR,mount_tag=host_share,security_model=mapped-xattr" \
+        -daemonize ||
+        {
+            echo "Failed to start $VM_NAME"
+            exit 1
+        }
+}
+
+start_filter_vm "filter1" "tap-f1-in" "tap-f1-out" "tap-f1-mgmt" "$BRIDGE1" "${MGMT_SUBNET}.1" "$FILTER1_MAC"
+start_filter_vm "filter2" "tap-f2-in" "tap-f2-out" "tap-f2-mgmt" "$BRIDGE2" "${MGMT_SUBNET}.2" "$FILTER2_MAC"
+
+for SVC in $(docker compose ps -q 2>/dev/null); do
+    docker exec "$SVC" ip neigh flush all 2>/dev/null || true
+done
+for SVC in $(docker compose -p "$(basename "$PROJECT_DIR")" ps --format '{{.Name}}' 2>/dev/null | grep "gen-1"); do
+    docker exec "$SVC" arp -s "${SUBNET1}.254" "$FILTER1_MAC" 2>/dev/null || true
+done
+for SVC in $(docker compose -p "$(basename "$PROJECT_DIR")" ps --format '{{.Name}}' 2>/dev/null | grep "gen-2"); do
+    docker exec "$SVC" arp -s "${SUBNET2}.254" "$FILTER2_MAC" 2>/dev/null || true
+done
+
+CTRL_OVERLAY="$PROJECT_DIR/controller.qcow2"
+if [ ! -f "$CTRL_OVERLAY" ]; then
+    qemu-img create -f qcow2 -b "$(realpath "$QEMU_IMAGE")" -F raw "$CTRL_OVERLAY" >/dev/null
+    gen_cloud_init_iso "controller" "controller" "${MGMT_SUBNET}.3"
+fi
+
+ip tuntap add dev "tap-ctrl" mode tap 2>/dev/null || true
+ip link set "tap-ctrl" master "$MGMT_BRIDGE"
+ip link set "tap-ctrl" up
+
+start_controller
+
+echo "Test stand is running"
+echo "  Filter VMs: filter1 (pid $(cat /tmp/qemu-filter1.pid 2>/dev/null)), filter2 (pid $(cat /tmp/qemu-filter2.pid 2>/dev/null))"
+echo "  Controller: pid $(cat /tmp/qemu-controller.pid 2>/dev/null)"
+echo "  Traffic generators: $(docker compose ps --format '{{.Name}}' | wc -l) containers"

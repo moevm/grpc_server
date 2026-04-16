@@ -1,0 +1,10 @@
+#cloud-config
+password: ubuntu
+chpasswd:
+  expire: false
+ssh_pwauth: true
+mounts:
+  - ["host_share", "/mnt", "9p", "trans=virtio,version=9p2000.L,cache=none", "0", "0"]
+runcmd:
+  - echo 256 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+  - dpkg -i /mnt/libxdp1_1.4.2-1ubuntu4_riscv64.deb

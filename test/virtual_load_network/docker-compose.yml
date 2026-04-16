@@ -1,25 +1,49 @@
 services:
-  traffic-gen:
+  traffic-gen-1:
     build:
       context: .
       dockerfile: Dockerfile.traffic-gen
     networks:
-      - testnet
+      - testnet1
     cap_add:
       - NET_ADMIN
     dns:
       - ${DNS:-8.8.8.8}
     deploy:
-      replicas: ${NUM_HOSTS:-3}
+      replicas: ${NUM_HOSTS_NET1:-2}
+    restart: unless-stopped
+
+  traffic-gen-2:
+    build:
+      context: .
+      dockerfile: Dockerfile.traffic-gen
+    networks:
+      - testnet2
+    cap_add:
+      - NET_ADMIN
+    dns:
+      - ${DNS:-8.8.8.8}
+    deploy:
+      replicas: ${NUM_HOSTS_NET2:-2}
     restart: unless-stopped
 
 networks:
-  testnet:
+  testnet1:
     driver: bridge
     driver_opts:
-      com.docker.network.bridge.name: "br-testnet"
+      com.docker.network.bridge.name: "br-testnet1"
       com.docker.network.bridge.enable_ip_masquerade: "false"
     ipam:
       config:
-        - subnet: ${SUBNET:-10.0.0}.0/24
-          gateway: ${GATEWAY:-10.0.0.254}
+        - subnet: ${SUBNET1:-10.0.0}.0/24
+          gateway: ${SUBNET1:-10.0.0}.254
+
+  testnet2:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: "br-testnet2"
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+    ipam:
+      config:
+        - subnet: ${SUBNET2:-10.0.1}.0/24
+          gateway: ${SUBNET2:-10.0.1}.254

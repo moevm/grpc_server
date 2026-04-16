@@ -1,0 +1,55 @@
+FROM --platform=linux/riscv64 ubuntu:24.04
+
+RUN apt update && apt install -y \
+    build-essential meson ninja-build python3-pyelftools \
+    libelf-dev libnuma-dev pkg-config git wget \
+    clang llvm m4 libpcap-dev libatomic1
+
+WORKDIR /tmp
+
+RUN git clone --depth 1 --branch v1.4.6 https://github.com/libbpf/libbpf.git && \
+    cd libbpf/src && make && \
+    make install PREFIX=/usr LIBDIR=/usr/lib/riscv64-linux-gnu && \
+    ldconfig && rm -rf /tmp/libbpf
+
+RUN git clone --depth 1 --branch v1.4.2 https://github.com/xdp-project/xdp-tools.git && \
+    cd xdp-tools && ./configure && make && \
+    make -C lib/libxdp install PREFIX=/usr LIBDIR=/usr/lib/riscv64-linux-gnu && \
+    ln -sf /usr/include/xdp/xsk.h /usr/include/bpf/xsk.h && \
+    ldconfig && rm -rf /tmp/xdp-tools
+
+RUN pkg-config --exists libbpf && echo "libbpf OK" && \
+    pkg-config --exists libxdp && echo "libxdp OK"
+
+RUN wget https://fast.dpdk.org/rel/dpdk-23.11.6.tar.xz && \
+    tar -xf dpdk-23.11.6.tar.xz && \
+    cd dpdk-stable-23.11.6 && \
+    meson setup -Denable_drivers=net/af_xdp,net/tap -Dmachine=generic build && \
+    ninja -C build && ninja -C build install && ldconfig && \
+    rm -rf /tmp/dpdk-*
+
+RUN mkdir -p /output/include /output/lib/pkgconfig /output/lib/bpf /output/runtime && \
+    cp /usr/lib/riscv64-linux-gnu/bpf/*.o /output/lib/bpf/ 2>/dev/null; \
+    cp -r /usr/local/include/* /output/include/ 2>/dev/null; \
+    cp -r /usr/include/bpf /output/include/ 2>/dev/null; \
+    cp -r /usr/include/xdp /output/include/ 2>/dev/null; \
+    for d in /usr/local/lib/riscv64-linux-gnu /usr/local/lib; do \
+        [ -f "$d/librte_eal.so" ] && { \
+            cp "$d"/librte_*.so* /output/lib/; \
+            cp "$d"/librte_*.a /output/lib/ 2>/dev/null; \
+            cp "$d"/pkgconfig/*.pc /output/lib/pkgconfig/ 2>/dev/null; \
+            cp "$d"/librte_*.so* /output/runtime/; \
+            break; \
+        }; \
+    done; \
+    for lib in libbpf libxdp libelf libnuma; do \
+        for d in /usr/lib/riscv64-linux-gnu /usr/lib /usr/local/lib; do \
+            ls "$d"/${lib}.so* &>/dev/null 2>&1 && { \
+                cp "$d"/${lib}.so* /output/lib/; \
+                cp "$d"/${lib}.a /output/lib/ 2>/dev/null; \
+                cp "$d"/${lib}.so* /output/runtime/; \
+                break; \
+            }; \
+        done; \
+    done; \
+    true

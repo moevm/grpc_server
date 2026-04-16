@@ -1,0 +1,15 @@
+[global.rules]
+block_categories = ["adult", "malware"]
+block_domains = ["example.com", "blocked-site.com"]
+allow_domains = ["google.com", "github.com"]
+min_trust_level = 50
+
+[global.rules.block_by_trust]
+dangerous = 10
+suspicious = 30
+
+[filters.filter_1]
+block_domains = ["extra-blocked.com"]
+
+[filters.filter_2]
+allow_domains = ["extra-allowed.com"]
