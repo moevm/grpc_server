@@ -10,8 +10,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Clear Bazel cache
+        working-directory: ./controller
         run: |
-          bazel clean --expunge
+          bazel clean --expunge || true
           rm -rf ~/.cache/bazel
 
       - name: Install Bazel via Bazelisk
@@ -29,5 +30,6 @@ jobs:
           bazel build --check_direct_dependencies=off //cmd/manager:manager
 
       - name: Test
+        working-directory: ./controller
         run: |
-          cd controller && bazel test --check_direct_dependencies=off --sandbox_writable_path=/run/controller --cache_test_results=no --test_arg=-test.v --test_output=streamed //...
+          bazel test --check_direct_dependencies=off --sandbox_writable_path=/run/controller --cache_test_results=no --test_arg=-test.v --test_output=streamed //...
