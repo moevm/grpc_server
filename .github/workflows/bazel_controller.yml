@@ -30,7 +30,6 @@ jobs:
         working-directory: ./controller
         run: |
           bazel build --check_direct_dependencies=off //cmd/grpc_server:grpc_server
-          bazel build --check_direct_dependencies=off //cmd/manager:manager
 
       - name: Test
         working-directory: ./controller
