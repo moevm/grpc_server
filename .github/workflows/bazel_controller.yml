@@ -9,29 +9,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Clear Bazel cache
-        working-directory: ./controller
-        run: |
-          bazel clean --expunge || true
-          rm -rf ~/.cache/bazel
-
-      - name: Install Bazel via Bazelisk
+      - name: Install Bazel 7.4.1
         run: |
           wget https://github.com/bazelbuild/bazel/releases/download/7.4.1/bazel-7.4.1-linux-x86_64
           chmod +x bazel-7.4.1-linux-x86_64
           sudo mv bazel-7.4.1-linux-x86_64 /usr/local/bin/bazel
-          bazel --version
-
 
       - name: Prepare socket directory
         run: sudo mkdir -p /run/controller/ && sudo chown runner:runner /run/controller/ && sudo chmod 755 /run/controller/
 
-      - name: Build Controller Components
+      - name: Build Controller
         working-directory: ./controller
+        run: bazel build --check_direct_dependencies=off //cmd/grpc_server:grpc_server
+
+      - name: Build Worker
+        working-directory: ./worker
         run: |
-          bazel build --check_direct_dependencies=off //cmd/grpc_server:grpc_server
+          make -f Makefile.main_x86
 
       - name: Test
         working-directory: ./controller
-        run: |
-          bazel test --check_direct_dependencies=off --sandbox_writable_path=/run/controller --cache_test_results=no --test_arg=-test.v --test_output=streamed //...
+        run: bazel test --check_direct_dependencies=off --sandbox_writable_path=/run/controller --test_output=streamed //...
