@@ -35,6 +35,8 @@ void forward_to_out(struct net_port *incoming_port,
 }
 
 int main(int argc, char **argv) {
+  // for test_stand disable bufferization
+  setvbuf(stdout, NULL, _IOLBF, 0);
   // since BASE_POLICY is filled when initializing worker, let’s initialize here
   struct BASE_POLICY policy;
   if (signal(SIGINT, signal_handler) == SIG_ERR) {

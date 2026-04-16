@@ -1,0 +1,10 @@
+version: 2
+ethernets:
+  eth0:
+    dhcp4: false
+  eth1:
+    dhcp4: false
+  eth2:
+    dhcp4: false
+    addresses:
+      - MGMT_IP/24
