@@ -44,6 +44,7 @@ void pakage_processing(struct net_port *port_in,
     memset(&info_pac, 0, sizeof(info_pac));
 
     parsing_pakage(pkts[i], &info_pac);
+    printf("[PKT] port = %hu; domain = %s\n", ntohs(info_pac.number_port), info_pac.domain);
     if (info_pac.domain[0] == '\0') {
       printf("[INFO] Packet without dns request\n");
       package_sending_decision(true, pkts[i], port_out, queue_number);
