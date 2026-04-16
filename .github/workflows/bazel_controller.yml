@@ -17,7 +17,7 @@ jobs:
 
       - name: Install Bazel via Bazelisk
         run: |
-          sudo curl -L https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+          sudo curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.19.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
           sudo chmod +x /usr/local/bin/bazel
 
       - name: Prepare socket directory
@@ -26,9 +26,9 @@ jobs:
       - name: Build Controller Components
         working-directory: ./controller
         run: |
-          bazel build //cmd/grpc_server:grpc_server
-          bazel build //cmd/manager:manager
+          bazel build --check_direct_dependencies=off //cmd/grpc_server:grpc_server
+          bazel build --check_direct_dependencies=off //cmd/manager:manager
 
       - name: Test
         run: |
-          cd controller && bazel test --sandbox_writable_path=/run/controller --cache_test_results=no --test_arg=-test.v --test_output=streamed //...
+          cd controller && bazel test --check_direct_dependencies=off --sandbox_writable_path=/run/controller --cache_test_results=no --test_arg=-test.v --test_output=streamed //...
