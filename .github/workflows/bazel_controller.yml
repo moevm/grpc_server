@@ -9,9 +9,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Clear Bazel cache
+        run: |
+          bazel clean --expunge
+          rm -rf ~/.cache/bazel
+
       - name: Install Bazel via Bazelisk
         run: |
-          sudo curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.19.0/bazelisk-linux-amd64 -o /usr/local/bin/bazel
+          sudo curl -L https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -o /usr/local/bin/bazel
           sudo chmod +x /usr/local/bin/bazel
 
       - name: Prepare socket directory
