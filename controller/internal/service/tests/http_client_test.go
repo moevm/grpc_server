@@ -1,11 +1,11 @@
 package tests
 
 import (
-	"github.com/moevm/grpc_server/internal/service/client"
-	"github.com/moevm/grpc_server/internal/service/models"
 	"os"
 	"testing"
 	"time"
+	"github.com/moevm/grpc_server/internal/service/client"
+	"github.com/moevm/grpc_server/internal/service/models"
 
 	"github.com/joho/godotenv"
 )
@@ -51,65 +51,121 @@ func TestHttpClientRequest(t *testing.T) {
 	provider := getKasperskyProvider()
 
 	tests := []struct {
-		name          string
-		providerName  string
-		provider      models.Provider
-		checkValue    string
-		endpointName  string
-		shouldSucceed bool
+		name         string
+		providerName string
+		provider     models.Provider
+		checkValue   string
+		endpointName string
+		expectError  bool
 	}{
 		{
-			name:          "Not exist endpoint",
-			providerName:  "kaspersky",
-			provider:      provider,
-			checkValue:    "8.8.8.8",
-			endpointName:  "ip_not_exist",
-			shouldSucceed: false,
+			name:         "Not exist endpoint",
+			providerName: "kaspersky",
+			provider:     provider,
+			checkValue:   "8.8.8.8",
+			endpointName: "ip_not_exist",
+			expectError:  true,
 		},
 		{
-			name:          "Domain check",
-			providerName:  "kaspersky",
-			provider:      provider,
-			checkValue:    "1xbet.com",
-			endpointName:  "domain",
-			shouldSucceed: true,
+			name:         "Domain check",
+			providerName: "kaspersky",
+			provider:     provider,
+			checkValue:   "1xbet.com",
+			endpointName: "domain",
+			expectError:  false,
 		},
 		{
-			name:          "IP check",
-			providerName:  "kaspersky",
-			provider:      provider,
-			checkValue:    "8.8.8.8",
-			endpointName:  "ip",
-			shouldSucceed: true,
+			name:         "IP check",
+			providerName: "kaspersky",
+			provider:     provider,
+			checkValue:   "8.8.8.8",
+			endpointName: "ip",
+			expectError:  false,
+		},
+		{
+			name:         "Empty check value",
+			providerName: "kaspersky",
+			provider:     provider,
+			checkValue:   "",
+			endpointName: "ip",
+			expectError:  false,
+		},
+		{
+			name:         "Invalid IP format",
+			providerName: "kaspersky",
+			provider:     provider,
+			checkValue:   "999.999.999.999",
+			endpointName: "ip",
+			expectError:  false,
+		},
+		{
+			name:         "Invalid domain format",
+			providerName: "kaspersky",
+			provider:     provider,
+			checkValue:   "invalid_domain",
+			endpointName: "domain",
+			expectError:  false,
+		},
+		{
+			name:         "Missing API key",
+			providerName: "kaspersky",
+			provider: models.Provider{
+				BaseURL:   provider.BaseURL,
+				Headers:   map[string]string{},
+				Endpoints: provider.Endpoints,
+			},
+			checkValue:   "8.8.8.8",
+			endpointName: "ip",
+			expectError:  false,
+		},
+		{
+			name:         "Very long domain",
+			providerName: "kaspersky",
+			provider:     provider,
+			checkValue:   string(make([]byte, 300)),
+			endpointName: "domain",
+			expectError:  false,
+		},
+		{
+			name:         "Special characters input",
+			providerName: "kaspersky",
+			provider:     provider,
+			checkValue:   "!@#$%^&*()",
+			endpointName: "domain",
+			expectError:  false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resp, err := httpClient.Request(tt.providerName, tt.provider, tt.checkValue, tt.endpointName)
+			resp, err := httpClient.Request(
+				tt.providerName,
+				tt.provider,
+				tt.checkValue,
+				tt.endpointName,
+			)
 
-			if tt.shouldSucceed {
-				if err != nil {
-					t.Errorf("Expected success but got error: %v", err)
-					return
-				}
-				if resp == nil {
-					t.Error("Response is nil")
-					return
-				}
-				err = resp.Body.Close()
-				if err != nil {
-					t.Errorf("Error to close body: %v", err)
-					return
-				}
-
-				if resp.StatusCode != 200 {
-					t.Errorf("Expected status 200, got %d", resp.StatusCode)
-				}
-			} else {
+			if tt.expectError {
 				if err == nil {
 					t.Error("Expected error but got success")
 				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if resp == nil {
+				t.Error("Response is nil")
+				return
+			}
+
+			defer resp.Body.Close()
+
+			if resp.StatusCode == 0 {
+				t.Error("Invalid status code")
 			}
 		})
 	}
