@@ -21,7 +21,10 @@ INET_BRIDGE="${INET_BRIDGE:-br-inet}"
 MGMT_SUBNET="${MGMT_SUBNET:-10.0.2}"
 MGMT_BRIDGE="${MGMT_BRIDGE:-br-mgmt}"
 HUGEPAGES="${HUGEPAGES:-1024}"
-QEMU_IMAGE="${QEMU_IMAGE:-ubuntu-24.04.4-preinstalled-server-riscv64.img}"
+YOCTO_DEPLOY_DIR="${YOCTO_DEPLOY_DIR:-/home/lespend/program/yadro/vm_build_risc_v/qemu/poky/build/tmp/deploy/images/qemuriscv64}"
+QEMU_ROOTFS="${QEMU_ROOTFS:-${YOCTO_DEPLOY_DIR}/cluster-image-qemuriscv64.rootfs.ext4}"
+QEMU_KERNEL="${QEMU_KERNEL:-${YOCTO_DEPLOY_DIR}/Image}"
+QEMU_BIOS="${QEMU_BIOS:-${YOCTO_DEPLOY_DIR}/fw_jump.elf}"
 QEMU_MEMORY="${QEMU_MEMORY:-4G}"
 QEMU_CPUS="${QEMU_CPUS:-2}"
 FILTER_RISCV_BIN="${FILTER_RISCV_BIN:-../../worker/main-riscv}"
@@ -61,6 +64,9 @@ ip link add "$MGMT_BRIDGE" type bridge 2>/dev/null || true
 ip link set "$MGMT_BRIDGE" up
 ip addr add "${MGMT_SUBNET}.254/24" dev "$MGMT_BRIDGE" 2>/dev/null || true
 
+iptables -I FORWARD -i "$MGMT_BRIDGE" -j ACCEPT
+iptables -I FORWARD -o "$MGMT_BRIDGE" -j ACCEPT
+
 SHARED_DIR="$PROJECT_DIR/shared"
 mkdir -p "$SHARED_DIR"
 
@@ -71,17 +77,6 @@ if [ -f "$CONTROLLER_BIN" ]; then
     cp "$CONTROLLER_BIN" "$SHARED_DIR/controller"
 fi
 
-DPDK_SYSROOT="$PROJECT_DIR/../../worker/dpdk-riscv-install"
-if [ -d "$DPDK_SYSROOT/lib" ]; then
-    mkdir -p "$SHARED_DIR/lib/bpf"
-    cp "$DPDK_SYSROOT"/lib/*.so* "$SHARED_DIR/lib/"
-    cp "$DPDK_SYSROOT"/lib/bpf/*.o "$SHARED_DIR/lib/bpf/" 2>/dev/null || true
-fi
-LIBXDP_DEB="libxdp1_1.4.2-1ubuntu4_riscv64.deb"
-if [ ! -f "$SHARED_DIR/$LIBXDP_DEB" ]; then
-    wget -q -P "$SHARED_DIR" "http://ports.ubuntu.com/ubuntu-ports/pool/main/x/xdp-tools/$LIBXDP_DEB"
-fi
-
 mkdir -p "$SHARED_DIR/internal/service/config"
 cp ../../controller/internal/service/config/categories.json "$SHARED_DIR/internal/service/config/"
 cp ../../controller/internal/service/config/providers.json "$SHARED_DIR/internal/service/config/"
@@ -89,38 +84,24 @@ if [ -d "$PROJECT_DIR/configs" ]; then
     cp -r "$PROJECT_DIR/configs" "$SHARED_DIR/"
 fi
 
-gen_cloud_init_iso() {
-    local VM_NAME="$1"
-    local VM_TYPE="$2"
-    local MGMT_IP="$3"
-    local GATEWAY_IP="${4:-}"
-    local CI_DIR="$PROJECT_DIR/cloud-init-${VM_NAME}"
-    local CI_TMPL="$PROJECT_DIR/configs/cloud-init"
-
-    mkdir -p "$CI_DIR"
-    sed "s/VM_NAME/${VM_NAME}/g" "$CI_TMPL/meta-data" > "$CI_DIR/meta-data"
-    sed "s/VM_NAME/${VM_NAME}/g" "$CI_TMPL/${VM_TYPE}-user-data" > "$CI_DIR/user-data"
-    sed -e "s/MGMT_IP/${MGMT_IP}/g" -e "s/GATEWAY_IP/${GATEWAY_IP}/g" \
-        "$CI_TMPL/${VM_TYPE}-network-config" > "$CI_DIR/network-config"
-
-    mkisofs -o "$PROJECT_DIR/cloud-init-${VM_NAME}.iso" \
-        -V cidata -J -r "$CI_DIR" > /dev/null 2>&1
-
-    rm -rf "$CI_DIR"
-}
-
 start_controller() {
+    local CTRL_OVERLAY="$PROJECT_DIR/controller.qcow2"
+    if [ ! -f "$CTRL_OVERLAY" ]; then
+        qemu-img create -f qcow2 -b "$QEMU_ROOTFS" -F raw "$CTRL_OVERLAY" >/dev/null
+    fi
+
     qemu-system-riscv64 \
-        -machine virt,acpi=off -m "$QEMU_MEMORY" -smp cpus="$QEMU_CPUS" \
+        -machine virt -m "$QEMU_MEMORY" -smp "$QEMU_CPUS" \
         -display none -serial "file:/tmp/qemu-controller.log" \
         -name "controller" \
         -pidfile "/tmp/qemu-controller.pid" \
-        -kernel /usr/lib/u-boot/qemu-riscv64_smode/uboot.elf \
+        -bios "$QEMU_BIOS" \
+        -kernel "$QEMU_KERNEL" \
+        -append "root=/dev/vda rw earlycon=sbi console=ttyS0 ip=${MGMT_SUBNET}.3::${MGMT_SUBNET}.254:255.255.255.0::eth0:off" \
         -netdev tap,id=net0,ifname="tap-ctrl",script=no,downscript=no \
         -device virtio-net-device,netdev=net0 \
-        -device virtio-rng-pci \
-        -drive "file=${CTRL_OVERLAY},format=qcow2,if=virtio" \
-        -drive "file=$PROJECT_DIR/cloud-init-controller.iso,format=raw,if=virtio" \
+        -object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 \
+        -drive "id=disk0,file=${CTRL_OVERLAY},format=qcow2,if=none" -device virtio-blk-device,drive=disk0 \
         -virtfs "local,path=$SHARED_DIR,mount_tag=host_share,security_model=mapped-xattr" \
         -daemonize ||
         {
@@ -140,8 +121,7 @@ start_filter_vm() {
 
     local OVERLAY="$PROJECT_DIR/${VM_NAME}.qcow2"
     if [ ! -f "$OVERLAY" ]; then
-        qemu-img create -f qcow2 -b "$(realpath "$QEMU_IMAGE")" -F raw "$OVERLAY" >/dev/null
-        gen_cloud_init_iso "$VM_NAME" "filter" "$MGMT_IP"
+        qemu-img create -f qcow2 -b "$QEMU_ROOTFS" -F raw "$OVERLAY" >/dev/null
     fi
 
     ip tuntap add dev "$TAP_IN" mode tap 2>/dev/null || true
@@ -157,20 +137,21 @@ start_filter_vm() {
     ip link set "$TAP_MGMT" up
 
     qemu-system-riscv64 \
-        -machine virt,acpi=off -m "$QEMU_MEMORY" -smp cpus="$QEMU_CPUS" \
+        -machine virt -m "$QEMU_MEMORY" -smp "$QEMU_CPUS" \
         -display none -serial "file:/tmp/qemu-${VM_NAME}.log" \
         -name "$VM_NAME" \
         -pidfile "/tmp/qemu-${VM_NAME}.pid" \
-        -kernel /usr/lib/u-boot/qemu-riscv64_smode/uboot.elf \
+        -bios "$QEMU_BIOS" \
+        -kernel "$QEMU_KERNEL" \
+        -append "root=/dev/vda rw earlycon=sbi console=ttyS0 ip=${MGMT_IP}::${MGMT_SUBNET}.254:255.255.255.0::eth2:off" \
         -netdev tap,id=net0,ifname="$TAP_IN",script=no,downscript=no \
         -device virtio-net-device,netdev=net0,mac="$ETH0_MAC" \
         -netdev tap,id=net1,ifname="$TAP_OUT",script=no,downscript=no \
         -device virtio-net-device,netdev=net1 \
         -netdev tap,id=net2,ifname="$TAP_MGMT",script=no,downscript=no \
         -device virtio-net-device,netdev=net2 \
-        -device virtio-rng-pci \
-        -drive "file=${OVERLAY},format=qcow2,if=virtio" \
-        -drive "file=$PROJECT_DIR/cloud-init-${VM_NAME}.iso,format=raw,if=virtio" \
+        -object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 \
+        -drive "id=disk0,file=${OVERLAY},format=qcow2,if=none" -device virtio-blk-device,drive=disk0 \
         -virtfs "local,path=$SHARED_DIR,mount_tag=host_share,security_model=mapped-xattr" \
         -daemonize ||
         {
@@ -191,12 +172,6 @@ done
 for SVC in $(docker compose -p "$(basename "$PROJECT_DIR")" ps --format '{{.Name}}' 2>/dev/null | grep "gen-2"); do
     docker exec "$SVC" arp -s "${SUBNET2}.254" "$FILTER2_MAC" 2>/dev/null || true
 done
-
-CTRL_OVERLAY="$PROJECT_DIR/controller.qcow2"
-if [ ! -f "$CTRL_OVERLAY" ]; then
-    qemu-img create -f qcow2 -b "$(realpath "$QEMU_IMAGE")" -F raw "$CTRL_OVERLAY" >/dev/null
-    gen_cloud_init_iso "controller" "controller" "${MGMT_SUBNET}.3"
-fi
 
 ip tuntap add dev "tap-ctrl" mode tap 2>/dev/null || true
 ip link set "tap-ctrl" master "$MGMT_BRIDGE"
