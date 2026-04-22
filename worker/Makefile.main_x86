@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS_BASE = -Iinclude -O2 -msse4.2 -mpclmul -maes
+CFLAGS_BASE = -Iinclude/dpdk_filter/ -O2 -msse4.2 -mpclmul -maes
 LDFLAGS = -lrte_eal -lrte_ethdev -lrte_mempool -lrte_mbuf -lrte_bus_vdev -lpthread -lnuma -ldl -lrte_net -lrte_hash -lsqlite3 -lrte_timer
 
 SRCS = src/dpdk_filter/main.c src/dpdk_filter/net_port.c src/dpdk_filter/filtr_packets.c src/dpdk_filter/pars_packets.c src/dpdk_filter/proc_packets.c src/dpdk_filter/dns_cache.c

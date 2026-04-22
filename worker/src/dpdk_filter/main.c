@@ -1,7 +1,7 @@
-#include "../../include/dpdk_filter/dns_cache.h"
-#include "../../include/dpdk_filter/net_port.h"
-#include "../../include/dpdk_filter/proc_packets.h"
-#include <rte_eal.h>
+#include "dns_cache.h"
+#include "net_port.h"
+#include "proc_packets.h"
+#include <rte_eal.h> 
 #include <rte_ethdev.h>
 #include <rte_ip.h>
 #include <rte_mbuf.h>

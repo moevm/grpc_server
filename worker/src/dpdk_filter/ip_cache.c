@@ -1,28 +1,28 @@
-#include "dns_cache.h"
+#include "ip_cache.h"
 
-static sqlite3 *cache_table;
+static sqlite3 *cache_table_ip;
 
-static struct rte_hash *dns_hash;
+static struct rte_hash *ip_hash;
 static struct rte_hash_parameters hash_params = {
-    .name = "dns_cache_hash",
+    .name = "ip_hash",
     .entries = CACHE_SIZE,
     .key_len = DOMAIN_MAX_LEN,
     .hash_func = rte_jhash,
     .extra_flag = RTE_HASH_EXTRA_FLAGS_EXT_TABLE,
 };
-static struct rte_timer cache_save_timer;
+static struct rte_timer cache_save_timSer;
 static uint64_t save_interval_cycles;
 
-static int insert_loaded_node(const char *domain, struct node_cache *node) {
-  char *key_copy = rte_malloc("dns_key(domain)", DOMAIN_MAX_LEN, 0);
+static int insert_loaded_node_ip(const void *ip, struct node_cache_ip *node) {
+  char *key_copy = rte_malloc("ip_key(ip)", DOMAIN_MAX_LEN, 0);
   if (!key_copy) {
     printf("[ERROR] Failed to allocate key for loaded node\n");
     return -ENOMEM;
   }
 
-  strncpy(key_copy, domain, DOMAIN_MAX_LEN);
+  strncpy(key_copy, ip, 16);
   key_copy[DOMAIN_MAX_LEN - 1] = '\0';
-  node->key_domain = key_copy;
+  node->key_ip = key_copy;
 
   int ret = rte_hash_add_key_data(dns_hash, key_copy, node);
   if (ret < 0) {
@@ -34,12 +34,12 @@ static int insert_loaded_node(const char *domain, struct node_cache *node) {
   return 0;
 }
 
-void load_cache_from_sqlite(void) {
+void load_cache_from_sqlite_ip(void) {
   if (!dns_hash) {
     printf("[ERROR] Hash table not initialized for loading\n");
     return;
   }
-  if (!cache_table) {
+  if (!cache_table_ip) {
     printf("[ERROR] SQLite connection not open for loading\n");
     return;
   }
@@ -51,10 +51,10 @@ void load_cache_from_sqlite(void) {
                     "ttl_seconds FROM main_table;";
 
   sqlite3_stmt *stmt = NULL;
-  int ret = sqlite3_prepare_v2(cache_table, sql, -1, &stmt, NULL);
+  int ret = sqlite3_prepare_v2(cache_table_ip, sql, -1, &stmt, NULL);
   if (ret != SQLITE_OK) {
     printf("[ERROR] Failed to prepare SELECT from main_table: %s\n",
-           sqlite3_errmsg(cache_table));
+           sqlite3_errmsg(cache_table_ip));
     return;
   }
 
@@ -74,8 +74,8 @@ void load_cache_from_sqlite(void) {
       continue;
     }
 
-    struct node_cache *node =
-        rte_malloc("loaded_node_cache", sizeof(struct node_cache), 0);
+    struct node_cache_ip *node =
+        rte_malloc("loaded_node_cache_ip", sizeof(struct node_cache_ip), 0);
     if (!node) {
       printf("[ERROR] Failed to allocate node for domain %s\n", domain);
       continue;
@@ -89,10 +89,11 @@ void load_cache_from_sqlite(void) {
     const char *sql_cat =
         "SELECT certain_category FROM categories_table WHERE domain = ?;";
     sqlite3_stmt *stmt_cat = NULL;
-    int rc_cat = sqlite3_prepare_v2(cache_table, sql_cat, -1, &stmt_cat, NULL);
+    int rc_cat =
+        sqlite3_prepare_v2(cache_table_ip, sql_cat, -1, &stmt_cat, NULL);
     if (rc_cat != SQLITE_OK) {
       printf("[ERROR] Failed to prepare categories SELECT: %s\n",
-             sqlite3_errmsg(cache_table));
+             sqlite3_errmsg(cache_table_ip));
       rte_free(node);
       continue;
     }
@@ -124,14 +125,14 @@ void load_cache_from_sqlite(void) {
   ret = sqlite3_finalize(stmt);
   if (ret != SQLITE_OK) {
     printf("[ERROR] Failed to delete prepared statement: %s\n",
-           sqlite3_errmsg(cache_table));
+           sqlite3_errmsg(cache_table_ip));
     return;
   }
   printf("[INFO] Loaded %d records from SQLite, %d expired skipped\n", loaded,
          expired);
 }
 
-static void cache_save_timer_cb(struct rte_timer *tim, void *arg) {
+static void cache_save_timer_ip(struct rte_timer *tim, void *arg) {
   (void)tim;
   (void)arg;
 
@@ -139,18 +140,19 @@ static void cache_save_timer_cb(struct rte_timer *tim, void *arg) {
   save_all_cache_to_sqlite();
 }
 
-void close_sqlite_cache(void) {
-  if (cache_table) {
-    int ret = sqlite3_close(cache_table);
+void close_sqlite_cache_ip(void) {
+  if (cache_table_ip) {
+    int ret = sqlite3_close(cache_table_ip);
     if (ret != SQLITE_OK) {
       printf("[ERROR] Failed close SQLite connection: %s\n",
-             sqlite3_errmsg(cache_table));
+             sqlite3_errmsg(cache_table_ip));
     }
   }
-  cache_table = NULL;
+  cache_table_ip = NULL;
 }
 
-int save_single_node_to_sqlite(const char *domain, struct node_cache *node) {
+int save_single_node_to_sqlite_ip(const char *domain,
+                                  struct node_cache_ip *node) {
   sqlite3_stmt *stmt = NULL;
   int ret;
 
@@ -159,10 +161,10 @@ int save_single_node_to_sqlite(const char *domain, struct node_cache *node) {
       "(domain, solution_is_send, trust_lvl, timestamp, ttl_seconds) "
       "VALUES (?, ?, ?, ?, ?)";
 
-  ret = sqlite3_prepare_v2(cache_table, sql_main, -1, &stmt, NULL);
+  ret = sqlite3_prepare_v2(cache_table_ip, sql_main, -1, &stmt, NULL);
   if (ret != SQLITE_OK) {
     printf("[ERROR] Failed to prepare main_table insert: %s\n",
-           sqlite3_errmsg(cache_table));
+           sqlite3_errmsg(cache_table_ip));
     sqlite3_finalize(stmt);
     return ret;
   }
@@ -176,7 +178,7 @@ int save_single_node_to_sqlite(const char *domain, struct node_cache *node) {
   ret = sqlite3_step(stmt);
   if (ret != SQLITE_DONE) {
     printf("[ERROR] Failed to insert into main_table: %s\n",
-           sqlite3_errmsg(cache_table));
+           sqlite3_errmsg(cache_table_ip));
     sqlite3_finalize(stmt);
     return ret;
   }
@@ -184,15 +186,15 @@ int save_single_node_to_sqlite(const char *domain, struct node_cache *node) {
   ret = sqlite3_finalize(stmt);
   if (ret != SQLITE_OK) {
     printf("[ERROR] Failed to delete prepared statement: %s\n",
-           sqlite3_errmsg(cache_table));
+           sqlite3_errmsg(cache_table_ip));
     return ret;
   }
 
   const char *sql_del = "DELETE FROM categories_table WHERE domain = ?";
-  ret = sqlite3_prepare_v2(cache_table, sql_del, -1, &stmt, NULL);
+  ret = sqlite3_prepare_v2(cache_table_ip, sql_del, -1, &stmt, NULL);
   if (ret != SQLITE_OK) {
     printf("[ERROR] Failed to prepare delete: %s\n",
-           sqlite3_errmsg(cache_table));
+           sqlite3_errmsg(cache_table_ip));
     sqlite3_finalize(stmt);
     return ret;
   }
@@ -201,7 +203,7 @@ int save_single_node_to_sqlite(const char *domain, struct node_cache *node) {
   ret = sqlite3_step(stmt);
   if (ret != SQLITE_DONE) {
     printf("[ERROR] Failed to delete old categories: %s\n",
-           sqlite3_errmsg(cache_table));
+           sqlite3_errmsg(cache_table_ip));
     sqlite3_finalize(stmt);
     return ret;
   }
@@ -209,16 +211,16 @@ int save_single_node_to_sqlite(const char *domain, struct node_cache *node) {
   ret = sqlite3_finalize(stmt);
   if (ret != SQLITE_OK) {
     printf("[ERROR] Failed to delete prepared statement: %s\n",
-           sqlite3_errmsg(cache_table));
+           sqlite3_errmsg(cache_table_ip));
     return ret;
   }
 
   const char *sql_cat =
       "INSERT INTO categories_table (domain, certain_category) VALUES (?, ?)";
-  ret = sqlite3_prepare_v2(cache_table, sql_cat, -1, &stmt, NULL);
+  ret = sqlite3_prepare_v2(cache_table_ip, sql_cat, -1, &stmt, NULL);
   if (ret != SQLITE_OK) {
     printf("[ERROR] Failed to prepare categories insert: %s\n",
-           sqlite3_errmsg(cache_table));
+           sqlite3_errmsg(cache_table_ip));
     return ret;
   }
 
@@ -233,7 +235,7 @@ int save_single_node_to_sqlite(const char *domain, struct node_cache *node) {
     ret = sqlite3_step(stmt);
     if (ret != SQLITE_DONE) {
       printf("[ERROR] Failed to prepare categories_table insert: %s\n",
-             sqlite3_errmsg(cache_table));
+             sqlite3_errmsg(cache_table_ip));
       sqlite3_finalize(stmt);
       return ret;
     }
@@ -241,7 +243,7 @@ int save_single_node_to_sqlite(const char *domain, struct node_cache *node) {
     ret = sqlite3_reset(stmt);
     if (ret != SQLITE_OK) {
       printf("[ERROR] Failed to reset prepared statement: %s\n",
-             sqlite3_errmsg(cache_table));
+             sqlite3_errmsg(cache_table_ip));
       sqlite3_finalize(stmt);
       return ret;
     }
@@ -250,20 +252,20 @@ int save_single_node_to_sqlite(const char *domain, struct node_cache *node) {
   ret = sqlite3_finalize(stmt);
   if (ret != SQLITE_OK) {
     printf("[ERROR] Failed to delete prepared statement: %s\n",
-           sqlite3_errmsg(cache_table));
+           sqlite3_errmsg(cache_table_ip));
     return ret;
   }
 
   return SQLITE_OK;
 }
 
-int save_all_cache_to_sqlite(void) {
+int save_all_cache_ip_to_sqlite(void) {
   if (!dns_hash) {
     printf("[ERROR] Hash table is not initialized\n");
     return -1;
   }
 
-  if (!cache_table) {
+  if (!cache_table_ip) {
     printf("[ERROR] SQLite connection is not open\n");
     return -1;
   }
@@ -275,16 +277,16 @@ int save_all_cache_to_sqlite(void) {
   int errors = 0;
   int ret;
 
-  ret = sqlite3_exec(cache_table, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+  ret = sqlite3_exec(cache_table_ip, "BEGIN TRANSACTION;", NULL, NULL, NULL);
   if (ret != SQLITE_OK) {
     printf("[ERROR] Failed to exec BEGIN TRANSACTION: %s\n",
-           sqlite3_errmsg(cache_table));
+           sqlite3_errmsg(cache_table_ip));
     return -1;
   }
 
   while (rte_hash_iterate(dns_hash, &key, &data, &next) >= 0) {
     const char *domain = (const char *)key;
-    struct node_cache *node = (struct node_cache *)data;
+    struct node_cache_ip *node = (struct node_cache_ip *)data;
 
     if (!domain || !node) {
       continue;
@@ -298,9 +300,10 @@ int save_all_cache_to_sqlite(void) {
     }
   }
 
-  ret = sqlite3_exec(cache_table, "COMMIT;", NULL, NULL, NULL);
+  ret = sqlite3_exec(cache_table_ip, "COMMIT;", NULL, NULL, NULL);
   if (ret != SQLITE_OK) {
-    printf("[ERROR] Failed to exec COMMIT: %s\n", sqlite3_errmsg(cache_table));
+    printf("[ERROR] Failed to exec COMMIT: %s\n",
+           sqlite3_errmsg(cache_table_ip));
     return -1;
   }
 
@@ -308,8 +311,8 @@ int save_all_cache_to_sqlite(void) {
   return count;
 }
 
-void init_tables_sqlite_dns_cache(void) {
-  int ret = sqlite3_open("cache.db", &cache_table);
+void init_tables_sqlite_ip_cache(void) {
+  int ret = sqlite3_open("cache.db", &cache_table_ip);
   if (ret != SQLITE_OK) {
     printf("[ERROR] Failed to open cache.db\n");
     return;
@@ -322,7 +325,7 @@ void init_tables_sqlite_dns_cache(void) {
                                   "timestamp INT NOT NULL, "
                                   "ttl_seconds INT NOT NULL)";
 
-  ret = sqlite3_exec(cache_table, create_main_table, NULL, NULL, NULL);
+  ret = sqlite3_exec(cache_table_ip, create_main_table, NULL, NULL, NULL);
   if (ret != SQLITE_OK) {
     printf("[ERROR] Failed to create table 'main_table'\n");
     return;
@@ -335,20 +338,20 @@ void init_tables_sqlite_dns_cache(void) {
       "PRIMARY KEY (domain, certain_category), "
       "FOREIGN KEY (domain) REFERENCES main_table(domain))";
 
-  ret = sqlite3_exec(cache_table, create_categories_table, NULL, NULL, NULL);
+  ret = sqlite3_exec(cache_table_ip, create_categories_table, NULL, NULL, NULL);
   if (ret != SQLITE_OK) {
     printf("[ERROR] Failed to create table 'categories_table'\n");
     return;
   }
 
-  ret =
-      sqlite3_exec(cache_table, "PRAGMA foreign_keys = ON;", NULL, NULL, NULL);
+  ret = sqlite3_exec(cache_table_ip, "PRAGMA foreign_keys = ON;", NULL, NULL,
+                     NULL);
   if (ret != SQLITE_OK) {
     printf("[ERROR] Failed to include foreign_keys\n");
   }
 }
 
-void init_dns_cache(void) {
+void init_ip_cache(void) {
   if (dns_hash)
     return;
 
@@ -358,7 +361,7 @@ void init_dns_cache(void) {
     return;
   }
 
-  init_tables_sqlite_dns_cache();
+  init_tables_sqlite_ip_cache();
 
   load_cache_from_sqlite();
 
@@ -369,7 +372,7 @@ void init_dns_cache(void) {
                   rte_lcore_id(), cache_save_timer_cb, NULL);
 }
 
-int lookup_dns_cache(const char *domain, struct node_cache **return_node) {
+int lookup_ip_cache(const char *domain, struct node_cache_ip **return_node) {
   int ret = rte_hash_lookup_data(dns_hash, domain, (void **)return_node);
 
   if (ret >= 0 && *return_node) {
@@ -394,7 +397,7 @@ int lookup_dns_cache(const char *domain, struct node_cache **return_node) {
   return ret;
 }
 
-void add_to_dns_cache(const char *domain, struct node_cache *node) {
+void add_to_ip_cache(const char *domain, struct node_cache_ip *node) {
   char *key_copy = rte_malloc("dns_key(domain)", DOMAIN_MAX_LEN, 0);
   if (!key_copy) {
     printf("[ERROR] Failed to allocate memory for key cache\n");
@@ -404,7 +407,7 @@ void add_to_dns_cache(const char *domain, struct node_cache *node) {
   strncpy(key_copy, domain, DOMAIN_MAX_LEN);
   key_copy[DOMAIN_MAX_LEN - 1] = '\0';
   node->timestamp = rte_get_timer_cycles();
-  node->ttl_seconds = DNS_CACHE_DEFAULT_TTL;
+  node->ttl_seconds = ip_cache_DEFAULT_TTL;
   node->key_domain = key_copy;
 
   int ret = rte_hash_add_key_data(dns_hash, key_copy, node);
@@ -415,7 +418,7 @@ void add_to_dns_cache(const char *domain, struct node_cache *node) {
   }
 }
 
-void free_dns_cache(void) {
+void free_ip_cache(void) {
   if (!dns_hash)
     return;
 
@@ -426,7 +429,7 @@ void free_dns_cache(void) {
   while (rte_hash_iterate(dns_hash, &key, &data, &next) >= 0) {
 
     if (data) {
-      struct node_cache *node = (struct node_cache *)data;
+      struct node_cache_ip *node = (struct node_cache_ip *)data;
       if (node->key_domain) {
         rte_free(node->key_domain);
       }
