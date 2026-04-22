@@ -10,8 +10,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../../include/dpdk_filter/constants.h"
-#include "../../include/dpdk_filter/types.h"
+#include "constants.h"
+#include "types.h"
 
 void init_dns_cache(void);
 int lookup_dns_cache(const char *domain, struct node_cache **return_node);

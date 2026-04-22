@@ -1,5 +1,5 @@
-#include "../../include/dpdk_filter/proc_packets.h"
-#include "../../include/dpdk_filter/dns_cache.h"
+#include "proc_packets.h"
+#include "dns_cache.h"
 
 extern bool worker_classify_domain(const char *domain,
                                    struct requested_classification *out_req);

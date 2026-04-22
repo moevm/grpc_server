@@ -1,5 +1,5 @@
-#include "../../include/dpdk_filter/filtr_packets.h"
-#include "../../include/dpdk_filter/pars_packets.h"
+#include "filtr_packets.h"
+#include "pars_packets.h"
 
 bool check_is_block(char domain[DOMAIN_MAX_LEN],
                     char block_domains[MAX_DOMAINS][DOMAIN_MAX_LEN]) {

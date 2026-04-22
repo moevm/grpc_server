@@ -1,5 +1,5 @@
-#include "../include/worker.hpp"
-#include "../include/dpdk_filter/proc_packets.h"
+#include "worker.hpp"
+#include "proc_packets.h"
 #include "communication.grpc.pb.h"
 #include <cstdlib>
 #include <cstring>

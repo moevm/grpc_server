@@ -46,6 +46,7 @@ cc_library(
         "include/dpdk_filter/types.h",
         "include/dpdk_filter/constants.h",
     ],
+    includes = ["include", "include/dpdk_filter"],
     srcs = [],
     visibility = ["//visibility:public"],
 )

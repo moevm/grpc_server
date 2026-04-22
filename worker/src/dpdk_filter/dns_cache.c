@@ -1,4 +1,4 @@
-#include "../../include/dpdk_filter/dns_cache.h"
+#include "dns_cache.h"
 
 static struct rte_hash *dns_hash;
 static struct rte_hash_parameters hash_params = {
