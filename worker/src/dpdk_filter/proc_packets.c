@@ -1,6 +1,9 @@
 #include "../../include/dpdk_filter/proc_packets.h"
 #include "../../include/dpdk_filter/dns_cache.h"
 
+extern bool worker_classify_domain(const char *domain,
+                                   struct requested_classification *out_req);
+
 const uint16_t LIST_EXCEPTION_PORTS[LEN_LIST_EXCEPTION_PORTS] = {22};
 
 void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
@@ -67,7 +70,15 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
 
       struct requested_classification req_clas;
 
-      bool solution_is_send = main_filtring(&req_clas, policy, info_pac.domain);
+      bool solution_is_send;
+      bool classification_success =
+          worker_classify_domain(info_pac.domain, &req_clas);
+      if (classification_success) {
+        solution_is_send = main_filtring(&req_clas, policy, info_pac.domain);
+      } else {
+        solution_is_send = true;
+        printf("[WARN] Classification failed for %s\n", info_pac.domain);
+      }
 
       package_sending_decision(solution_is_send, pkts[i], port_out,
                                queue_number);
