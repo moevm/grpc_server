@@ -82,8 +82,6 @@ void Worker::initDPDK(int argc, char **argv) {
     throw std::runtime_error("Start ports");
   }
 
-  init_dns_cache();
-
   spdlog::info("DPDK initialized: in_port={}, out_port={}", port_in->port_id,
                port_out->port_id);
 }
@@ -137,7 +135,6 @@ void Worker::requestPolicyFromController() {
         current_policy.locked_categories[i][CATEGORY_MAX_LEN - 1] = '\0';
       }
 
-      int trust_map_count = pol.block_by_trust_size();
       int idx = 0;
       for (const auto &[category, min_trust] : pol.block_by_trust()) {
         if (idx >= MAX_CATEGORIES_BY_TRUST_LVL)
@@ -270,8 +267,6 @@ Worker::~Worker() {
   spdlog::info("Worker {} shutting down", worker_id);
 
   if (port_in && port_out) {
-    free_dns_cache();
-
     net_port_close(port_in);
     net_port_close(port_out);
     net_port_close(port_exception);

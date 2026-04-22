@@ -4,7 +4,6 @@
 #include "communication.grpc.pb.h"
 #include "communication.pb.h"
 extern "C" {
-#include "dpdk_filter/dns_cache.h"
 #include "dpdk_filter/filtr_packets.h"
 #include "dpdk_filter/net_port.h"
 #include "dpdk_filter/proc_packets.h"

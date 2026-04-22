@@ -1,9 +1,6 @@
 #include "../../include/dpdk_filter/proc_packets.h"
 #include "../../include/dpdk_filter/dns_cache.h"
 
-extern bool worker_classify_domain(const char *domain,
-                                   struct requested_classification *out_req);
-
 const uint16_t LIST_EXCEPTION_PORTS[LEN_LIST_EXCEPTION_PORTS] = {22};
 
 void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
@@ -46,6 +43,8 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
     memset(&info_pac, 0, sizeof(info_pac));
 
     parsing_pakage(pkts[i], &info_pac);
+    printf("[PKT] port = %hu; domain = %s\n", ntohs(info_pac.number_port),
+           info_pac.domain);
     if (info_pac.domain[0] == '\0') {
       printf("[INFO] Packet without dns request\n");
       package_sending_decision(true, pkts[i], port_out, queue_number);
@@ -67,16 +66,9 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
     } else if (ret == -ENOENT) {
 
       struct requested_classification req_clas;
-      memset(&req_clas, 0, sizeof(req_clas));
-      bool solution_is_send;
-      bool classification_success =
-          worker_classify_domain(info_pac.domain, &req_clas);
-      if (classification_success) {
-        solution_is_send = main_filtring(&req_clas, policy, info_pac.domain);
-      } else {
-        solution_is_send = true;
-        printf("[WARN] Classification failed for %s\n", info_pac.domain);
-      }
+
+      bool solution_is_send = main_filtring(&req_clas, policy, info_pac.domain);
+
       package_sending_decision(solution_is_send, pkts[i], port_out,
                                queue_number);
 
