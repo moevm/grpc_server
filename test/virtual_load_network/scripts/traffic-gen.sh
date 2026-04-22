@@ -2,7 +2,10 @@
 
 URLS=(
     "http://www.google.com"
-    "https://github.com"
+    "https://youtube.com"
+    "https://www.tiktok.com"
+    "https://1xbet.com/"
+    "https://betboom.ru/"
 )
 
 while true; do
