@@ -2,8 +2,8 @@
 #define FILTR_PAK_H
 
 #include "constants.h"
-#include "types.h"
 #include "pars_packets.h"
+#include "types.h"
 #include <rte_mbuf.h>
 #include <stdint.h>
 
