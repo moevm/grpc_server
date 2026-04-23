@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	pb "github.com/moevm/grpc_server/controller/test"
+	pb "github.com/moevm/grpc_server/pkg/proto/communication"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"

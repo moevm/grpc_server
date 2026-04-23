@@ -24,7 +24,7 @@ go_test(
     name = "integration_test",
     srcs = ["worker_test.go"],
     deps = [
-        ":test_communication_go_proto", 
+        "//pkg/proto/communication:communication_go_proto", 
         "@org_golang_google_grpc//:grpc",
         "@org_golang_google_grpc//test/bufconn",
         "@org_golang_google_grpc//credentials/insecure",
