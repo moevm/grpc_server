@@ -15,8 +15,6 @@ import (
 	pb "github.com/moevm/grpc_server/controller/test"
 )
 
-const bufSize = 1024 * 1024
-
 type MockController struct {
 	pb.UnimplementedDataServiceServer
 	Policy *pb.WorkerPolicy
@@ -35,7 +33,7 @@ func (m *MockController) Classify(ctx context.Context, req *pb.ClassifyRequest) 
 	m.t.Logf("Classify called: worker_id=%d, domain=%s", req.WorkerId, req.Domain)
 	return &pb.ClassifyResponse{
 		Categories: []string{"news", "technology"},
-		TrustLevel: 85,
+		TrustLevel: 3,
 	}, nil
 }
 
@@ -45,7 +43,15 @@ func (m *MockController) SendStats(ctx context.Context, req *pb.StatsReport) (*e
 }
 
 func StartMockController(t *testing.T, policy *pb.WorkerPolicy) (string, func()) {
-    lis, err := net.Listen("tcp", "127.0.0.1:0")
+    listenAddr := os.Getenv("TEST_CONTROLLER_ADDR")
+    if listenAddr == "" {
+        listenAddr = "localhost:0"
+    }
+    
+    lis, err := net.Listen("tcp", listenAddr)
+    if err != nil {
+        t.Fatalf("Failed to listen on %s: %v", listenAddr, err)
+    }
     if err != nil {
         t.Fatalf("Failed to listen: %v", err)
     }
@@ -97,14 +103,14 @@ func TestWorkerPolicyContent(t *testing.T) {
 	}
 
 	testPolicy := &pb.WorkerPolicy{
-		ConfigVersion:   42,
-		MinTrustLevel:   75,
-		BlockCategories: []string{"gambling", "adult", "violence"},
-		BlockDomains:    []string{"bad-site.com", "blocked.org"},
-		AllowDomains:    []string{"safe-site.com", "trusted.net"},
+		ConfigVersion:   2,
+		MinTrustLevel:   2,
+		BlockCategories: []string{"CATEGORY_ONLINE_SHOPS", "CATEGORY_ANONYMIZERS", "CATEGORY_ALCOHOL"},
+		BlockDomains:    []string{"1xbet.com"},
+		AllowDomains:    []string{"github.com", "vk.com"},
 		BlockByTrust: map[string]int32{
-			"social_media": 60,
-			"games":        40,
+			"CATEGORY_MALWARE": 3,
+			"CATEGORY_BETTING": 4,
 		},
 	}
 
@@ -126,19 +132,21 @@ func TestWorkerPolicyContent(t *testing.T) {
 	output, err := worker.CombinedOutput()
 	assert.NoError(t, err, "Worker failed: %s", string(output))
 
-	assert.Contains(t, string(output), "Policy received")
-	assert.Contains(t, string(output), "Min trust level: 75")
-	assert.Contains(t, string(output), "gambling")
-	assert.Contains(t, string(output), "adult")
-	assert.Contains(t, string(output), "violence")
-	assert.Contains(t, string(output), "bad-site.com")
-	assert.Contains(t, string(output), "blocked.org")
-	assert.Contains(t, string(output), "safe-site.com")
-	assert.Contains(t, string(output), "trusted.net")
-	assert.Contains(t, string(output), "Config version: 42")
+	outputStr := string(output) 
+
+	assert.Contains(t, outputStr, "Policy received")
+	assert.Contains(t, outputStr, "Min trust level: 2")
+	assert.Contains(t, outputStr, "Config version: 2")
+	
+	assert.Contains(t, outputStr, "blocked_categories: CATEGORY_ONLINE_SHOPS")
+	assert.Contains(t, outputStr, "blocked_categories: CATEGORY_ANONYMIZERS")
+	assert.Contains(t, outputStr, "blocked_categories: CATEGORY_ALCOHOL")
+	assert.Contains(t, outputStr, "block_domains: 1xbet.com")
+	assert.Contains(t, outputStr, "allow_domains: github.com")
+	assert.Contains(t, outputStr, "allow_domains: vk.com")
 }
 
-func TestWorkerClassifyWithMock(t *testing.T) {
+func TestWorkerClassify(t *testing.T) {
 	root := findProjectRoot()
 	workerBin := filepath.Join(root, "worker", "bazel-bin", "worker")
 
@@ -146,12 +154,7 @@ func TestWorkerClassifyWithMock(t *testing.T) {
 		t.Skipf("Worker binary not found: %v", err)
 	}
 
-	testPolicy := &pb.WorkerPolicy{
-		ConfigVersion: 1,
-		MinTrustLevel: 50,
-	}
-
-	addr, cleanup := StartMockController(t, testPolicy)
+	addr, cleanup := StartMockController(t, nil) 
 	defer cleanup()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -167,7 +170,39 @@ func TestWorkerClassifyWithMock(t *testing.T) {
 	}
 
 	output, err := worker.CombinedOutput()
+	outputStr := string(output) 
 	assert.NoError(t, err, "Worker failed: %s", string(output))
-	assert.Contains(t, string(output), "Domain 'example.com' classified as category")
-	assert.Contains(t, string(output), "trust level 85")
+	assert.Contains(t, outputStr, "Domain 'example.com' classified as categories [news, technology] with trust level 3")
+}
+
+func TestWorkerSendStats(t *testing.T) {
+	root := findProjectRoot()
+	workerBin := filepath.Join(root, "worker", "bazel-bin", "worker")
+
+	if _, err := os.Stat(workerBin); err != nil {
+		t.Skipf("Worker binary not found: %v", err)
+	}
+
+	addr, cleanup := StartMockController(t, nil)
+	defer cleanup()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	worker := exec.CommandContext(ctx, workerBin)
+	worker.Env = []string{
+		"WORKER_ID=1",
+		"CONTROLLER_GRPC_ADDR=" + addr,
+		"METRICS_GATEWAY_ADDRESS=localhost",
+		"METRICS_GATEWAY_PORT=9091",
+		"TEST_STATS=true",  
+	}
+
+	output, err := worker.CombinedOutput()
+	assert.NoError(t, err, "Worker failed: %s", string(output))
+
+	outputStr := string(output)
+	
+	assert.Contains(t, outputStr, "Stats sent successfully")
+
 }
