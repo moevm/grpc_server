@@ -168,6 +168,31 @@ void Worker::requestPolicyFromController() {
       current_policy.min_trust_level = pol.min_trust_level();
 
       current_config_version = pol.config_version();
+
+      spdlog::info("POLICY LOADED");
+      spdlog::info("Config version: {}", current_config_version);
+      spdlog::info("Min trust level: {}", current_policy.min_trust_level);
+      
+      spdlog::info("Locked categories ({} total)", block_cat_count);
+      for (int i = 0; i < block_cat_count && i < MAX_CATEGORIES; ++i) {
+          if (strlen(current_policy.locked_categories[i]) > 0) {
+              spdlog::info("  [{}] {}", i, current_policy.locked_categories[i]);
+          }
+      }
+      
+      spdlog::info("Blocked domains ({} total)", block_dom_count);
+      for (int i = 0; i < block_dom_count && i < MAX_DOMAINS; ++i) {
+          if (strlen(current_policy.block_domains[i]) > 0) {
+              spdlog::info("  [{}] {}", i, current_policy.block_domains[i]);
+          }
+      }
+      
+      spdlog::info("Allowed domains ({} total)", allow_dom_count);
+      for (int i = 0; i < allow_dom_count && i < MAX_DOMAINS; ++i) {
+          if (strlen(current_policy.allow_domains[i]) > 0) {
+              spdlog::info("  [{}] {}", i, current_policy.allow_domains[i]);
+          }
+      }
       break;
     }
     case GetPolicyResponse::POLICY_UNCHANGED: {
