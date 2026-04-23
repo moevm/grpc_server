@@ -28,7 +28,9 @@ QEMU_BIOS="${QEMU_BIOS:-${YOCTO_DEPLOY_DIR}/fw_jump.elf}"
 QEMU_MEMORY="${QEMU_MEMORY:-4G}"
 QEMU_CPUS="${QEMU_CPUS:-2}"
 FILTER_RISCV_BIN="${FILTER_RISCV_BIN:-../../worker/main-riscv}"
+WORKER_RISCV_BIN="${WORKER_RISCV_BIN:-../../worker/bazel-bin/worker}"
 CONTROLLER_BIN="${CONTROLLER_BIN:-../../controller/bin/grpc_server}"
+VM_HUGEPAGES="${VM_HUGEPAGES:-64}"
 FILTER1_MAC="52:54:00:f1:00:01"
 FILTER2_MAC="52:54:00:f2:00:01"
 
@@ -73,9 +75,20 @@ mkdir -p "$SHARED_DIR"
 if [ -f "$FILTER_RISCV_BIN" ]; then
     cp "$FILTER_RISCV_BIN" "$SHARED_DIR/filter"
 fi
+if [ -f "$WORKER_RISCV_BIN" ]; then
+    cp "$WORKER_RISCV_BIN" "$SHARED_DIR/worker"
+fi
 if [ -f "$CONTROLLER_BIN" ]; then
     cp "$CONTROLLER_BIN" "$SHARED_DIR/controller"
 fi
+
+cat > "$SHARED_DIR/setup-inet.sh" << EOF
+#!/bin/sh
+ip addr add ${INET_SUBNET}.1/24 dev eth1 2>/dev/null || true
+ip route replace default via ${INET_SUBNET}.254 dev eth1
+echo "nameserver 8.8.8.8" > /etc/resolv.conf
+EOF
+chmod +x "$SHARED_DIR/setup-inet.sh"
 
 mkdir -p "$SHARED_DIR/internal/service/config"
 cp ../../controller/internal/service/config/categories.json "$SHARED_DIR/internal/service/config/"
@@ -97,9 +110,11 @@ start_controller() {
         -pidfile "/tmp/qemu-controller.pid" \
         -bios "$QEMU_BIOS" \
         -kernel "$QEMU_KERNEL" \
-        -append "root=/dev/vda rw earlycon=sbi console=ttyS0 ip=${MGMT_SUBNET}.3::${MGMT_SUBNET}.254:255.255.255.0::eth0:off" \
+        -append "root=/dev/vda rw earlycon=sbi console=ttyS0 hugepages=${VM_HUGEPAGES} ip=${MGMT_SUBNET}.3::${MGMT_SUBNET}.254:255.255.255.0::eth0:off" \
         -netdev tap,id=net0,ifname="tap-ctrl",script=no,downscript=no \
         -device virtio-net-device,netdev=net0 \
+        -netdev tap,id=net1,ifname="tap-ctrl-inet",script=no,downscript=no \
+        -device virtio-net-device,netdev=net1 \
         -object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 \
         -drive "id=disk0,file=${CTRL_OVERLAY},format=qcow2,if=none" -device virtio-blk-device,drive=disk0 \
         -virtfs "local,path=$SHARED_DIR,mount_tag=host_share,security_model=mapped-xattr" \
@@ -143,7 +158,7 @@ start_filter_vm() {
         -pidfile "/tmp/qemu-${VM_NAME}.pid" \
         -bios "$QEMU_BIOS" \
         -kernel "$QEMU_KERNEL" \
-        -append "root=/dev/vda rw earlycon=sbi console=ttyS0 ip=${MGMT_IP}::${MGMT_SUBNET}.254:255.255.255.0::eth2:off" \
+        -append "root=/dev/vda rw earlycon=sbi console=ttyS0 hugepages=${VM_HUGEPAGES} ip=${MGMT_IP}::${MGMT_SUBNET}.254:255.255.255.0::eth2:off" \
         -netdev tap,id=net0,ifname="$TAP_IN",script=no,downscript=no \
         -device virtio-net-device,netdev=net0,mac="$ETH0_MAC" \
         -netdev tap,id=net1,ifname="$TAP_OUT",script=no,downscript=no \
@@ -176,6 +191,10 @@ done
 ip tuntap add dev "tap-ctrl" mode tap 2>/dev/null || true
 ip link set "tap-ctrl" master "$MGMT_BRIDGE"
 ip link set "tap-ctrl" up
+
+ip tuntap add dev "tap-ctrl-inet" mode tap 2>/dev/null || true
+ip link set "tap-ctrl-inet" master "$INET_BRIDGE"
+ip link set "tap-ctrl-inet" up
 
 start_controller
 
