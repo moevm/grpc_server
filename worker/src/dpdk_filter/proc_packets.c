@@ -1,5 +1,5 @@
-#include "proc_packets.h"
-#include "dns_cache.h"
+#include "../../include/dpdk_filter/proc_packets.h"
+#include "../../include/dpdk_filter/dns_cache.h"
 
 const uint16_t LIST_EXCEPTION_PORTS[LEN_LIST_EXCEPTION_PORTS] = {22};
 

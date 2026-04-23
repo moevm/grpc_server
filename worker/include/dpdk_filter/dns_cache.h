@@ -11,8 +11,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "constants.h"
-#include "types.h"
+#include "../../include/dpdk_filter/constants.h"
+#include "../../include/dpdk_filter/types.h"
 
 void load_cache_from_sqlite(void);
 void close_sqlite_cache(void);
