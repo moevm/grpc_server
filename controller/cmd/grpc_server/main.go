@@ -1,17 +1,37 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
+	"os"
 
 	"github.com/moevm/grpc_server/internal/config"
 	"github.com/moevm/grpc_server/internal/grpcserver"
 	"github.com/moevm/grpc_server/internal/manager"
+	"github.com/moevm/grpc_server/internal/service/storage"
 	adminPb "github.com/moevm/grpc_server/pkg/proto/admin_service"
 	commPb "github.com/moevm/grpc_server/pkg/proto/communication"
+	"github.com/subosito/gotenv"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
+
+func init() {
+	gotenv.Load()
+}
+
+func LoadConfigRedis() (storage.Config, error) {
+	addr, exist := os.LookupEnv("REDIS_ADDR")
+
+	if !exist {
+		return storage.Config{}, fmt.Errorf("REDIS_ADDR does not exists")
+	}
+
+	return storage.Config{
+		Addr: addr,
+	}, nil
+}
 
 func main() {
 	cfg := config.Load()
@@ -23,7 +43,13 @@ func main() {
 
 	adminServer.SetManager(mgr)
 
-	dataServer, err := grpcserver.NewDataServer(mgr, "internal/service/config/categories.json", "internal/service/config/providers.json")
+	configRedis, err := LoadConfigRedis()
+
+	if err != nil {
+		log.Fatalf("Error to load redis config: %v", err)
+	}
+
+	dataServer, err := grpcserver.NewDataServer(mgr, "internal/service/config/categories.json", "internal/service/config/providers.json", configRedis)
 
 	if err != nil {
 		log.Fatalf("Failed to create data server: %v", err)
