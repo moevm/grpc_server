@@ -98,9 +98,10 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  LOG_INFO("An endless cycle has been started. Packets pass from port with id=%u "
-         "to port with id=%u",
-         port_in->port_id, port_out->port_id);
+  LOG_INFO(
+      "An endless cycle has been started. Packets pass from port with id=%u "
+      "to port with id=%u",
+      port_in->port_id, port_out->port_id);
 
   uint64_t timer_check_counter = 0;
   const uint64_t timer_check_interval = 10000;

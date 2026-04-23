@@ -26,8 +26,8 @@ int find_port_by_dev_name(const char *dev_name, uint16_t *port_id_dev) {
 
     if (ret) {
       LOG_ERROR("Failed to retrieve the contextual information of an "
-             "Ethernet device: %s",
-             strerror(-ret));
+                "Ethernet device: %s",
+                strerror(-ret));
       return ret;
     }
 
@@ -96,7 +96,7 @@ int net_port_init(struct net_port *port) {
   ret = find_port_by_dev_name(port->dev_name, &port_id);
   if (ret) {
     LOG_INFO("no port was found that has the same vdev name. vdev = %s",
-           port->dev_name);
+             port->dev_name);
     rte_vdev_uninit(dev_name);
     return -1;
   }
@@ -150,8 +150,8 @@ int net_port_start(uint16_t port_id) {
   ret = rte_eth_promiscuous_enable(port_id);
   if (ret) {
     LOG_ERROR("Failed to enable receipt in promiscuous mode for an "
-           "Ethernet device: %s",
-           strerror(-ret));
+              "Ethernet device: %s",
+              strerror(-ret));
     return ret;
   }
 
@@ -181,8 +181,7 @@ void net_port_close(struct net_port *port) {
 
   ret = rte_eth_dev_close(port_id);
   if (ret) {
-    LOG_ERROR("Failed to close a stopped Ethernet device: %s",
-           strerror(-ret));
+    LOG_ERROR("Failed to close a stopped Ethernet device: %s", strerror(-ret));
     return;
   }
 
