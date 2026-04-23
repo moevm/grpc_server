@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
+	pb "github.com/moevm/grpc_server/controller/test"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
-	pb "github.com/moevm/grpc_server/controller/test"
 )
 
 type MockController struct {
@@ -43,38 +43,38 @@ func (m *MockController) SendStats(ctx context.Context, req *pb.StatsReport) (*e
 }
 
 func StartMockController(t *testing.T, policy *pb.WorkerPolicy) (string, func()) {
-    listenAddr := os.Getenv("TEST_CONTROLLER_ADDR")
-    if listenAddr == "" {
-        listenAddr = "localhost:0"
-    }
-    
-    lis, err := net.Listen("tcp", listenAddr)
-    if err != nil {
-        t.Fatalf("Failed to listen on %s: %v", listenAddr, err)
-    }
-    if err != nil {
-        t.Fatalf("Failed to listen: %v", err)
-    }
+	listenAddr := os.Getenv("TEST_CONTROLLER_ADDR")
+	if listenAddr == "" {
+		listenAddr = "localhost:0"
+	}
 
-    s := grpc.NewServer()
-    mock := &MockController{
-        Policy: policy,
-        t:      t,
-    }
-    pb.RegisterDataServiceServer(s, mock)
+	lis, err := net.Listen("tcp", listenAddr)
+	if err != nil {
+		t.Fatalf("Failed to listen on %s: %v", listenAddr, err)
+	}
+	if err != nil {
+		t.Fatalf("Failed to listen: %v", err)
+	}
 
-    go func() {
-        if err := s.Serve(lis); err != nil {
-            t.Logf("Server error: %v", err)
-        }
-    }()
+	s := grpc.NewServer()
+	mock := &MockController{
+		Policy: policy,
+		t:      t,
+	}
+	pb.RegisterDataServiceServer(s, mock)
 
-    addr := lis.Addr().String()
-    cleanup := func() {
-        s.Stop()
-        lis.Close()
-    }
-    return addr, cleanup
+	go func() {
+		if err := s.Serve(lis); err != nil {
+			t.Logf("Server error: %v", err)
+		}
+	}()
+
+	addr := lis.Addr().String()
+	cleanup := func() {
+		s.Stop()
+		lis.Close()
+	}
+	return addr, cleanup
 }
 
 func findProjectRoot() string {
@@ -114,7 +114,7 @@ func TestWorkerPolicyContent(t *testing.T) {
 		},
 	}
 
-	addr, cleanup := StartMockController(t, testPolicy) 
+	addr, cleanup := StartMockController(t, testPolicy)
 	defer cleanup()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -132,12 +132,12 @@ func TestWorkerPolicyContent(t *testing.T) {
 	output, err := worker.CombinedOutput()
 	assert.NoError(t, err, "Worker failed: %s", string(output))
 
-	outputStr := string(output) 
+	outputStr := string(output)
 
 	assert.Contains(t, outputStr, "Policy received")
 	assert.Contains(t, outputStr, "Min trust level: 2")
 	assert.Contains(t, outputStr, "Config version: 2")
-	
+
 	assert.Contains(t, outputStr, "blocked_categories: CATEGORY_ONLINE_SHOPS")
 	assert.Contains(t, outputStr, "blocked_categories: CATEGORY_ANONYMIZERS")
 	assert.Contains(t, outputStr, "blocked_categories: CATEGORY_ALCOHOL")
@@ -154,7 +154,7 @@ func TestWorkerClassify(t *testing.T) {
 		t.Skipf("Worker binary not found: %v", err)
 	}
 
-	addr, cleanup := StartMockController(t, nil) 
+	addr, cleanup := StartMockController(t, nil)
 	defer cleanup()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -170,7 +170,7 @@ func TestWorkerClassify(t *testing.T) {
 	}
 
 	output, err := worker.CombinedOutput()
-	outputStr := string(output) 
+	outputStr := string(output)
 	assert.NoError(t, err, "Worker failed: %s", string(output))
 	assert.Contains(t, outputStr, "Domain 'example.com' classified as categories [news, technology] with trust level 3")
 }
@@ -195,14 +195,14 @@ func TestWorkerSendStats(t *testing.T) {
 		"CONTROLLER_GRPC_ADDR=" + addr,
 		"METRICS_GATEWAY_ADDRESS=localhost",
 		"METRICS_GATEWAY_PORT=9091",
-		"TEST_STATS=true",  
+		"TEST_STATS=true",
 	}
 
 	output, err := worker.CombinedOutput()
 	assert.NoError(t, err, "Worker failed: %s", string(output))
 
 	outputStr := string(output)
-	
+
 	assert.Contains(t, outputStr, "Stats sent successfully")
 
 }

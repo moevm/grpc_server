@@ -172,26 +172,27 @@ void Worker::requestPolicyFromController() {
       spdlog::info("POLICY LOADED");
       spdlog::info("Config version: {}", current_config_version);
       spdlog::info("Min trust level: {}", current_policy.min_trust_level);
-      
+
       spdlog::info("Blocked categories ({} total)", block_cat_count);
       for (int i = 0; i < block_cat_count && i < MAX_CATEGORIES; ++i) {
-          if (strlen(current_policy.locked_categories[i]) > 0) {
-              spdlog::info("blocked_categories: {}", current_policy.locked_categories[i]);
-          }
+        if (strlen(current_policy.locked_categories[i]) > 0) {
+          spdlog::info("blocked_categories: {}",
+                       current_policy.locked_categories[i]);
+        }
       }
 
       spdlog::info("Blocked domains ({} total)", block_dom_count);
       for (int i = 0; i < block_dom_count && i < MAX_DOMAINS; ++i) {
-          if (strlen(current_policy.block_domains[i]) > 0) {
-              spdlog::info("block_domains: {}", current_policy.block_domains[i]);
-          }
+        if (strlen(current_policy.block_domains[i]) > 0) {
+          spdlog::info("block_domains: {}", current_policy.block_domains[i]);
+        }
       }
 
       spdlog::info("Allowed domains ({} total)", allow_dom_count);
       for (int i = 0; i < allow_dom_count && i < MAX_DOMAINS; ++i) {
-          if (strlen(current_policy.allow_domains[i]) > 0) {
-              spdlog::info("allow_domains: {}", current_policy.allow_domains[i]);
-          }
+        if (strlen(current_policy.allow_domains[i]) > 0) {
+          spdlog::info("allow_domains: {}", current_policy.allow_domains[i]);
+        }
       }
       break;
     }
@@ -229,11 +230,13 @@ bool Worker::classifyDomain(const std::string &domain,
 
     std::string categories_str;
     for (int i = 0; i < resp.categories_size(); ++i) {
-        if (i > 0) categories_str += ", ";
-        categories_str += resp.categories(i);
+      if (i > 0)
+        categories_str += ", ";
+      categories_str += resp.categories(i);
     }
-    spdlog::info("Domain '{}' classified as categories [{}] with trust level {}",
-                domain, categories_str, resp.trust_level());
+    spdlog::info(
+        "Domain '{}' classified as categories [{}] with trust level {}", domain,
+        categories_str, resp.trust_level());
 
     out_req->get_trust_level = resp.trust_level();
     int cat_count = std::min(resp.categories_size(), MAX_CATEGORIES);
