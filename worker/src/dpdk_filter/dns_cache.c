@@ -1,6 +1,8 @@
 #include "dns_cache.h"
+#include <rte_spinlock.h>
 
 static sqlite3 *cache_table;
+static rte_spinlock_t cache_spinlock = RTE_SPINLOCK_INITIALIZER;
 
 static struct rte_hash *dns_hash;
 static struct rte_hash_parameters hash_params = {
@@ -24,7 +26,10 @@ static int insert_loaded_node(const char *domain, struct node_cache *node) {
   key_copy[DOMAIN_MAX_LEN - 1] = '\0';
   node->key_domain = key_copy;
 
+  rte_spinlock_lock(&cache_spinlock);
   int ret = rte_hash_add_key_data(dns_hash, key_copy, node);
+  rte_spinlock_unlock(&cache_spinlock);
+
   if (ret < 0) {
     LOG_ERROR("Failed to insert loaded node into hash: %s", strerror(-ret));
     rte_free(key_copy);
@@ -280,6 +285,7 @@ int save_all_cache_to_sqlite(void) {
     return -1;
   }
 
+  rte_spinlock_lock(&cache_spinlock);
   while (rte_hash_iterate(dns_hash, &key, &data, &next) >= 0) {
     const char *domain = (const char *)key;
     struct node_cache *node = (struct node_cache *)data;
@@ -295,6 +301,7 @@ int save_all_cache_to_sqlite(void) {
       errors++;
     }
   }
+  rte_spinlock_unlock(&cache_spinlock);
 
   ret = sqlite3_exec(cache_table, "COMMIT;", NULL, NULL, NULL);
   if (ret != SQLITE_OK) {
@@ -368,6 +375,7 @@ void init_dns_cache(void) {
 }
 
 int lookup_dns_cache(const char *domain, struct node_cache **return_node) {
+  rte_spinlock_lock(&cache_spinlock);
   int ret = rte_hash_lookup_data(dns_hash, domain, (void **)return_node);
 
   if (ret >= 0 && *return_node) {
@@ -380,15 +388,18 @@ int lookup_dns_cache(const char *domain, struct node_cache **return_node) {
       int ret_del = rte_hash_del_key(dns_hash, domain);
       if (ret_del < 0) {
         LOG_ERROR("Failed to deleting an obsolete hashtable value");
+        rte_spinlock_unlock(&cache_spinlock);
         return -ENOENT;
       }
       rte_free((*return_node)->key_domain);
       rte_free(*return_node);
       *return_node = NULL;
 
+      rte_spinlock_unlock(&cache_spinlock);
       return -ENOENT;
     }
   }
+  rte_spinlock_unlock(&cache_spinlock);
   return ret;
 }
 
@@ -405,7 +416,10 @@ void add_to_dns_cache(const char *domain, struct node_cache *node) {
   node->ttl_seconds = DNS_CACHE_DEFAULT_TTL;
   node->key_domain = key_copy;
 
+  rte_spinlock_lock(&cache_spinlock);
   int ret = rte_hash_add_key_data(dns_hash, key_copy, node);
+  rte_spinlock_unlock(&cache_spinlock);
+
   if (ret) {
     LOG_ERROR("Failed to add key data in hash table");
     rte_free(key_copy);
