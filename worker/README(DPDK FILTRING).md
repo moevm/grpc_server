@@ -33,6 +33,10 @@ Before starting, it is recommended to run the virtual device configuration scrip
 sudo ./scripts/set_virt_dev_for_test_xdp.sh
 ```
 
+For debugging add DEBUG=1, example:
+```bash
+make -f Makefile.main_x86 virt DEBUG=1
+```
 
 # Clean
 ```bash
