@@ -1,7 +1,7 @@
 #ifndef AF_XDP_PORT_H
 #define AF_XDP_PORT_H
 
-#include "../../include/dpdk_filter/types.h"
+#include "types.h"
 #include <rte_mempool.h>
 #include <stdint.h>
 

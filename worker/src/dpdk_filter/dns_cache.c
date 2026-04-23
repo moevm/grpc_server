@@ -1,4 +1,4 @@
-#include "../../include/dpdk_filter/dns_cache.h"
+#include "dns_cache.h"
 
 static sqlite3 *cache_table;
 
