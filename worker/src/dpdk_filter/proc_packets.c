@@ -11,7 +11,7 @@ void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
     uint16_t ret = rte_eth_tx_burst(port_out->port_id, queue_number, tx_pkt, 1);
 
     if (ret < 1) {
-      printf("[ERROR] Failed to send packet\n");
+      LOG_ERROR("Failed to send packet");
       // PLUG (to be added later) - need to add processing for this case
       rte_pktmbuf_free(pkt);
     }
@@ -44,7 +44,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
 
     parsing_pakage(pkts[i], &info_pac);
     if (info_pac.domain[0] == '\0') {
-      printf("[INFO] Packet without dns request\n");
+      LOG_INFO("Packet without dns request");
       package_sending_decision(true, pkts[i], port_out, queue_number);
       continue;
     }
@@ -74,15 +74,15 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
           rte_calloc("struct_node_cache", 1, sizeof(struct node_cache),
                      RTE_CACHE_LINE_SIZE);
       if (!new_node) {
-        printf("[ERROR] Failed to allocate memory for struct node_cache\n");
+        LOG_ERROR("Failed to allocate memory for struct node_cache");
         continue;
       }
       new_node->solution_is_send = solution_is_send;
       // NEED TO FILL THE STRUCTURE WITH CATEGORIES
       add_to_dns_cache(info_pac.domain, new_node);
     } else {
-      printf(
-          "[ERROR] Failed to search a key-value pair in the hash table: %s\n",
+      LOG_ERROR(
+          "[ERROR] Failed to search a key-value pair in the hash table: %s",
           strerror(-ret));
     }
   }

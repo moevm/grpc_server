@@ -6,6 +6,11 @@ PKG_CONFIG = env PKG_CONFIG_LIBDIR=$(DPDK_PREFIX)/lib/pkgconfig pkg-config
 
 CFLAGS_BASE = -Iinclude/dpdk_filter -O2 $(shell $(PKG_CONFIG) --cflags libdpdk)
 
+DEBUG ?= 0
+ifeq ($(DEBUG),1)
+    CFLAGS_BASE += -DDEBUG
+endif
+
 LDFLAGS = -L$(DPDK_PREFIX)/lib \
           -Wl,--start-group \
           -lrte_eal -lrte_ethdev -lrte_mempool -lrte_mbuf \

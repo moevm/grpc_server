@@ -13,7 +13,7 @@ static volatile int running = 1;
 
 static void signal_handler(int signum) {
   if (signum == SIGINT || signum == SIGTERM) {
-    printf("\n Signal %d received, shutting down.\n", signum);
+    LOG_INFO("\n Signal %d received, shutting down.", signum);
     running = 0;
   }
 }
@@ -27,7 +27,7 @@ void forward_to_out(struct net_port *incoming_port,
     int ret =
         rte_eth_tx_burst(outgoing_port->port_id, queue_number, &tap_pkts[i], 1);
     if (ret < 1) {
-      printf("[ERROR] Failed to send packet\n");
+      LOG_ERROR("Failed to send packet");
       // PLUG (to be added later) - need to add processing for this case
       rte_pktmbuf_free(tap_pkts[i]);
     }
@@ -38,11 +38,11 @@ int main(int argc, char **argv) {
   // since BASE_POLICY is filled when initializing worker, let’s initialize here
   struct BASE_POLICY policy;
   if (signal(SIGINT, signal_handler) == SIG_ERR) {
-    printf("[ERROR] Failed to set SIGINT handler\n");
+    LOG_ERROR("Failed to set SIGINT handler");
     return 1;
   }
   if (signal(SIGTERM, signal_handler) == SIG_ERR) {
-    printf("[ERROR] Failed to set SIGTERM handler\n");
+    LOG_ERROR("Failed to set SIGTERM handler");
     return 1;
   }
 
@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
 
   int ret = rte_eal_init(argc, argv);
   if (ret < 0) {
-    printf("[ERROR] EAL init failed: %s\n", rte_strerror(rte_errno));
+    LOG_ERROR("EAL init failed: %s", rte_strerror(rte_errno));
     return 1;
   }
 
@@ -67,17 +67,17 @@ int main(int argc, char **argv) {
       "POOL", mbuf_quantity_in_pool, cache_size_per_kernel, priv_size,
       RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
   if (!mbuf_pool) {
-    printf("[ERROR] Failed to create mbuf pool: %s\n", rte_strerror(rte_errno));
+    LOG_ERROR("Failed to create mbuf pool: %s", rte_strerror(rte_errno));
     return -1;
   }
   init_dns_cache();
 
 #ifdef VIRT_PORTS
-  printf("Using virtual ports: veth0/veth1\n");
+  LOG_INFO("Using virtual ports: veth0/veth1");
   port_in = init_struct_af_xdp_port("veth0", mbuf_pool);
   port_out = init_struct_af_xdp_port("veth1", mbuf_pool);
 #else
-  printf("Using real ports: eth0/eth1\n");
+  LOG_INFO("Using real ports: eth0/eth1");
   port_in = init_struct_af_xdp_port("eth0", mbuf_pool);
   port_out = init_struct_af_xdp_port("eth1", mbuf_pool);
 #endif
@@ -98,8 +98,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  printf("An endless cycle has been started. Packets pass from port with id=%u "
-         "to port with id=%u\n",
+  LOG_INFO("An endless cycle has been started. Packets pass from port with id=%u "
+         "to port with id=%u",
          port_in->port_id, port_out->port_id);
 
   uint64_t timer_check_counter = 0;
