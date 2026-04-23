@@ -66,4 +66,9 @@ struct node_cache {
   char *key_domain;
 };
 
+struct snapshot {
+  struct node_cache node;
+  char domain[DOMAIN_MAX_LEN];
+};
+
 #endif

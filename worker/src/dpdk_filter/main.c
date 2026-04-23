@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  save_all_cache_to_sqlite();
+  save_all_cache_to_sqlite(NULL);
   free_dns_cache();
 
   net_port_close(port_in);
