@@ -1,7 +1,7 @@
 version: '3.9'
 
 services:
-  redis:
+  redis_new:
     image: redis:latest
     container_name: redis_container
     environment:
@@ -46,5 +46,5 @@ services:
     environment:
       - REDIS_ADDR=redis:6379
     depends_on:
-      - redis
+      - redis_new
 

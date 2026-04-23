@@ -14,7 +14,7 @@ go_library(
         "//internal/service/storage",
         "//pkg/proto/admin_service:admin_service_go_proto",
         "//pkg/proto/communication:communication_go_proto",
-        "@com_github_redis_go_redis_v9//:go_redis_v9",
+        "@com_github_redis_go_redis_v9//:go-redis",
         "@org_golang_google_grpc//codes",
         "@org_golang_google_grpc//status",
         "@org_golang_google_grpc//:go_default_library",

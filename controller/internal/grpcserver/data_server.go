@@ -2,14 +2,12 @@ package grpcserver
 
 import (
 	"context"
-	"errors"
 	"log"
 	"time"
 
 	"github.com/moevm/grpc_server/internal/manager"
 	"github.com/moevm/grpc_server/internal/service/storage"
 	pb "github.com/moevm/grpc_server/pkg/proto/communication"
-	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
