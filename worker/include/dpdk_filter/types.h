@@ -23,6 +23,11 @@
   fprintf(stdout, "[ERROR] %s: %d: " error "\n", __func__, __LINE__,           \
           ##__VA_ARGS__)
 #endif
+enum type_ip {
+  IP_4 = 1,
+  IP_6 = 2
+};
+
 
 struct net_port {
   uint16_t port_id;
@@ -31,6 +36,7 @@ struct net_port {
   char dev_args[256];
   struct rte_mempool *mbuf_pool;
 };
+
 struct info_of_pakage {
   uint16_t ethernet_type_host;
   uint16_t ethernet_type_protocol;
@@ -57,7 +63,7 @@ struct requested_classification {
   int get_trust_level;
 };
 
-struct node_cache {
+struct node_cache_domain {
   char categories[MAX_CATEGORIES][CATEGORY_MAX_LEN];
   bool solution_is_send;
   int trust_lvl;
@@ -70,5 +76,16 @@ struct snapshot {
   struct node_cache node;
   char domain[DOMAIN_MAX_LEN];
 };
+
+struct node_cache_ip {
+  char categories[MAX_CATEGORIES][CATEGORY_MAX_LEN];
+  bool solution_is_send;
+  int trust_lvl;
+  uint64_t timestamp;
+  uint32_t ttl_seconds;
+  type_ip;
+  char *key_ip;
+};
+
 
 #endif
