@@ -1,18 +1,15 @@
 #ifndef AF_XDP_PORT_H
 #define AF_XDP_PORT_H
 
+#include "types.h"
 #include <rte_mempool.h>
 #include <stdint.h>
-#include "../../include/dpdk_filter/types.h"
-
-
 
 struct net_port *init_struct_tap_port(const char *tap_iface_name,
-                                            struct rte_mempool *mbuf_pool);
-
+                                      struct rte_mempool *mbuf_pool);
 
 struct net_port *init_struct_af_xdp_port(const char *iface_name,
-                                            struct rte_mempool *mbuf_pool);
+                                         struct rte_mempool *mbuf_pool);
 
 int net_port_init(struct net_port *port);
 

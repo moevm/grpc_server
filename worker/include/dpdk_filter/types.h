@@ -2,8 +2,27 @@
 #define TYPES_H
 
 #include "constants.h"
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
+
+#ifdef DEBUG
+#define LOG_INFO(info, ...)                                                    \
+  fprintf(stdout, "[INFO] %s: %d: " info "\n", __func__, __LINE__,             \
+          ##__VA_ARGS__)
+
+#define LOG_ERROR(error, ...)                                                  \
+  fprintf(stdout, "[ERROR] %s: %d: " error "\n", __func__, __LINE__,           \
+          ##__VA_ARGS__)
+
+#else
+#define LOG_INFO(info, ...)                                                    \
+  do {                                                                         \
+  } while (0)
+
+#define LOG_ERROR(error, ...)                                                  \
+  fprintf(stdout, "[ERROR] %s: %d: " error "\n", __func__, __LINE__,           \
+          ##__VA_ARGS__)
+#endif
 
 struct net_port {
   uint16_t port_id;
@@ -20,23 +39,23 @@ struct info_of_pakage {
 };
 
 struct trust_categories_with_lvl {
-    char locked_by_trust_category[CATEGORY_MAX_LEN];
-    int trust_lvl;
+  char locked_by_trust_category[CATEGORY_MAX_LEN];
+  int trust_lvl;
 };
 
 struct BASE_POLICY {
   char locked_categories[MAX_CATEGORIES][CATEGORY_MAX_LEN];
-  struct trust_categories_with_lvl categories_with_lvl[MAX_CATEGORIES_BY_TRUST_LVL];
+  struct trust_categories_with_lvl
+      categories_with_lvl[MAX_CATEGORIES_BY_TRUST_LVL];
   char block_domains[MAX_DOMAINS][DOMAIN_MAX_LEN];
   char allow_domains[MAX_DOMAINS][DOMAIN_MAX_LEN];
   int min_trust_level;
 };
 
 struct requested_classification {
-    char get_categories[MAX_CATEGORIES][CATEGORY_MAX_LEN];
-    int get_trust_level;
+  char get_categories[MAX_CATEGORIES][CATEGORY_MAX_LEN];
+  int get_trust_level;
 };
-
 
 struct node_cache {
   char categories[MAX_CATEGORIES][CATEGORY_MAX_LEN];
@@ -46,6 +65,5 @@ struct node_cache {
   uint32_t ttl_seconds;
   char *key_domain;
 };
-
 
 #endif
