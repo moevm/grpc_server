@@ -23,7 +23,11 @@ func main() {
 
 	adminServer.SetManager(mgr)
 
-	dataServer := grpcserver.NewDataServer(mgr)
+	dataServer, err := grpcserver.NewDataServer(mgr, "internal/service/config/categories.json", "internal/service/config/providers.json")
+
+	if err != nil {
+		log.Fatalf("Failed to create data server: %v", err)
+	}
 
 	lis, err := net.Listen("tcp", net.JoinHostPort(cfg.Host, cfg.Port))
 	if err != nil {

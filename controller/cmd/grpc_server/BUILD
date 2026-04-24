@@ -4,6 +4,9 @@ go_binary(
     name = "grpc_server",
     embed = [":grpc_server_lib"],
     visibility = ["//visibility:public"],
+    data = [
+        "//internal/service/config",
+    ],
 )
 
 go_library(
@@ -15,6 +18,7 @@ go_library(
         "//internal/config",
         "//internal/grpcserver",
         "//internal/manager",
+        "//internal/service/service",
         "//pkg/proto/admin_service:admin_service_go_proto",
         "//pkg/proto/communication:communication_go_proto",
         "@org_golang_google_grpc//:go_default_library",

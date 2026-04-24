@@ -1,0 +1,90 @@
+{
+  "providers": {
+    "kaspersky": {
+      "base_url": "https://opentip.kaspersky.com/api/v1",
+      "headers": {
+        "x-api-key": "${env:KASPERSKY_API_KEY}"
+      },
+      "endpoints": {
+        "domain": {
+          "method": "GET",
+          "path": "/search/domain",
+          "query": {
+            "request": "{domain}"
+          },
+          "categories": "DomainGeneralInfo.Categories"
+        },
+        "ip": {
+          "method": "GET",
+          "path": "/search/ip",
+          "query": {
+            "request": "{ip}"
+          },
+          "categories": "IpGeneralInfo.Categories"
+        }
+      }
+    },
+
+    "virustotal": {
+      "base_url": "https://www.virustotal.com/api/v3",
+      "headers": {
+        "x-apikey": "${env:VIRUSTOTAL_API_KEY}"
+      },
+      "endpoints": {
+        "domain": {
+          "method": "GET",
+          "path": "/domains/{domain}",
+          "categories": "data.attributes.categories"
+        },
+        "ip": {
+          "method": "GET",
+          "path": "/ip_addresses/{ip}",
+          "categories": "data.attributes.categories"
+        }
+      }
+    },
+
+    "skydns": {
+      "base_url": "http://z.api.skydns.ru",
+      "headers": {
+
+      },
+      "endpoints": {
+        "domain": {
+          "method": "GET",
+          "path": "/domain/{domain}",
+          "categories": "category_name"
+        },
+        "ip": {
+          "path": "/ip/{ip}",
+          "categories": "category_name"
+        }
+      }
+    },
+
+    "example_custom": {
+      "base_url": "https://api.example.com",
+      "headers": {
+        "Authorization": "Bearer {token}"
+      },
+      "endpoints": {
+        "domain": {
+          "method": "POST",
+          "path": "/check",
+          "body": {
+            "domain": "{domain}"
+          },
+          "categories": "data.categories"
+        },
+        "ip": {
+          "method": "POST",
+          "path": "/check",
+          "body": {
+            "ip": "{ip}"
+          },
+          "categories": "data.categories"
+        }
+      }
+    }
+  }
+}
