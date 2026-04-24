@@ -124,7 +124,6 @@ void Worker::requestPolicyFromController() {
     case GetPolicyResponse::POLICY_PROVIDED: {
       spdlog::info("Policy received");
       const auto &pol = resp.policy();
-      current_config_version = resp.policy().config_version();
       std::lock_guard<std::mutex> lock(policy_mutex);
       memset(&current_policy, 0, sizeof(current_policy));
 
@@ -279,6 +278,7 @@ Worker::~Worker() {
 }
 
 void Worker::MainLoop() {
+  struct BASE_POLICY local_policy;
   using namespace std::chrono;
 
   last_policy_time = steady_clock::now();
@@ -288,9 +288,13 @@ void Worker::MainLoop() {
   uint16_t nb_pkts = 32;
   uint16_t queue_number = 0;
   while (!stop_flag && GetState() != WorkerState::SHUTTING_DOWN) {
+    {
+      std::lock_guard<std::mutex> lock(policy_mutex);
+      local_policy = current_policy;
+    }
     forward_to_out(port_exception, port_in, queue_number);
     pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts,
-                      pkts, &current_policy);
+                      pkts, &local_policy);
     forward_to_out(port_out, port_in, queue_number);
 
     auto now = steady_clock::now();
@@ -310,8 +314,6 @@ void Worker::MainLoop() {
       policy_interval =
           MIN_POLICY_TIME + (rand() % (MAX_POLICY_TIME - MIN_POLICY_TIME + 1));
     }
-
-    std::this_thread::sleep_for(milliseconds(100));
   }
 
   if (stop_flag) {
