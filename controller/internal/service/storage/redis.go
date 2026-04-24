@@ -23,7 +23,7 @@ type RedisClient struct {
 	db *redis.Client
 }
 
-type RequestHash struct {
+type RequestCash struct {
 	Endpoint      string
 	CategoriesIds []int
 }
@@ -48,7 +48,7 @@ func NewRedisClient(ctx context.Context, cfg Config) (*RedisClient, error) {
 	return &RedisClient{db: db}, nil
 }
 
-func (c *RedisClient) SaveRequestHash(ctx context.Context, hash RequestHash) error {
+func (c *RedisClient) SaveRequestHash(ctx context.Context, hash RequestCash) error {
 
 	key := fmt.Sprintf("request:hash:%s", hash.Endpoint)
 
@@ -61,7 +61,7 @@ func (c *RedisClient) SaveRequestHash(ctx context.Context, hash RequestHash) err
 	return c.db.Set(ctx, key, data, 0).Err()
 }
 
-func (c *RedisClient) GetRequestHash(ctx context.Context, endpoint string) (*RequestHash, error) {
+func (c *RedisClient) GetRequestHash(ctx context.Context, endpoint string) (*RequestCash, error) {
 
 	key := fmt.Sprintf("request:hash:%s", endpoint)
 
@@ -85,5 +85,5 @@ func (c *RedisClient) GetRequestHash(ctx context.Context, endpoint string) (*Req
 		return nil, err
 	}
 
-	return &RequestHash{Endpoint: endpoint, CategoriesIds: categoriesID}, nil
+	return &RequestCash{Endpoint: endpoint, CategoriesIds: categoriesID}, nil
 }

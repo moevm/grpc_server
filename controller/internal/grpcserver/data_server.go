@@ -80,7 +80,7 @@ func (s *DataServer) GetPolicy(ctx context.Context, req *pb.GetPolicyRequest) (*
 func (s *DataServer) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb.ClassifyResponse, error) {
 	log.Printf("gRPC Classify from worker %d for domain: %s", req.WorkerId, req.Domain)
 
-	hastRequest, err := s.storage.GetRequestHash(ctx, req.Domain)
+	cashRequest, err := s.storage.GetRequestHash(ctx, req.Domain)
 
 	var categoryIDs []int
 
@@ -94,7 +94,7 @@ func (s *DataServer) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb
 			}, nil
 		}
 
-		err = s.storage.SaveRequestHash(ctx, storage.RequestHash{
+		err = s.storage.SaveRequestHash(ctx, storage.RequestCash{
 			Endpoint:      req.Domain,
 			CategoriesIds: categoryIDs,
 		})
@@ -104,7 +104,7 @@ func (s *DataServer) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb
 		}
 
 	} else {
-		categoryIDs = hastRequest.CategoriesIds
+		categoryIDs = cashRequest.CategoriesIds
 	}
 
 	if len(categoryIDs) > 0 {
