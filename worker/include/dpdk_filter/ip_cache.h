@@ -22,8 +22,8 @@ void init_tables_sqlite_dns_cache(void);
 void copy_data_from_hash_to_snapshot(struct snapshot *snapt);
 
 void init_dns_cache(void);
-int lookup_dns_cache(const char *domain, struct node_cache **return_node);
-void add_to_dns_cache(const char *domain, struct node_cache *node);
+int lookup_dns_cache(const char *domain, struct node_cache_ip **return_node);
+void add_to_dns_cache(const char *domain, struct node_cache_ip *node);
 void free_dns_cache(void);
 void clear_cache(void);
 
