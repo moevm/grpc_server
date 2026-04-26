@@ -5,6 +5,25 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifdef DEBUG
+#define LOG_INFO(info, ...)                                                    \
+  fprintf(stdout, "[INFO] %s: %d: " info "\n", __func__, __LINE__,             \
+          ##__VA_ARGS__)
+
+#define LOG_ERROR(error, ...)                                                  \
+  fprintf(stdout, "[ERROR] %s: %d: " error "\n", __func__, __LINE__,           \
+          ##__VA_ARGS__)
+
+#else
+#define LOG_INFO(info, ...)                                                    \
+  do {                                                                         \
+  } while (0)
+
+#define LOG_ERROR(error, ...)                                                  \
+  fprintf(stdout, "[ERROR] %s: %d: " error "\n", __func__, __LINE__,           \
+          ##__VA_ARGS__)
+#endif
+
 struct net_port {
   uint16_t port_id;
   char iface_name[32];
