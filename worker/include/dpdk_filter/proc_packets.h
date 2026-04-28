@@ -12,6 +12,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
+                              struct net_port *port_out, uint16_t queue_number);
+
+bool check_is_exception(struct info_of_pakage *info_pac);
+
 void pakage_processing(struct net_port *port_in, struct net_port *port_out,
                        struct net_port *port_exception, uint16_t queue_number,
                        uint16_t nb_pkts, struct rte_mbuf **pkts,

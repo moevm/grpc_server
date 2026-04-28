@@ -71,6 +71,7 @@ int main(int argc, char **argv) {
     return -1;
   }
   init_dns_cache();
+  init_dns_cache();
 
 #ifdef VIRT_PORTS
   LOG_INFO("Using virtual ports: veth0/veth1");
