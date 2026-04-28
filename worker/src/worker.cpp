@@ -82,6 +82,8 @@ void Worker::initDPDK(int argc, char **argv) {
     throw std::runtime_error("Start ports");
   }
 
+  init_dns_cache();
+
   spdlog::info("DPDK initialized: in_port={}, out_port={}", port_in->port_id,
                port_out->port_id);
 }
@@ -167,6 +169,7 @@ void Worker::requestPolicyFromController() {
       current_policy.min_trust_level = pol.min_trust_level();
 
       current_config_version = pol.config_version();
+      clear_cache();
       break;
     }
     case GetPolicyResponse::POLICY_UNCHANGED: {
@@ -266,6 +269,9 @@ Worker::~Worker() {
   spdlog::info("Worker {} shutting down", worker_id);
 
   if (port_in && port_out) {
+    save_all_cache_to_sqlite();
+    free_dns_cache();
+
     net_port_close(port_in);
     net_port_close(port_out);
     net_port_close(port_exception);
