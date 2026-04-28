@@ -1,7 +1,6 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-#include "constants.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -28,6 +27,7 @@ enum type_ip {
   IP_6 = 2
 };
 
+enum ip_version { IP_4 = 1, IP_6 = 2 };
 
 struct net_port {
   uint16_t port_id;
@@ -42,6 +42,11 @@ struct info_of_pakage {
   uint16_t ethernet_type_protocol;
   uint16_t number_port;
   char domain[DOMAIN_MAX_LEN];
+  uint8_t ip_version;
+  uint32_t ip4_src;
+  uint32_t ip4_dist;
+  uint8_t ip6_src[IP6_LEN];
+  uint8_t ip6_dist[IP6_LEN];
 };
 
 struct trust_categories_with_lvl {
@@ -55,6 +60,10 @@ struct BASE_POLICY {
       categories_with_lvl[MAX_CATEGORIES_BY_TRUST_LVL];
   char block_domains[MAX_DOMAINS][DOMAIN_MAX_LEN];
   char allow_domains[MAX_DOMAINS][DOMAIN_MAX_LEN];
+  uint32_t block_ip4[MAX_IP4];
+  uint32_t allow_ip4[MAX_IP4];
+  uint8_t block_ip6[MAX_IP6][IP6_LEN];
+  uint8_t allow_ip6[MAX_IP6][IP6_LEN];
   int min_trust_level;
 };
 
@@ -69,6 +78,9 @@ struct node_cache_domain {
   int trust_lvl;
   uint64_t timestamp;
   uint32_t ttl_seconds;
+  enum ip_version ip;
+  uint32_t ip4_src;
+  uint8_t ip6_src[IP6_LEN];
   char *key_domain;
 };
 
@@ -83,9 +95,10 @@ struct node_cache_ip {
   int trust_lvl;
   uint64_t timestamp;
   uint32_t ttl_seconds;
-  type_ip;
+  enum ip_version ip;
+  uint32_t ip4_src;
+  uint8_t ip6_src[IP6_LEN];
   char *key_ip;
 };
-
 
 #endif
