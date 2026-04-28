@@ -442,3 +442,8 @@ void free_dns_cache(void) {
     LOG_ERROR("Failed to stopping timer");
   }
 }
+
+void clear_cache(void) {
+  rte_hash_reset(dns_hash);
+  LOG_INFO("Cache clear");
+}
