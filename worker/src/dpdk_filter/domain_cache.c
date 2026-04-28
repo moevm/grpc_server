@@ -63,7 +63,7 @@ void load_cache_from_sqlite(void) {
   int expired = 0;
 
   while (sqlite3_step(stmt) == SQLITE_ROW) {
-    const char *domain = (const char *)sqlite3_column_text(stmt, 0);
+    const *domain = (const char *)sqlite3_column_text(stmt, 0);
     int solution_is_send = sqlite3_column_int(stmt, 1);
     int trust_lvl = sqlite3_column_int(stmt, 2);
     uint64_t timestamp = (uint64_t)sqlite3_column_int64(stmt, 3);
@@ -116,7 +116,7 @@ void load_cache_from_sqlite(void) {
 
     sqlite3_finalize(stmt_cat);
 
-    if (insert_loaded_node(domain, node) == 0) {
+    if (insert_loaded_node(ip, node) == 0) {
       loaded++;
     } else {
       rte_free(node);
@@ -313,9 +313,9 @@ int save_all_cache_to_sqlite(void) {
 }
 
 void init_tables_sqlite_dns_cache(void) {
-  int ret = sqlite3_open("cache.db", &cache_table_domen);
+  int ret = sqlite3_open("cache_domain.db", &cache_table_domen);
   if (ret != SQLITE_OK) {
-    printf("[ERROR] Failed to open cache.db\n");
+    printf("[ERROR] Failed to open cache_domain.db\n");
     return;
   }
 
