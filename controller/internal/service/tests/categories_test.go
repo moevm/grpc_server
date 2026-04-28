@@ -12,7 +12,7 @@ var testCategories = models.CategoryList{
 			ID:          1,
 			Name:        "Phishing",
 			TrustLevel:  5,
-			Description: "Фишинговые сайты",
+			Description: "Phishing sites",
 			Mappings: map[string][]string{
 				"kaspersky":  {"Phishing", "Fraud"},
 				"virustotal": {"phishing", "scam"},
@@ -23,7 +23,7 @@ var testCategories = models.CategoryList{
 			ID:          2,
 			Name:        "Malware",
 			TrustLevel:  5,
-			Description: "Вредоносное ПО",
+			Description: "Malicious software",
 			Mappings: map[string][]string{
 				"kaspersky":  {"Malware", "Virus"},
 				"virustotal": {"malware"},
@@ -34,7 +34,7 @@ var testCategories = models.CategoryList{
 }
 
 func TestCategoryLoadFromFile(t *testing.T) {
-	filename := "categories_test.json"
+	filename := "../config/categories.json"
 	list := models.CategoryList{}
 
 	err := list.LoadFromFile(filename)

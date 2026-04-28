@@ -1,4 +1,4 @@
-#include "../../include/dpdk_filter/pars_packets.h"
+#include "pars_packets.h"
 #include <rte_ether.h>
 #include <rte_ip.h>
 #include <rte_net.h>
@@ -13,7 +13,7 @@ void parsing_pakage(struct rte_mbuf *packet, struct info_of_pakage *info_pac) {
   uint32_t pkt_type = rte_net_get_ptype(packet, &hdr_lens, RTE_PTYPE_ALL_MASK);
 
   if (pkt_type == RTE_PTYPE_UNKNOWN) {
-    printf("[ERROR PARS] Problem with get lens of headers");
+    LOG_ERROR(" PARS] Problem with get lens of headers");
     return;
   }
 

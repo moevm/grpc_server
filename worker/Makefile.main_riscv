@@ -4,7 +4,12 @@ DPDK_PREFIX = ./dpdk-riscv-install
 SQLITE_PREFIX = ./sqlite3-riscv-install
 PKG_CONFIG = env PKG_CONFIG_LIBDIR=$(DPDK_PREFIX)/lib/pkgconfig pkg-config
 
-CFLAGS_BASE = -Iinclude -I$(DPDK_PREFIX)/include -I$(DPDK_PREFIX)/include/dpdk -I$(SQLITE_PREFIX)/include -O2 $(shell $(PKG_CONFIG) --cflags libdpdk 2>/dev/null)
+CFLAGS_BASE = -Iinclude/dpdk_filter -O2 $(shell $(PKG_CONFIG) --cflags libdpdk)
+
+DEBUG ?= 0
+ifeq ($(DEBUG),1)
+    CFLAGS_BASE += -DDEBUG
+endif
 
 LDFLAGS = -L$(DPDK_PREFIX)/lib \
           -Wl,-rpath-link,$(DPDK_PREFIX)/lib \
@@ -16,10 +21,9 @@ LDFLAGS = -L$(DPDK_PREFIX)/lib \
           -lrte_net -lrte_meter \
           -lrte_log -ldl \
           -lrte_hash \
-          -lrte_rcu \
           -lrte_timer \
           -Wl,--end-group \
-          -lnuma -latomic \
+          -latomic  \
           -L$(SQLITE_PREFIX)/lib \
           -lsqlite3
 

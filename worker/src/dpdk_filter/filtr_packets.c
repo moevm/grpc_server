@@ -1,5 +1,5 @@
-#include "../../include/dpdk_filter/filtr_packets.h"
-#include "../../include/dpdk_filter/pars_packets.h"
+#include "filtr_packets.h"
+#include "pars_packets.h"
 
 bool check_is_block(char domain[DOMAIN_MAX_LEN],
                     char block_domains[MAX_DOMAINS][DOMAIN_MAX_LEN]) {
@@ -71,30 +71,30 @@ bool main_filtring(struct requested_classification *req_clas,
                    struct BASE_POLICY *policy, char domain[DOMAIN_MAX_LEN]) {
 
   if (check_is_block(domain, policy->block_domains) == true) {
-    printf("This domain is blocked");
+    LOG_INFO("This domain is blocked");
     return false;
   }
 
   if (check_is_allow(domain, policy->allow_domains) == true) {
-    printf("This domain is allowed");
+    LOG_INFO("This domain is allowed");
     return true;
   }
 
   if (check_categories(req_clas->get_categories, policy->locked_categories) ==
       false) {
-    printf("This site has a locked category");
+    LOG_INFO("This site has a locked category");
     return false;
   }
 
   if (check_trust_level(req_clas->get_trust_level, policy->min_trust_level) ==
       false) {
-    printf("This site has a too small trust level");
+    LOG_INFO("This site has a too small trust level");
     return false;
   }
 
   if (check_categories_with_lvl(req_clas, policy->categories_with_lvl) ==
       false) {
-    printf(
+    LOG_INFO(
         "This site blocked in accordance with 'trust categories with level'");
     return false;
   }

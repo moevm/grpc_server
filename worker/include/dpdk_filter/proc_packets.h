@@ -1,11 +1,11 @@
 #ifndef PROC_PAK_H
 #define PROC_PAK_H
 
-#include "../../include/dpdk_filter/constants.h"
-#include "../../include/dpdk_filter/filtr_packets.h"
-#include "../../include/dpdk_filter/net_port.h"
-#include "../../include/dpdk_filter/pars_packets.h"
-#include "../../include/dpdk_filter/types.h"
+#include "constants.h"
+#include "filtr_packets.h"
+#include "net_port.h"
+#include "pars_packets.h"
+#include "types.h"
 #include <rte_ethdev.h>
 #include <rte_mbuf.h>
 #include <rte_mempool.h>
