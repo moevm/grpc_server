@@ -20,7 +20,7 @@ type Service struct {
 
 func NewService(categoryFile, providerFile string) (*Service, error) {
 
-    if err := godotenv.Load(); err != nil {
+	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: .env file not found, using system environment variables")
 	}
 
@@ -75,7 +75,7 @@ func (s *Service) Check(checkValue string, endpointName string) ([]int, error) {
 			continue
 		}
 
-	    resp.Body.Close()
+		resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			log.Printf("Provider %s returned %s", providerName, resp.Status)

@@ -3,9 +3,19 @@
 
 #include "communication.grpc.pb.h"
 #include "communication.pb.h"
+extern "C" {
+#include "dpdk_filter/filtr_packets.h"
+#include "dpdk_filter/net_port.h"
+#include "dpdk_filter/proc_packets.h"
+#include "dpdk_filter/types.h"
+}
 #include <cstdint>
 #include <grpcpp/grpcpp.h>
 #include <memory>
+#include <rte_eal.h>
+#include <rte_ethdev.h>
+#include <rte_mbuf.h>
+#include <rte_mempool.h>
 
 #define EXPECTED_POLICY_TIME 60
 #define MIN_POLICY_TIME 30
@@ -29,6 +39,14 @@ class Worker {
   int64_t policy_interval = MIN_POLICY_TIME;
   int64_t stats_interval = MIN_STATS_TIME;
 
+  struct net_port *port_in = nullptr;
+  struct net_port *port_out = nullptr;
+  struct net_port *port_exception = nullptr;
+  struct rte_mempool *mbuf_pool = nullptr;
+  std::mutex policy_mutex;
+  struct BASE_POLICY current_policy;
+  uint16_t queue_number = 0;
+
   std::unique_ptr<DataService::Stub> stub_;
 
   WorkerState state;
@@ -39,9 +57,13 @@ public:
   Worker(uint64_t id);
   ~Worker();
 
+  void initDPDK(int argc, char **argv);
   inline uint64_t GetID() const { return worker_id; }
   void requestPolicyFromController();
-  void classifyDomain(const std::string &domain);
+  bool classifyDomain(const std::string &domain,
+                      struct requested_classification *out_req);
+  void forward_to_out(struct net_port *incoming_port,
+                      struct net_port *outgoing_port, uint16_t queue_number);
   void statsReport();
   WorkerState GetState() const { return state; }
   void MainLoop();

@@ -1,5 +1,5 @@
-#include "../include/metrics_collector.hpp"
-#include "../include/worker.hpp"
+#include "metrics_collector.hpp"
+#include "worker.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -20,7 +20,7 @@ public:
                           ("worker-" + std::to_string(id)).c_str()) {}
 };
 
-int main() {
+int main(int argc, char **argv) {
   const char *worker_id_str = getenv("WORKER_ID");
   if (worker_id_str == nullptr) {
     spdlog::error("WORKER_ID environment variable not set");
@@ -42,7 +42,6 @@ int main() {
 
   try {
     Worker worker(worker_id);
-
     bool test_mode = false;
     if (getenv("TEST_REQUEST_POLICY") != nullptr) {
       test_mode = true;
@@ -62,14 +61,22 @@ int main() {
       test_mode = true;
       spdlog::info("Test mode: classifying domain '{}'", domain);
       std::this_thread::sleep_for(std::chrono::seconds(1));
-      worker.classifyDomain(domain);
+      struct requested_classification req_clas;
+      memset(&req_clas, 0, sizeof(req_clas));
+      bool success = worker.classifyDomain(domain, &req_clas);
+      if (success) {
+        spdlog::info("Classification successful: trust_level={}",
+                     req_clas.get_trust_level);
+      } else {
+        spdlog::error("Classification failed");
+      }
     }
 
     if (test_mode) {
       spdlog::info("Test mode completed, exiting");
       return 0;
     }
-
+    worker.initDPDK(argc, argv);
     worker.MainLoop();
 
   } catch (std::exception &e) {
