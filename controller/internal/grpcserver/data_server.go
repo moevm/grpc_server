@@ -3,8 +3,10 @@ package grpcserver
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/moevm/grpc_server/internal/manager"
+	"github.com/moevm/grpc_server/internal/service/storage"
 	pb "github.com/moevm/grpc_server/pkg/proto/communication"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -18,18 +20,30 @@ type DataServer struct {
 	pb.UnimplementedDataServiceServer
 	manager    *manager.Manager
 	classifier *service.Service
+	storage    *storage.RedisClient
 }
 
-func NewDataServer(mgr *manager.Manager, categoryFile, providerFile string) (*DataServer, error) {
+func NewDataServer(mgr *manager.Manager, categoryFile, providerFile string, config storage.Config) (*DataServer, error) {
 	classifier, err := service.NewService(categoryFile, providerFile)
 
 	if err != nil {
 		return nil, err
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+
+	defer cancel()
+
+	redis, err := storage.NewRedisClient(ctx, config)
+
+	if err != nil {
+		log.Fatalf("Error to create redis storage: %v", err)
+	}
+
 	return &DataServer{
 		manager:    mgr,
 		classifier: classifier,
+		storage:    redis,
 	}, nil
 }
 
@@ -70,13 +84,31 @@ func (s *DataServer) GetPolicy(ctx context.Context, req *pb.GetPolicyRequest) (*
 func (s *DataServer) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb.ClassifyResponse, error) {
 	log.Printf("gRPC Classify from worker %d for domain: %s", req.WorkerId, req.Domain)
 
-	categoryIDs, err := s.classifier.Check(req.Domain, "domain")
+	cashRequest, err := s.storage.GetRequestHash(ctx, req.Domain)
+
+	var categoryIDs []int
+
 	if err != nil {
-		log.Printf("Classification error: %v", err)
-		return &pb.ClassifyResponse{
-			Categories: []string{"unknown"},
-			TrustLevel: 0,
-		}, nil
+		categoryIDs, err = s.classifier.Check(req.Domain, "domain")
+		if err != nil {
+			log.Printf("Classification error: %v", err)
+			return &pb.ClassifyResponse{
+				Categories: []string{"unknown"},
+				TrustLevel: 0,
+			}, nil
+		}
+
+		err = s.storage.SaveRequestHash(ctx, storage.RequestCash{
+			Endpoint:      req.Domain,
+			CategoriesIds: categoryIDs,
+		})
+
+		if err != nil {
+			log.Printf("Error save hash: %v", err.Error())
+		}
+
+	} else {
+		categoryIDs = cashRequest.CategoriesIds
 	}
 
 	if len(categoryIDs) > 0 {
