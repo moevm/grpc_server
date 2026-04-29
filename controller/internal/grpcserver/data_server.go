@@ -36,6 +36,10 @@ func NewDataServer(mgr *manager.Manager, categoryFile, providerFile string, conf
 
 	redis, err := storage.NewRedisClient(ctx, config)
 
+	if err != nil {
+		log.Fatalf("Error to create redis storage: %v", err)
+	}
+
 	return &DataServer{
 		manager:    mgr,
 		classifier: classifier,

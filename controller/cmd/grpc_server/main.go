@@ -18,7 +18,10 @@ import (
 )
 
 func init() {
-	gotenv.Load()
+	err := gotenv.Load()
+	if err != nil {
+		log.Fatalf("Error to load env: %v", err)
+	}
 }
 
 func LoadConfigRedis() (storage.Config, error) {
