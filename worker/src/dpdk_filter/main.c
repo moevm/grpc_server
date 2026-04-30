@@ -1,4 +1,5 @@
-#include "dns_cache.h"
+#include "domain_cache.h"
+#include "ip_cache.h"
 #include "net_port.h"
 #include "proc_packets.h"
 #include <rte_eal.h>
@@ -71,7 +72,7 @@ int main(int argc, char **argv) {
     return -1;
   }
   init_dns_cache();
-  init_dns_cache();
+  init_ip_cache();
 
 #ifdef VIRT_PORTS
   LOG_INFO("Using virtual ports: veth0/veth1");
@@ -120,7 +121,10 @@ int main(int argc, char **argv) {
   }
 
   save_all_cache_to_sqlite(NULL);
+  save_all_cache_ip_to_sqlite(NULL);
+
   free_dns_cache();
+  free_ip_cache();
 
   net_port_close(port_in);
   net_port_close(port_out);
