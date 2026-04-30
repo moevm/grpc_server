@@ -9,11 +9,10 @@
 #include <spdlog/spdlog.h>
 #include <thread>
 
-
 extern "C" bool
 worker_classify_domain(const char *domain,
                        struct requested_classification *out_req) {
-  Worker* worker = Worker::getInstance();
+  Worker *worker = Worker::getInstance();
   if (!worker) {
     fprintf(stderr, "worker_classify_domain: worker is null\n");
     return false;
@@ -30,9 +29,7 @@ static void signal_handler(int signum) {
   }
 }
 
-Worker* Worker::getInstance() {
-  return instance;
-}
+Worker *Worker::getInstance() { return instance; }
 
 void Worker::LogStateChange(WorkerState new_state) {
   const char *state_names[] = {"BOOTING", "FREE", "BUSY", "SHUTTING_DOWN",

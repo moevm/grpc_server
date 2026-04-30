@@ -48,7 +48,7 @@ class Worker {
   uint16_t queue_number = 0;
 
   std::unique_ptr<DataService::Stub> stub_;
-  inline static Worker* instance = nullptr; 
+  inline static Worker *instance = nullptr;
 
   WorkerState state;
   void LogStateChange(WorkerState new_state);
@@ -67,7 +67,7 @@ public:
                       struct net_port *outgoing_port, uint16_t queue_number);
   void statsReport();
   WorkerState GetState() const { return state; }
-  static Worker* getInstance(); 
+  static Worker *getInstance();
   void MainLoop();
 };
 
