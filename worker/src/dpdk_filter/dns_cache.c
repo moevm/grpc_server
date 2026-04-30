@@ -1,6 +1,10 @@
 #include "dns_cache.h"
+#include <pthread.h>
+#include <rte_spinlock.h>
+#include <stdlib.h>
 
 static sqlite3 *cache_table;
+static rte_spinlock_t cache_spinlock = RTE_SPINLOCK_INITIALIZER;
 
 static struct rte_hash *dns_hash;
 static struct rte_hash_parameters hash_params = {
@@ -24,7 +28,10 @@ static int insert_loaded_node(const char *domain, struct node_cache *node) {
   key_copy[DOMAIN_MAX_LEN - 1] = '\0';
   node->key_domain = key_copy;
 
+  rte_spinlock_lock(&cache_spinlock);
   int ret = rte_hash_add_key_data(dns_hash, key_copy, node);
+  rte_spinlock_unlock(&cache_spinlock);
+
   if (ret < 0) {
     LOG_ERROR("Failed to insert loaded node into hash: %s", strerror(-ret));
     rte_free(key_copy);
@@ -135,7 +142,14 @@ static void cache_save_timer_cb(struct rte_timer *tim, void *arg) {
   (void)arg;
 
   LOG_INFO("Periodic cache saving to SQLite.");
-  save_all_cache_to_sqlite();
+
+  pthread_t tid;
+  if (pthread_create(&tid, NULL, save_all_cache_to_sqlite, NULL) != 0) {
+    LOG_ERROR("Failed to create save thread");
+    return;
+  }
+
+  pthread_detach(tid);
 }
 
 void close_sqlite_cache(void) {
@@ -255,55 +269,73 @@ int save_single_node_to_sqlite(const char *domain, struct node_cache *node) {
   return SQLITE_OK;
 }
 
-int save_all_cache_to_sqlite(void) {
+void copy_data_from_hash_to_snapshot(struct snapshot *snapt) {
+
+  int i = 0;
+  uint32_t next = 0;
+  const void *key;
+  void *data;
+
+  rte_spinlock_lock(&cache_spinlock);
+
+  while (rte_hash_iterate(dns_hash, &key, &data, &next) >= 0) {
+
+    strncpy(snapt[i].domain, (const char *)key, DOMAIN_MAX_LEN - 1);
+    snapt[i].domain[DOMAIN_MAX_LEN - 1] = '\0';
+
+    struct node_cache *orig = (struct node_cache *)data;
+    memcpy(&snapt[i].node, orig, sizeof(struct node_cache));
+
+    i++;
+  }
+
+  rte_spinlock_unlock(&cache_spinlock);
+}
+
+void *save_all_cache_to_sqlite(void *arg) {
+  (void)arg;
   if (!dns_hash) {
     LOG_ERROR("Hash table is not initialized");
-    return -1;
+    return NULL;
   }
 
   if (!cache_table) {
     LOG_ERROR("SQLite connection is not open");
-    return -1;
+    return NULL;
   }
 
-  uint32_t next = 0;
-  const void *key;
-  void *data;
-  int count = 0;
-  int errors = 0;
+  uint32_t count = rte_hash_count(dns_hash);
+  struct snapshot *snapt = malloc(count * sizeof(struct snapshot));
+  copy_data_from_hash_to_snapshot(snapt);
+
   int ret;
 
   ret = sqlite3_exec(cache_table, "BEGIN TRANSACTION;", NULL, NULL, NULL);
   if (ret != SQLITE_OK) {
     LOG_ERROR("Failed to exec BEGIN TRANSACTION: %s",
               sqlite3_errmsg(cache_table));
-    return -1;
+    return NULL;
   }
 
-  while (rte_hash_iterate(dns_hash, &key, &data, &next) >= 0) {
-    const char *domain = (const char *)key;
-    struct node_cache *node = (struct node_cache *)data;
-
-    if (!domain || !node) {
-      continue;
-    }
-
-    ret = save_single_node_to_sqlite(domain, node);
-    if (ret == SQLITE_OK) {
-      count++;
-    } else {
+  int records = 0;
+  int errors = 0;
+  for (int i = 0; i < count; i++) {
+    if (save_single_node_to_sqlite(snapt[i].domain, &snapt[i].node) ==
+        SQLITE_OK)
+      records++;
+    else
       errors++;
-    }
   }
 
   ret = sqlite3_exec(cache_table, "COMMIT;", NULL, NULL, NULL);
   if (ret != SQLITE_OK) {
     LOG_ERROR("Failed to exec COMMIT: %s", sqlite3_errmsg(cache_table));
-    return -1;
+    return NULL;
   }
 
+  free(snapt);
   LOG_INFO("Saved %d records to SQLite, %d errors", count, errors);
-  return count;
+  return NULL;
 }
 
 void init_tables_sqlite_dns_cache(void) {
@@ -368,6 +400,7 @@ void init_dns_cache(void) {
 }
 
 int lookup_dns_cache(const char *domain, struct node_cache **return_node) {
+  rte_spinlock_lock(&cache_spinlock);
   int ret = rte_hash_lookup_data(dns_hash, domain, (void **)return_node);
 
   if (ret >= 0 && *return_node) {
@@ -380,15 +413,18 @@ int lookup_dns_cache(const char *domain, struct node_cache **return_node) {
       int ret_del = rte_hash_del_key(dns_hash, domain);
       if (ret_del < 0) {
         LOG_ERROR("Failed to deleting an obsolete hashtable value");
+        rte_spinlock_unlock(&cache_spinlock);
         return -ENOENT;
       }
       rte_free((*return_node)->key_domain);
       rte_free(*return_node);
       *return_node = NULL;
 
+      rte_spinlock_unlock(&cache_spinlock);
       return -ENOENT;
     }
   }
+  rte_spinlock_unlock(&cache_spinlock);
   return ret;
 }
 
@@ -405,7 +441,10 @@ void add_to_dns_cache(const char *domain, struct node_cache *node) {
   node->ttl_seconds = DNS_CACHE_DEFAULT_TTL;
   node->key_domain = key_copy;
 
+  rte_spinlock_lock(&cache_spinlock);
   int ret = rte_hash_add_key_data(dns_hash, key_copy, node);
+  rte_spinlock_unlock(&cache_spinlock);
+
   if (ret) {
     LOG_ERROR("Failed to add key data in hash table");
     rte_free(key_copy);
@@ -420,7 +459,7 @@ void free_dns_cache(void) {
   uint32_t next = 0;
   const void *key;
   void *data;
-
+  rte_spinlock_lock(&cache_spinlock);
   while (rte_hash_iterate(dns_hash, &key, &data, &next) >= 0) {
 
     if (data) {
@@ -437,6 +476,7 @@ void free_dns_cache(void) {
   close_sqlite_cache();
   dns_hash = NULL;
 
+  rte_spinlock_unlock(&cache_spinlock);
   int ret = rte_timer_stop(&cache_save_timer);
   if (!ret) {
     LOG_ERROR("Failed to stopping timer");
