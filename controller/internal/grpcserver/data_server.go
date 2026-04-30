@@ -68,7 +68,7 @@ func (s *DataServer) GetPolicy(ctx context.Context, req *pb.GetPolicyRequest) (*
 }
 
 func (s *DataServer) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb.ClassifyResponse, error) {
-	g.Printf("gRPC Classify from worker %d: type=%s, target=%s",
+	log.Printf("gRPC Classify from worker %d: type=%s, target=%s",
 		req.WorkerId, req.Type, req.Target)
 
 	categoryIDs, err := s.classifier.Check(req.Target, req.Type)
