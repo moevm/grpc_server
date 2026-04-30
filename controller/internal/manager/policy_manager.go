@@ -14,6 +14,8 @@ type TOMLRules struct {
 	BlockByTrust    map[string]int32       `toml:"block_by_trust"`
 	BlockDomains    []string               `toml:"block_domains"`
 	AllowDomains    []string               `toml:"allow_domains"`
+	BlockIps        []string               `toml:"block_ips"`
+	AllowIps        []string               `toml:"allow_ips"`
 	MinTrustLevel   *int32                 `toml:"min_trust_level"`
 	Extra           map[string]interface{} `toml:",remain"`
 }
@@ -51,6 +53,8 @@ func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy 
 		BlockByTrust:    make(map[string]int32, len(pm.config.Global.Rules.BlockByTrust)),
 		BlockDomains:    make([]string, len(pm.config.Global.Rules.BlockDomains)),
 		AllowDomains:    make([]string, len(pm.config.Global.Rules.AllowDomains)),
+		BlockIps:        make([]string, len(pm.config.Global.Rules.BlockIps)),
+		AllowIps:        make([]string, len(pm.config.Global.Rules.AllowIps)),
 		ConfigVersion:   pm.version,
 	}
 	copy(policy.BlockCategories, pm.config.Global.Rules.BlockCategories)
@@ -59,6 +63,8 @@ func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy 
 	}
 	copy(policy.BlockDomains, pm.config.Global.Rules.BlockDomains)
 	copy(policy.AllowDomains, pm.config.Global.Rules.AllowDomains)
+	copy(policy.BlockIps, pm.config.Global.Rules.BlockIps)
+	copy(policy.AllowIps, pm.config.Global.Rules.AllowIps)
 
 	if pm.config.Global.Rules.MinTrustLevel != nil {
 		policy.MinTrustLevel = *pm.config.Global.Rules.MinTrustLevel
@@ -102,6 +108,30 @@ func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy 
 			for _, d := range filter.AllowDomains {
 				if !existing[d] {
 					policy.AllowDomains = append(policy.AllowDomains, d)
+				}
+			}
+		}
+
+		if len(filter.BlockIps) > 0 {
+			existing := make(map[string]bool)
+			for _, ip := range policy.BlockIps {
+				existing[ip] = true
+			}
+			for _, ip := range filter.BlockIps {
+				if !existing[ip] {
+					policy.BlockIps = append(policy.BlockIps, ip)
+				}
+			}
+		}
+
+		if len(filter.AllowIps) > 0 {
+			existing := make(map[string]bool)
+			for _, ip := range policy.AllowIps {
+				existing[ip] = true
+			}
+			for _, ip := range filter.AllowIps {
+				if !existing[ip] {
+					policy.AllowIps = append(policy.AllowIps, ip)
 				}
 			}
 		}
