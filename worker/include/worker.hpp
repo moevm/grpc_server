@@ -60,8 +60,8 @@ public:
   void initDPDK(int argc, char **argv);
   inline uint64_t GetID() const { return worker_id; }
   void requestPolicyFromController();
-  bool classifyDomain(const std::string &domain,
-                      struct requested_classification *out_req);
+  bool classify(const std::string &type, const std::string &target,
+                struct requested_classification *out_req);
   void forward_to_out(struct net_port *incoming_port,
                       struct net_port *outgoing_port, uint16_t queue_number);
   void statsReport();
