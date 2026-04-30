@@ -53,6 +53,7 @@ COPY ./MODULE.bazel ./
 COPY ./communication.proto ./
 COPY ./toolchains ./toolchains
 COPY ./platforms ./platforms
+COPY ./third_party ./third_party
 
 RUN bazel build //:worker
 
