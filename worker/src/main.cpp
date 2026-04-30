@@ -42,7 +42,6 @@ int main(int argc, char **argv) {
 
   try {
     Worker worker(worker_id);
-    worker.initDPDK(argc, argv);
     bool test_mode = false;
     if (getenv("TEST_REQUEST_POLICY") != nullptr) {
       test_mode = true;
@@ -77,7 +76,7 @@ int main(int argc, char **argv) {
       spdlog::info("Test mode completed, exiting");
       return 0;
     }
-
+    worker.initDPDK(argc, argv);
     worker.MainLoop();
 
   } catch (std::exception &e) {

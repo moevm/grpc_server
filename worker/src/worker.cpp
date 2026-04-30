@@ -167,6 +167,32 @@ void Worker::requestPolicyFromController() {
       current_policy.min_trust_level = pol.min_trust_level();
 
       current_config_version = pol.config_version();
+
+      spdlog::info("POLICY LOADED");
+      spdlog::info("Config version: {}", current_config_version);
+      spdlog::info("Min trust level: {}", current_policy.min_trust_level);
+
+      spdlog::info("Blocked categories ({} total)", block_cat_count);
+      for (int i = 0; i < block_cat_count && i < MAX_CATEGORIES; ++i) {
+        if (strlen(current_policy.locked_categories[i]) > 0) {
+          spdlog::info("blocked_categories: {}",
+                       current_policy.locked_categories[i]);
+        }
+      }
+
+      spdlog::info("Blocked domains ({} total)", block_dom_count);
+      for (int i = 0; i < block_dom_count && i < MAX_DOMAINS; ++i) {
+        if (strlen(current_policy.block_domains[i]) > 0) {
+          spdlog::info("block_domains: {}", current_policy.block_domains[i]);
+        }
+      }
+
+      spdlog::info("Allowed domains ({} total)", allow_dom_count);
+      for (int i = 0; i < allow_dom_count && i < MAX_DOMAINS; ++i) {
+        if (strlen(current_policy.allow_domains[i]) > 0) {
+          spdlog::info("allow_domains: {}", current_policy.allow_domains[i]);
+        }
+      }
       break;
     }
     case GetPolicyResponse::POLICY_UNCHANGED: {
@@ -201,10 +227,15 @@ bool Worker::classifyDomain(const std::string &domain,
       return false;
     }
 
-    std::string cat =
-        resp.categories_size() > 0 ? resp.categories(0) : "unknown";
-    spdlog::info("Domain '{}' classified as category '{}' with trust level {}",
-                 domain, cat, resp.trust_level());
+    std::string categories_str;
+    for (int i = 0; i < resp.categories_size(); ++i) {
+      if (i > 0)
+        categories_str += ", ";
+      categories_str += resp.categories(i);
+    }
+    spdlog::info(
+        "Domain '{}' classified as categories [{}] with trust level {}", domain,
+        categories_str, resp.trust_level());
 
     out_req->get_trust_level = resp.trust_level();
     int cat_count = std::min(resp.categories_size(), MAX_CATEGORIES);
@@ -314,6 +345,10 @@ void Worker::MainLoop() {
       policy_interval =
           MIN_POLICY_TIME + (rand() % (MAX_POLICY_TIME - MIN_POLICY_TIME + 1));
     }
+  }
+
+  if (stop_flag) {
+    SetState(WorkerState::SHUTTING_DOWN);
   }
 
   if (stop_flag) {
