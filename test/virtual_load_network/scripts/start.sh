@@ -31,8 +31,12 @@ FILTER_RISCV_BIN="${FILTER_RISCV_BIN:-../../worker/main-riscv}"
 WORKER_RISCV_BIN="${WORKER_RISCV_BIN:-../../worker/bazel-bin/worker}"
 CONTROLLER_BIN="${CONTROLLER_BIN:-../../controller/bin/grpc_server}"
 VM_HUGEPAGES="${VM_HUGEPAGES:-64}"
-FILTER1_MAC="52:54:00:f1:00:01"
-FILTER2_MAC="52:54:00:f2:00:01"
+FILTER1_MAC_IN="52:54:00:f1:00:01"
+FILTER1_MAC_OUT="52:54:00:f1:00:02"
+FILTER1_MAC_MGMT="52:54:00:f1:00:03"
+FILTER2_MAC_IN="52:54:00:f2:00:01"
+FILTER2_MAC_OUT="52:54:00:f2:00:02"
+FILTER2_MAC_MGMT="52:54:00:f2:00:03"
 
 "$SCRIPT_DIR/stop.sh" 2>/dev/null || true
 
@@ -71,6 +75,7 @@ iptables -I FORWARD -o "$MGMT_BRIDGE" -j ACCEPT
 
 SHARED_DIR="$PROJECT_DIR/shared"
 mkdir -p "$SHARED_DIR"
+mkdir -p "$SHARED_DIR/logs"
 
 if [ -f "$FILTER_RISCV_BIN" ]; then
     cp "$FILTER_RISCV_BIN" "$SHARED_DIR/filter"
@@ -110,7 +115,7 @@ start_controller() {
         -pidfile "/tmp/qemu-controller.pid" \
         -bios "$QEMU_BIOS" \
         -kernel "$QEMU_KERNEL" \
-        -append "root=/dev/vda rw earlycon=sbi console=ttyS0 hugepages=${VM_HUGEPAGES} ip=${MGMT_SUBNET}.3::${MGMT_SUBNET}.254:255.255.255.0::eth0:off" \
+        -append "root=/dev/vda rw earlycon=sbi console=ttyS0 hugepages=${VM_HUGEPAGES} role=controller ip=${MGMT_SUBNET}.3::${MGMT_SUBNET}.254:255.255.255.0::eth0:off" \
         -netdev tap,id=net0,ifname="tap-ctrl",script=no,downscript=no \
         -device virtio-net-device,netdev=net0 \
         -netdev tap,id=net1,ifname="tap-ctrl-inet",script=no,downscript=no \
@@ -132,7 +137,10 @@ start_filter_vm() {
     local TAP_MGMT="$4"
     local BRIDGE_IN="$5"
     local MGMT_IP="$6"
-    local ETH0_MAC="$7"
+    local MAC_IN="$7"
+    local MAC_OUT="$8"
+    local MAC_MGMT="$9"
+    local WORKER_ID="${10}"
 
     local OVERLAY="$PROJECT_DIR/${VM_NAME}.qcow2"
     if [ ! -f "$OVERLAY" ]; then
@@ -158,13 +166,13 @@ start_filter_vm() {
         -pidfile "/tmp/qemu-${VM_NAME}.pid" \
         -bios "$QEMU_BIOS" \
         -kernel "$QEMU_KERNEL" \
-        -append "root=/dev/vda rw earlycon=sbi console=ttyS0 hugepages=${VM_HUGEPAGES} ip=${MGMT_IP}::${MGMT_SUBNET}.254:255.255.255.0::eth2:off" \
+        -append "root=/dev/vda rw earlycon=sbi console=ttyS0 hugepages=${VM_HUGEPAGES} role=worker worker_id=${WORKER_ID} ip=${MGMT_IP}::${MGMT_SUBNET}.254:255.255.255.0::eth2:off" \
         -netdev tap,id=net0,ifname="$TAP_IN",script=no,downscript=no \
-        -device virtio-net-device,netdev=net0,mac="$ETH0_MAC" \
+        -device virtio-net-device,netdev=net0,mac="$MAC_IN" \
         -netdev tap,id=net1,ifname="$TAP_OUT",script=no,downscript=no \
-        -device virtio-net-device,netdev=net1 \
+        -device virtio-net-device,netdev=net1,mac="$MAC_OUT" \
         -netdev tap,id=net2,ifname="$TAP_MGMT",script=no,downscript=no \
-        -device virtio-net-device,netdev=net2 \
+        -device virtio-net-device,netdev=net2,mac="$MAC_MGMT" \
         -object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 \
         -drive "id=disk0,file=${OVERLAY},format=qcow2,if=none" -device virtio-blk-device,drive=disk0 \
         -virtfs "local,path=$SHARED_DIR,mount_tag=host_share,security_model=mapped-xattr" \
@@ -175,17 +183,17 @@ start_filter_vm() {
         }
 }
 
-start_filter_vm "filter1" "tap-f1-in" "tap-f1-out" "tap-f1-mgmt" "$BRIDGE1" "${MGMT_SUBNET}.1" "$FILTER1_MAC"
-start_filter_vm "filter2" "tap-f2-in" "tap-f2-out" "tap-f2-mgmt" "$BRIDGE2" "${MGMT_SUBNET}.2" "$FILTER2_MAC"
+start_filter_vm "filter1" "tap-f1-in" "tap-f1-out" "tap-f1-mgmt" "$BRIDGE1" "${MGMT_SUBNET}.1" "$FILTER1_MAC_IN" "$FILTER1_MAC_OUT" "$FILTER1_MAC_MGMT" 1
+start_filter_vm "filter2" "tap-f2-in" "tap-f2-out" "tap-f2-mgmt" "$BRIDGE2" "${MGMT_SUBNET}.2" "$FILTER2_MAC_IN" "$FILTER2_MAC_OUT" "$FILTER2_MAC_MGMT" 2
 
 for SVC in $(docker compose ps -q 2>/dev/null); do
     docker exec "$SVC" ip neigh flush all 2>/dev/null || true
 done
 for SVC in $(docker compose -p "$(basename "$PROJECT_DIR")" ps --format '{{.Name}}' 2>/dev/null | grep "gen-1"); do
-    docker exec "$SVC" arp -s "${SUBNET1}.254" "$FILTER1_MAC" 2>/dev/null || true
+    docker exec "$SVC" arp -s "${SUBNET1}.254" "$FILTER1_MAC_IN" 2>/dev/null || true
 done
 for SVC in $(docker compose -p "$(basename "$PROJECT_DIR")" ps --format '{{.Name}}' 2>/dev/null | grep "gen-2"); do
-    docker exec "$SVC" arp -s "${SUBNET2}.254" "$FILTER2_MAC" 2>/dev/null || true
+    docker exec "$SVC" arp -s "${SUBNET2}.254" "$FILTER2_MAC_IN" 2>/dev/null || true
 done
 
 ip tuntap add dev "tap-ctrl" mode tap 2>/dev/null || true
