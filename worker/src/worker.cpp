@@ -9,16 +9,16 @@
 #include <spdlog/spdlog.h>
 #include <thread>
 
-Worker *g_worker = nullptr;
 
 extern "C" bool
 worker_classify_domain(const char *domain,
                        struct requested_classification *out_req) {
-  if (!g_worker) {
-    fprintf(stderr, "worker_classify_domain: g_worker is null\n");
+  Worker* worker = Worker::getInstance();
+  if (!worker) {
+    fprintf(stderr, "worker_classify_domain: worker is null\n");
     return false;
   }
-  return g_worker->classifyDomain(std::string(domain), out_req);
+  return worker->classifyDomain(std::string(domain), out_req);
 }
 
 static volatile bool stop_flag = false;
@@ -28,6 +28,10 @@ static void signal_handler(int signum) {
     spdlog::info("Signal {} received, shutting down.", signum);
     stop_flag = true;
   }
+}
+
+Worker* Worker::getInstance() {
+  return instance;
 }
 
 void Worker::LogStateChange(WorkerState new_state) {
@@ -275,7 +279,7 @@ void Worker::statsReport() {
 }
 
 Worker::Worker(uint64_t id) : worker_id(id), state(WorkerState::FREE) {
-  g_worker = this;
+  instance = this;
   std::string controller_addr = "localhost:50051";
   if (const char *env_addr = getenv("CONTROLLER_GRPC_ADDR")) {
     controller_addr = env_addr;
