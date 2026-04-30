@@ -324,6 +324,8 @@ void Worker::MainLoop() {
   struct rte_mbuf *pkts[32];
   uint16_t nb_pkts = 32;
   uint16_t queue_number = 0;
+  uint64_t timer_check_counter = 0;
+  const uint64_t timer_check_interval = 10000;
   while (!stop_flag && GetState() != WorkerState::SHUTTING_DOWN) {
     {
       std::lock_guard<std::mutex> lock(policy_mutex);
@@ -333,6 +335,10 @@ void Worker::MainLoop() {
     pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts,
                       pkts, &local_policy);
     forward_to_out(port_out, port_in, queue_number);
+    if (++timer_check_counter >= timer_check_interval) {
+      rte_timer_manage();
+      timer_check_counter = 0;
+    }
 
     auto now = steady_clock::now();
 
