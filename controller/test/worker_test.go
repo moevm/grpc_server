@@ -30,7 +30,7 @@ func (m *MockController) GetPolicy(ctx context.Context, req *pb.GetPolicyRequest
 }
 
 func (m *MockController) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb.ClassifyResponse, error) {
-	m.t.Logf("Classify called: worker_id=%d, domain=%s", req.WorkerId, req.Domain)
+	m.t.Logf("Classify called: worker_id=%d, type=%s, target=%s", req.WorkerId, req.Type, req.Target)
 	return &pb.ClassifyResponse{
 		Categories: []string{"news", "technology"},
 		TrustLevel: 3,
@@ -166,13 +166,13 @@ func TestWorkerClassify(t *testing.T) {
 		"CONTROLLER_GRPC_ADDR=" + addr,
 		"METRICS_GATEWAY_ADDRESS=localhost",
 		"METRICS_GATEWAY_PORT=9091",
-		"TEST_CLASSIFY_DOMAIN=example.com",
+		"TEST_CLASSIFY_TARGET=example.com",
 	}
 
 	output, err := worker.CombinedOutput()
 	outputStr := string(output)
 	assert.NoError(t, err, "Worker failed: %s", string(output))
-	assert.Contains(t, outputStr, "Domain 'example.com' classified as categories [news, technology] with trust level 3")
+	assert.Contains(t, outputStr, "Target 'example.com' classified as categories [news, technology] with trust level 3")
 }
 
 func TestWorkerSendStats(t *testing.T) {
