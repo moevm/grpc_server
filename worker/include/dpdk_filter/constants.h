@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#define EXCEPTION_BURST_SIZE 32
 #define MAX_CATEGORIES_BY_TRUST_LVL 64
 #define MAX_DOMAINS 64
 #define CACHE_SIZE 1024
