@@ -1,6 +1,7 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include "constants.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -22,10 +23,6 @@
   fprintf(stdout, "[ERROR] %s: %d: " error "\n", __func__, __LINE__,           \
           ##__VA_ARGS__)
 #endif
-enum type_ip {
-  IP_4 = 1,
-  IP_6 = 2
-};
 
 enum ip_version { IP_4 = 1, IP_6 = 2 };
 
@@ -84,8 +81,8 @@ struct node_cache_domain {
   char *key_domain;
 };
 
-struct snapshot {
-  struct node_cache node;
+struct snapshot_domain {
+  struct node_cache_domain node;
   char domain[DOMAIN_MAX_LEN];
 };
 
@@ -95,10 +92,20 @@ struct node_cache_ip {
   int trust_lvl;
   uint64_t timestamp;
   uint32_t ttl_seconds;
-  enum ip_version ip;
-  uint32_t ip4_src;
-  uint8_t ip6_src[IP6_LEN];
-  char *key_ip;
+  struct ip_key *key;
+};
+
+struct ip_key {
+  enum ip_version version;
+  union {
+    uint32_t ip4;
+    uint8_t ip6[IP6_LEN];
+  } addr;
+};
+
+struct snapshot_ip {
+  struct node_cache_ip node;
+  struct ip_key key;
 };
 
 #endif

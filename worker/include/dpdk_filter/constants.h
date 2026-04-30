@@ -10,6 +10,7 @@
 #define MAX_IP6 64
 #define CACHE_SIZE 1024
 #define DOMAIN_MAX_LEN 260
+#define IP_MAX_LEN sizeof(struct ip_key)
 #define IP6_LEN 16
 #define MAX_CATEGORIES 100
 #define CATEGORY_MAX_LEN 64

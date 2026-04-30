@@ -50,7 +50,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
     printf("[PKT] port = %hu; domain = %s\n", ntohs(info_pac.number_port),
            info_pac.domain);
     if (info_pac.domain[0] == '\0') {
-      printf("[INFO] Packet without dns request\n");
+      LOG_INFO("Packet without dns request");
       struct node_cache_ip *cached_node_ip = NULL;
 
       if (check_is_exception(&info_pac.number_port) == true) {
@@ -59,10 +59,15 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       }
 
       int ret;
+      struct ip_key key;
       if (info_pac.ip_version == IP_4) {
-        ret = lookup_dns_cache(info_pac.ip4_dist, &cached_node_ip);
+        key.version = 4;
+        key.addr.ip4 = info_pac.ip4_dist;
+        ret = lookup_ip_cache(&key, &cached_node_ip);
       } else {
-        ret = lookup_dns_cache(info_pac.ip6_dist, &cached_node_ip);
+        key.version = 6;
+        memcpy(key.addr.ip6, info_pac.ip6_dist, 16);
+        ret = lookup_ip_cache(&key, &cached_node_ip);
       }
 
       if (ret >= 0 && cached_node_ip) {
@@ -73,7 +78,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
         struct requested_classification req_clas; // query to ip controller
 
         bool solution_is_send =
-            main_filtring_by_ip(&req_clas, policy, info_pac);
+            main_filtring_by_ip(&req_clas, policy, &info_pac);
 
         package_sending_decision(solution_is_send, pkts[i], port_out,
                                  queue_number);
@@ -82,22 +87,29 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
             rte_calloc("struct_node_cache_ip", 1, sizeof(struct node_cache_ip),
                        RTE_CACHE_LINE_SIZE);
         if (!new_node) {
-          printf(
-              "[ERROR] Failed to allocate memory for struct node_cache_ip\n");
+          LOG_ERROR("Failed to allocate memory for struct node_cache_ip");
           continue;
         }
 
         new_node->solution_is_send = solution_is_send;
 
-        add_to_dns_cache(info_pac.domain, new_node);
+        struct ip_key key;
+        if (info_pac.ip_version == IP_4) {
+          key.version = 4;
+          key.addr.ip4 = info_pac.ip4_dist;
+          add_to_ip_cache(&key, new_node);
+        } else {
+          key.version = 6;
+          memcpy(key.addr.ip6, info_pac.ip6_dist, 16);
+          add_to_ip_cache(&key, new_node);
+        }
 
       } else {
-        printf(
-            "[ERROR] Failed to search a key-value pair in the hash table: %s\n",
-            strerror(-ret));
+        LOG_ERROR("Failed to search a key-value pair in the hash table: %s",
+                  strerror(-ret));
       }
     } else {
-      printf("[INFO] Packet with dns request\n");
+      LOG_INFO("[INFO] Packet with dns request");
       struct node_cache_domain *cached_node_domain = NULL;
 
       if (check_is_exception(&info_pac.number_port) == true) {
@@ -115,7 +127,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
         struct requested_classification req_clas; // query to domain controller
 
         bool solution_is_send =
-            main_filtring_by_domain(&req_clas, policy, info_pac);
+            main_filtring_by_domain(&req_clas, policy, &info_pac);
 
         package_sending_decision(solution_is_send, pkts[i], port_out,
                                  queue_number);
@@ -124,7 +136,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
             rte_calloc("struct_node_cache", 1, sizeof(struct node_cache_domain),
                        RTE_CACHE_LINE_SIZE);
         if (!new_node) {
-          printf("[ERROR] Failed to allocate memory for struct node_cache\n");
+          LOG_ERROR("Failed to allocate memory for struct node_cache");
           continue;
         }
 
@@ -132,9 +144,8 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
 
         add_to_dns_cache(info_pac.domain, new_node);
       } else {
-        printf(
-            "[ERROR] Failed to search a key-value pair in the hash table: %s\n",
-            strerror(-ret));
+        LOG_ERROR("Failed to search a key-value pair in the hash table: %s",
+                  strerror(-ret));
       }
     }
   }
