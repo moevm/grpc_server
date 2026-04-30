@@ -14,6 +14,10 @@
   fprintf(stdout, "[ERROR] %s: %d: " error "\n", __func__, __LINE__,           \
           ##__VA_ARGS__)
 
+#define LOG_WARNING(warning, ...)                                              \
+  fprintf(stdout, "[WARNING] %s: %d: " error "\n", __func__, __LINE__,         \
+          ##__VA_ARGS__)
+
 #else
 #define LOG_INFO(info, ...)                                                    \
   do {                                                                         \
@@ -22,6 +26,11 @@
 #define LOG_ERROR(error, ...)                                                  \
   fprintf(stdout, "[ERROR] %s: %d: " error "\n", __func__, __LINE__,           \
           ##__VA_ARGS__)
+
+#define LOG_WARNING(warning, ...)                                              \
+  fprintf(stdout, "[WARNING] %s: %d: " warning "\n", __func__, __LINE__,       \
+          ##__VA_ARGS__)
+
 #endif
 
 enum ip_version { IP_4 = 1, IP_6 = 2 };
