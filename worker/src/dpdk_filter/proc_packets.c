@@ -48,7 +48,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
 
     parsing_pakage(pkts[i], &info_pac);
     LOG_INFO("[PKT] port = %hu; domain = %s", ntohs(info_pac.number_port),
-           info_pac.domain);
+             info_pac.domain);
     if (info_pac.domain[0] == '\0') {
       LOG_INFO("Packet without dns request");
       struct node_cache_ip *cached_node_ip = NULL;
