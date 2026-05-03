@@ -504,3 +504,8 @@ void free_ip_cache(void) {
     LOG_ERROR("Failed to stopping timer");
   }
 }
+
+void clear_ip_cache(void) {
+  rte_hash_reset(ip_hash);
+  LOG_INFO("IP cache clear");
+}
