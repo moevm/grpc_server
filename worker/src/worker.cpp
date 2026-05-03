@@ -9,16 +9,14 @@
 #include <spdlog/spdlog.h>
 #include <thread>
 
-Worker *g_worker = nullptr;
-
 extern "C" bool worker_classify(const char *type, const char *target,
                                 struct requested_classification *out_req) {
-  if (!g_worker) {
-    fprintf(stderr, "worker_classify: g_worker is null\n");
+  Worker *worker = Worker::getInstance();
+  if (!worker) {
+    fprintf(stderr, "worker_classify: worker is null\n");
     return false;
   }
-  return g_worker->classify(std::string(type), std::string(target), out_req);
-}
+  return worker->classify(std::string(type), std::string(target), out_req);
 
 static volatile bool stop_flag = false;
 
@@ -28,6 +26,8 @@ static void signal_handler(int signum) {
     stop_flag = true;
   }
 }
+
+Worker *Worker::getInstance() { return instance; }
 
 void Worker::LogStateChange(WorkerState new_state) {
   const char *state_names[] = {"BOOTING", "FREE", "BUSY", "SHUTTING_DOWN",
@@ -123,7 +123,6 @@ void Worker::requestPolicyFromController() {
     case GetPolicyResponse::POLICY_PROVIDED: {
       spdlog::info("Policy received");
       const auto &pol = resp.policy();
-      current_config_version = resp.policy().config_version();
       std::lock_guard<std::mutex> lock(policy_mutex);
       memset(&current_policy, 0, sizeof(current_policy));
 
@@ -276,7 +275,7 @@ void Worker::statsReport() {
 }
 
 Worker::Worker(uint64_t id) : worker_id(id), state(WorkerState::FREE) {
-  g_worker = this;
+  instance = this;
   std::string controller_addr = "localhost:50051";
   if (const char *env_addr = getenv("CONTROLLER_GRPC_ADDR")) {
     controller_addr = env_addr;
@@ -310,6 +309,7 @@ Worker::~Worker() {
 }
 
 void Worker::MainLoop() {
+  struct BASE_POLICY local_policy;
   using namespace std::chrono;
 
   last_policy_time = steady_clock::now();
@@ -319,9 +319,13 @@ void Worker::MainLoop() {
   uint16_t nb_pkts = 32;
   uint16_t queue_number = 0;
   while (!stop_flag && GetState() != WorkerState::SHUTTING_DOWN) {
+    {
+      std::lock_guard<std::mutex> lock(policy_mutex);
+      local_policy = current_policy;
+    }
     forward_to_out(port_exception, port_in, queue_number);
     pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts,
-                      pkts, &current_policy);
+                      pkts, &local_policy);
     forward_to_out(port_out, port_in, queue_number);
 
     auto now = steady_clock::now();
@@ -341,8 +345,10 @@ void Worker::MainLoop() {
       policy_interval =
           MIN_POLICY_TIME + (rand() % (MAX_POLICY_TIME - MIN_POLICY_TIME + 1));
     }
+  }
 
-    std::this_thread::sleep_for(milliseconds(100));
+  if (stop_flag) {
+    SetState(WorkerState::SHUTTING_DOWN);
   }
 
   if (stop_flag) {

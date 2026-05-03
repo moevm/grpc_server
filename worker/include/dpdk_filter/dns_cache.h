@@ -17,8 +17,9 @@
 void load_cache_from_sqlite(void);
 void close_sqlite_cache(void);
 int save_single_node_to_sqlite(const char *domain, struct node_cache *node);
-int save_all_cache_to_sqlite(void);
+void *save_all_cache_to_sqlite(void *arg);
 void init_tables_sqlite_dns_cache(void);
+void copy_data_from_hash_to_snapshot(struct snapshot *snapt);
 
 void init_dns_cache(void);
 int lookup_dns_cache(const char *domain, struct node_cache **return_node);
