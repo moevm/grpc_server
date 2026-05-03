@@ -15,7 +15,7 @@
           ##__VA_ARGS__)
 
 #define LOG_WARNING(warning, ...)                                              \
-  fprintf(stdout, "[WARNING] %s: %d: " error "\n", __func__, __LINE__,         \
+  fprintf(stdout, "[WARNING] %s: %d: " warning "\n", __func__, __LINE__,       \
           ##__VA_ARGS__)
 
 #else

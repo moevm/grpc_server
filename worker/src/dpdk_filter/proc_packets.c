@@ -47,8 +47,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
     memset(&info_pac, 0, sizeof(info_pac));
 
     parsing_pakage(pkts[i], &info_pac);
-    LOG_INFO("[PKT] port = %hu; domain = %s", ntohs(info_pac.number_port),
-             info_pac.domain);
+    LOG_INFO("[PKT] port = %hu", ntohs(info_pac.number_port));
     if (info_pac.domain[0] == '\0') {
       LOG_INFO("Packet without dns request");
       struct node_cache_ip *cached_node_ip = NULL;
@@ -127,8 +126,10 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
         struct requested_classification req_clas; // query to domain controller
 
         bool solution_is_send;
-        bool classification_success =
-            worker_classify_domain(info_pac.domain, &req_clas);
+        // bool classification_success =
+        //     worker_classify_domain(info_pac.domain, &req_clas);
+        bool classification_success = true; // PLUG
+
         if (classification_success) {
           solution_is_send =
               main_filtring_by_domain(&req_clas, policy, &info_pac);
