@@ -47,7 +47,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
     memset(&info_pac, 0, sizeof(info_pac));
 
     parsing_pakage(pkts[i], &info_pac);
-    printf("[PKT] port = %hu; domain = %s\n", ntohs(info_pac.number_port),
+    LOG_INFO("[PKT] port = %hu; domain = %s", ntohs(info_pac.number_port),
            info_pac.domain);
     if (info_pac.domain[0] == '\0') {
       LOG_INFO("Packet without dns request");
@@ -126,13 +126,6 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
 
         struct requested_classification req_clas; // query to domain controller
 
-<<<<<<< HEAD
-        bool solution_is_send =
-            main_filtring_by_domain(&req_clas, policy, &info_pac);
-
-        package_sending_decision(solution_is_send, pkts[i], port_out,
-                                 queue_number);
-=======
         bool solution_is_send;
         bool classification_success =
             worker_classify_domain(info_pac.domain, &req_clas);
@@ -143,7 +136,6 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
           solution_is_send = true;
           LOG_WARNING("Classification failed for %s", info_pac.domain);
         }
->>>>>>> b56f38b (fix: warning added and logic filtring fixed)
 
         struct node_cache_domain *new_node =
             rte_calloc("struct_node_cache", 1, sizeof(struct node_cache_domain),
