@@ -10,10 +10,12 @@
 #define MAX_IP4 1024
 #define MAX_IP6 1024
 #define IP6_LEN 16
+#define IP_MAX_LEN sizeof(struct ip_key)
 #define DOMAIN_MAX_LEN 260
 #define MAX_CATEGORIES 100
 #define CATEGORY_MAX_LEN 64
 #define DNS_CACHE_DEFAULT_TTL (7 * 24 * 60 * 60)
+#define IP_CACHE_DEFAULT_TTL (7 * 24 * 60 * 60)
 #define LEN_LIST_EXCEPTION_PORTS 1
 extern const uint16_t LIST_EXCEPTION_PORTS[LEN_LIST_EXCEPTION_PORTS];
 
