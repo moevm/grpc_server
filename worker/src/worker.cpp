@@ -17,6 +17,7 @@ extern "C" bool worker_classify(const char *type, const char *target,
     return false;
   }
   return worker->classify(std::string(type), std::string(target), out_req);
+}
 
 static volatile bool stop_flag = false;
 
