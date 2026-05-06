@@ -41,13 +41,78 @@ static int insert_loaded_node_domain(const char *domain,
   return 0;
 }
 
-void load_cache_from_sqlite(void) {
-  if (!dns_hash) {
-    LOG_ERROR("Hash table not initialized for loading");
-    return;
+static int load_domain_categories(const char *domain,
+                                  struct node_cache_domain *node) {
+  const char *sql =
+      "SELECT certain_category FROM categories_table WHERE domain = ?;";
+  sqlite3_stmt *stmt = NULL;
+  int rc = sqlite3_prepare_v2(cache_table, sql, -1, &stmt, NULL);
+  if (rc != SQLITE_OK) {
+    LOG_ERROR("Failed to prepare categories SELECT: %s",
+              sqlite3_errmsg(cache_table));
+    return -1;
   }
-  if (!cache_table) {
-    LOG_ERROR("SQLite connection not open for loading");
+
+  sqlite3_bind_text(stmt, 1, domain, -1, SQLITE_STATIC);
+
+  int cat_idx = 0;
+  while (sqlite3_step(stmt) == SQLITE_ROW && cat_idx < MAX_CATEGORIES) {
+    const unsigned char *cat = sqlite3_column_text(stmt, 0);
+    if (cat) {
+      strncpy(node->categories[cat_idx], (const char *)cat,
+              CATEGORY_MAX_LEN - 1);
+      node->categories[cat_idx][CATEGORY_MAX_LEN - 1] = '\0';
+    }
+    cat_idx++;
+  }
+
+  sqlite3_finalize(stmt);
+  return 0;
+}
+
+static enum load_result create_domain_node_from_db_row(sqlite3_stmt *stmt,
+                                                       uint64_t now_cycles,
+                                                       uint64_t hz) {
+
+  const char *domain = (const char *)sqlite3_column_text(stmt, 0);
+  int solution_is_send = sqlite3_column_int(stmt, 1);
+  int trust_lvl = sqlite3_column_int(stmt, 2);
+  uint64_t timestamp = (uint64_t)sqlite3_column_int64(stmt, 3);
+  uint32_t ttl_seconds = (uint32_t)sqlite3_column_int(stmt, 4);
+
+  uint64_t age_seconds = (now_cycles - timestamp) / hz;
+  if (age_seconds >= ttl_seconds) {
+    return LOAD_EXPIRED;
+  }
+
+  struct node_cache_domain *node =
+      rte_malloc("loaded_node_cache", sizeof(struct node_cache_domain), 0);
+  if (!node) {
+    LOG_ERROR("Failed to allocate node for domain: %s", domain);
+    return LOAD_ERROR;
+  }
+
+  node->solution_is_send = solution_is_send;
+  node->trust_lvl = trust_lvl;
+  node->timestamp = timestamp;
+  node->ttl_seconds = ttl_seconds;
+
+  if (load_domain_categories(domain, node) != 0) {
+    rte_free(node);
+    return LOAD_ERROR;
+  }
+
+  if (insert_loaded_node_domain(domain, node) != 0) {
+    rte_free(node);
+    return LOAD_ERROR;
+  }
+
+  return LOAD_OK;
+}
+
+void load_cache_from_sqlite(void) {
+  if (!dns_hash || !cache_table) {
+    LOG_ERROR("Cache or DB not initialized");
     return;
   }
 
@@ -60,82 +125,31 @@ void load_cache_from_sqlite(void) {
   sqlite3_stmt *stmt = NULL;
   int ret = sqlite3_prepare_v2(cache_table, sql, -1, &stmt, NULL);
   if (ret != SQLITE_OK) {
-    LOG_ERROR("Failed to prepare SELECT from main_table: %s",
-              sqlite3_errmsg(cache_table));
+    LOG_ERROR("Failed to prepare SELECT: %s", sqlite3_errmsg(cache_table));
     return;
   }
 
   int loaded = 0;
   int expired = 0;
+  int errors = 0;
 
   while (sqlite3_step(stmt) == SQLITE_ROW) {
-    const char *domain = (const char *)sqlite3_column_text(stmt, 0);
-    int solution_is_send = sqlite3_column_int(stmt, 1);
-    int trust_lvl = sqlite3_column_int(stmt, 2);
-    uint64_t timestamp = (uint64_t)sqlite3_column_int64(stmt, 3);
-    uint32_t ttl_seconds = (uint32_t)sqlite3_column_int(stmt, 4);
-
-    uint64_t age_seconds = (now_cycles - timestamp) / hz;
-    if (age_seconds >= ttl_seconds) {
-      expired++;
-      continue;
-    }
-
-    struct node_cache_domain *node =
-        rte_malloc("loaded_node_cache", sizeof(struct node_cache_domain), 0);
-    if (!node) {
-      LOG_ERROR("Failed to allocate node for domain %s", domain);
-      continue;
-    }
-
-    node->solution_is_send = solution_is_send ? true : false;
-    node->trust_lvl = trust_lvl;
-    node->timestamp = timestamp;
-    node->ttl_seconds = ttl_seconds;
-
-    const char *sql_cat =
-        "SELECT certain_category FROM categories_table WHERE domain = ?;";
-    sqlite3_stmt *stmt_cat = NULL;
-    int rc_cat = sqlite3_prepare_v2(cache_table, sql_cat, -1, &stmt_cat, NULL);
-    if (rc_cat != SQLITE_OK) {
-      LOG_ERROR("Failed to prepare categories SELECT: %s",
-                sqlite3_errmsg(cache_table));
-      rte_free(node);
-      continue;
-    }
-
-    sqlite3_bind_text(stmt_cat, 1, domain, -1, SQLITE_STATIC);
-
-    int cat_idx = 0;
-    while (sqlite3_step(stmt_cat) == SQLITE_ROW && cat_idx < MAX_CATEGORIES) {
-      const unsigned char *cat_text = sqlite3_column_text(stmt_cat, 0);
-      if (cat_text) {
-        strncpy(node->categories[cat_idx], (const char *)cat_text,
-                CATEGORY_MAX_LEN - 1);
-        node->categories[cat_idx][CATEGORY_MAX_LEN - 1] = '\0';
-      } else {
-        node->categories[cat_idx][0] = '\0';
-      }
-      cat_idx++;
-    }
-
-    sqlite3_finalize(stmt_cat);
-
-    if (insert_loaded_node_domain(domain, node) == 0) {
+    enum load_result res = create_domain_node_from_db_row(stmt, now_cycles, hz);
+    switch (res) {
+    case LOAD_OK:
       loaded++;
-    } else {
-      rte_free(node);
+      break;
+    case LOAD_EXPIRED:
+      expired++;
+      break;
+    case LOAD_ERROR:
+      errors++;
+      break;
     }
   }
 
-  ret = sqlite3_finalize(stmt);
-  if (ret != SQLITE_OK) {
-    LOG_ERROR("Failed to delete prepared statement: %s",
-              sqlite3_errmsg(cache_table));
-    return;
-  }
-  LOG_INFO("Loaded %d records from SQLite, %d expired skipped", loaded,
-           expired);
+  sqlite3_finalize(stmt);
+  LOG_INFO("Loaded %d domains, expired %d, errors %d", loaded, expired, errors);
 }
 
 static void cache_save_timer_cb(struct rte_timer *tim, void *arg) {
