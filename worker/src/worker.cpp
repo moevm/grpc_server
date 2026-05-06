@@ -9,15 +9,14 @@
 #include <spdlog/spdlog.h>
 #include <thread>
 
-extern "C" bool
-worker_classify_domain(const char *domain,
-                       struct requested_classification *out_req) {
+extern "C" bool worker_classify(const char *type, const char *target,
+                                struct requested_classification *out_req) {
   Worker *worker = Worker::getInstance();
   if (!worker) {
-    fprintf(stderr, "worker_classify_domain: worker is null\n");
+    fprintf(stderr, "worker_classify: worker is null\n");
     return false;
   }
-  return worker->classifyDomain(std::string(domain), out_req);
+  return worker->classify(std::string(type), std::string(target), out_req);
 }
 
 static volatile bool stop_flag = false;
@@ -82,6 +81,8 @@ void Worker::initDPDK(int argc, char **argv) {
       net_port_start(port_exception->port_id)) {
     throw std::runtime_error("Start ports");
   }
+
+  init_dns_cache();
 
   spdlog::info("DPDK initialized: in_port={}, out_port={}", port_in->port_id,
                port_out->port_id);
@@ -168,6 +169,7 @@ void Worker::requestPolicyFromController() {
       current_policy.min_trust_level = pol.min_trust_level();
 
       current_config_version = pol.config_version();
+      clear_cache();
 
       spdlog::info("POLICY LOADED");
       spdlog::info("Config version: {}", current_config_version);
@@ -210,14 +212,15 @@ void Worker::requestPolicyFromController() {
   }
 }
 
-bool Worker::classifyDomain(const std::string &domain,
-                            struct requested_classification *out_req) {
+bool Worker::classify(const std::string &type, const std::string &target,
+                      struct requested_classification *out_req) {
   try {
-    spdlog::info("Worker {} classifying domain '{}'", worker_id, domain);
+    spdlog::info("Worker {} classifying '{}' as {}", worker_id, target, type);
 
     ClassifyRequest req;
     req.set_worker_id(worker_id);
-    req.set_domain(domain);
+    req.set_type(type);
+    req.set_target(target);
 
     ClassifyResponse resp;
     grpc::ClientContext context;
@@ -235,7 +238,7 @@ bool Worker::classifyDomain(const std::string &domain,
       categories_str += resp.categories(i);
     }
     spdlog::info(
-        "Domain '{}' classified as categories [{}] with trust level {}", domain,
+        "Target '{}' classified as categories [{}] with trust level {}", target,
         categories_str, resp.trust_level());
 
     out_req->get_trust_level = resp.trust_level();
@@ -298,6 +301,9 @@ Worker::~Worker() {
   spdlog::info("Worker {} shutting down", worker_id);
 
   if (port_in && port_out) {
+    save_all_cache_to_sqlite();
+    free_dns_cache();
+
     net_port_close(port_in);
     net_port_close(port_out);
     net_port_close(port_exception);
@@ -319,6 +325,8 @@ void Worker::MainLoop() {
   struct rte_mbuf *pkts[32];
   uint16_t nb_pkts = 32;
   uint16_t queue_number = 0;
+  uint64_t timer_check_counter = 0;
+  const uint64_t timer_check_interval = 10000;
   while (!stop_flag && GetState() != WorkerState::SHUTTING_DOWN) {
     {
       std::lock_guard<std::mutex> lock(policy_mutex);
@@ -328,6 +336,10 @@ void Worker::MainLoop() {
     pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts,
                       pkts, &local_policy);
     forward_to_out(port_out, port_in, queue_number);
+    if (++timer_check_counter >= timer_check_interval) {
+      rte_timer_manage();
+      timer_check_counter = 0;
+    }
 
     auto now = steady_clock::now();
 

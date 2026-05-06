@@ -42,6 +42,95 @@ static int insert_loaded_node_ip(const struct ip_key *ip,
   return 0;
 }
 
+static int ip_str_to_key(const char *ip_str, struct ip_key *key) {
+  if (inet_pton(AF_INET, ip_str, &key->addr.ip4) == 1) {
+    key->version = 4;
+    return 0;
+  }
+  if (inet_pton(AF_INET6, ip_str, &key->addr.ip6) == 1) {
+    key->version = 6;
+    return 0;
+  }
+  LOG_ERROR("Failed to parse IP: %s", ip_str);
+  return -1;
+}
+
+static int load_ip_categories(const char *ip_str,
+                              struct node_cache_ip *node_ip) {
+  const char *sql_cat =
+      "SELECT certain_category FROM categories_table WHERE ip_str = ?;";
+  sqlite3_stmt *stmt_cat = NULL;
+  int rc_cat = sqlite3_prepare_v2(ip_cache_table, sql_cat, -1, &stmt_cat, NULL);
+  if (rc_cat != SQLITE_OK) {
+    LOG_ERROR("Failed to prepare categories SELECT: %s",
+              sqlite3_errmsg(ip_cache_table));
+    return -1;
+  }
+
+  sqlite3_bind_text(stmt_cat, 1, ip_str, -1, SQLITE_STATIC);
+
+  int cat_idx = 0;
+  while (sqlite3_step(stmt_cat) == SQLITE_ROW && cat_idx < MAX_CATEGORIES) {
+    const unsigned char *cat_text = sqlite3_column_text(stmt_cat, 0);
+    if (cat_text) {
+      strncpy(node_ip->categories[cat_idx], (const char *)cat_text,
+              CATEGORY_MAX_LEN - 1);
+      node_ip->categories[cat_idx][CATEGORY_MAX_LEN - 1] = '\0';
+    } else {
+      node_ip->categories[cat_idx][0] = '\0';
+    }
+    cat_idx++;
+  }
+
+  sqlite3_finalize(stmt_cat);
+  return 0;
+}
+
+static enum load_result
+create_node_from_db_row(sqlite3_stmt *stmt, uint64_t now_cycles, uint64_t hz) {
+
+  const char *ip_str = (const char *)sqlite3_column_text(stmt, 0);
+  int solution_is_send = sqlite3_column_int(stmt, 1);
+  int trust_lvl = sqlite3_column_int(stmt, 2);
+  uint64_t timestamp = (uint64_t)sqlite3_column_int64(stmt, 3);
+  uint32_t ttl_seconds = (uint32_t)sqlite3_column_int(stmt, 4);
+
+  uint64_t age_seconds = (now_cycles - timestamp) / hz;
+  if (age_seconds >= ttl_seconds) {
+    return LOAD_EXPIRED;
+  }
+
+  struct node_cache_ip *node =
+      rte_malloc("loaded_node_cache", sizeof(struct node_cache_ip), 0);
+  if (!node) {
+    LOG_ERROR("Failed to allocate node for IP: %s", ip_str);
+    return LOAD_ERROR;
+  }
+
+  node->solution_is_send = solution_is_send;
+  node->trust_lvl = trust_lvl;
+  node->timestamp = timestamp;
+  node->ttl_seconds = ttl_seconds;
+
+  if (load_ip_categories(ip_str, node)) {
+    rte_free(node);
+    return LOAD_ERROR;
+  }
+
+  struct ip_key key;
+  if (ip_str_to_key(ip_str, &key)) {
+    rte_free(node);
+    return LOAD_ERROR;
+  }
+
+  if (insert_loaded_node_ip(&key, node)) {
+    rte_free(node);
+    return LOAD_ERROR;
+  }
+
+  return LOAD_OK;
+}
+
 void load_cache_ip_from_sqlite(void) {
   if (!ip_hash) {
     LOG_ERROR("Hash table not initialized for loading");
@@ -67,77 +156,23 @@ void load_cache_ip_from_sqlite(void) {
   }
 
   int loaded = 0;
+  int errors = 0;
   int expired = 0;
 
   while (sqlite3_step(stmt) == SQLITE_ROW) {
-    const char *ip_str = (const char *)sqlite3_column_text(stmt, 0);
-    int solution_is_send = sqlite3_column_int(stmt, 1);
-    int trust_lvl = sqlite3_column_int(stmt, 2);
-    uint64_t timestamp = (uint64_t)sqlite3_column_int64(stmt, 3);
-    uint32_t ttl_seconds = (uint32_t)sqlite3_column_int(stmt, 4);
-
-    uint64_t age_seconds = (now_cycles - timestamp) / hz;
-    if (age_seconds >= ttl_seconds) {
-      expired++;
-      continue;
-    }
-
-    struct node_cache_ip *node_ip =
-        rte_malloc("loaded_node_cache", sizeof(struct node_cache_ip), 0);
-    if (!node_ip) {
-      LOG_ERROR("Failed to allocate node for ip");
-      continue;
-    }
-
-    node_ip->solution_is_send = solution_is_send ? true : false;
-    node_ip->trust_lvl = trust_lvl;
-    node_ip->timestamp = timestamp;
-    node_ip->ttl_seconds = ttl_seconds;
-
-    const char *sql_cat =
-        "SELECT certain_category FROM categories_table WHERE ip_str = ?;";
-    sqlite3_stmt *stmt_cat = NULL;
-    int rc_cat =
-        sqlite3_prepare_v2(ip_cache_table, sql_cat, -1, &stmt_cat, NULL);
-    if (rc_cat != SQLITE_OK) {
-      LOG_ERROR("Failed to prepare categories SELECT: %s",
-                sqlite3_errmsg(ip_cache_table));
-      rte_free(node_ip);
-      continue;
-    }
-
-    sqlite3_bind_text(stmt_cat, 1, ip_str, -1, SQLITE_STATIC);
-
-    int cat_idx = 0;
-    while (sqlite3_step(stmt_cat) == SQLITE_ROW && cat_idx < MAX_CATEGORIES) {
-      const unsigned char *cat_text = sqlite3_column_text(stmt_cat, 0);
-      if (cat_text) {
-        strncpy(node_ip->categories[cat_idx], (const char *)cat_text,
-                CATEGORY_MAX_LEN - 1);
-        node_ip->categories[cat_idx][CATEGORY_MAX_LEN - 1] = '\0';
-      } else {
-        node_ip->categories[cat_idx][0] = '\0';
-      }
-      cat_idx++;
-    }
-
-    sqlite3_finalize(stmt_cat);
-
-    struct ip_key key;
-    if (inet_pton(AF_INET, ip_str, &key.addr.ip4) == 1) {
-      key.version = 4;
-    } else if (inet_pton(AF_INET6, ip_str, &key.addr.ip6) == 1) {
-      key.version = 6;
-    } else {
-      LOG_ERROR("Failed to parse IP: %s", ip_str);
-      rte_free(node_ip);
-      continue;
-    }
-
-    if (insert_loaded_node_ip(&key, node_ip) == 0) {
+    ret = create_node_from_db_row(stmt, now_cycles, hz);
+    switch (ret) {
+    case LOAD_OK:
       loaded++;
-    } else {
-      rte_free(node_ip);
+      break;
+
+    case LOAD_EXPIRED:
+      expired++;
+      break;
+
+    case LOAD_ERROR:
+      errors++;
+      break;
     }
   }
 
@@ -147,8 +182,8 @@ void load_cache_ip_from_sqlite(void) {
               sqlite3_errmsg(ip_cache_table));
     return;
   }
-  LOG_INFO("Loaded %d records from SQLite, %d expired skipped", loaded,
-           expired);
+  LOG_INFO("Loaded %d records from SQLite, %d records expired, %d errors",
+           loaded, expired, errors);
 }
 
 static void cache_save_timer_cb(struct rte_timer *tim, void *arg) {
@@ -177,29 +212,18 @@ void close_sqlite_cache_ip(void) {
   ip_cache_table = NULL;
 }
 
-int save_single_node_ip_to_sqlite(const struct ip_key *key,
-                                  struct node_cache_ip *node) {
-  sqlite3_stmt *stmt = NULL;
-  int ret;
-
-  const char *sql_main =
+static int insert_ip_main_record(const char *ip_str,
+                                 struct node_cache_ip *node) {
+  const char *sql =
       "INSERT OR REPLACE INTO ip_main_table "
       "(ip_str, solution_is_send, trust_lvl, timestamp, ttl_seconds) "
       "VALUES (?, ?, ?, ?, ?)";
-
-  ret = sqlite3_prepare_v2(ip_cache_table, sql_main, -1, &stmt, NULL);
+  sqlite3_stmt *stmt = NULL;
+  int ret = sqlite3_prepare_v2(ip_cache_table, sql, -1, &stmt, NULL);
   if (ret != SQLITE_OK) {
-    LOG_ERROR("Failed to prepare ip_main_table insert: %s",
+    LOG_ERROR("Failed to prepare main insert: %s",
               sqlite3_errmsg(ip_cache_table));
-    sqlite3_finalize(stmt);
     return ret;
-  }
-
-  char ip_str[INET6_ADDRSTRLEN];
-  if (key->version == 4) {
-    inet_ntop(AF_INET, &key->addr.ip4, ip_str, sizeof(ip_str));
-  } else {
-    inet_ntop(AF_INET6, &key->addr.ip6, ip_str, sizeof(ip_str));
   }
 
   sqlite3_bind_text(stmt, 1, ip_str, -1, SQLITE_STATIC);
@@ -209,82 +233,84 @@ int save_single_node_ip_to_sqlite(const struct ip_key *key,
   sqlite3_bind_int(stmt, 5, (int)node->ttl_seconds);
 
   ret = sqlite3_step(stmt);
+  sqlite3_finalize(stmt);
+
   if (ret != SQLITE_DONE) {
-    LOG_ERROR("Failed to insert into ip_main_table: %s",
-              sqlite3_errmsg(ip_cache_table));
-    sqlite3_finalize(stmt);
+    LOG_ERROR("Failed to execute insert: %s", sqlite3_errmsg(ip_cache_table));
     return ret;
   }
+  return SQLITE_OK;
+}
 
-  ret = sqlite3_finalize(stmt);
-  if (ret != SQLITE_OK) {
-    LOG_ERROR("Failed to delete prepared statement: %s",
-              sqlite3_errmsg(ip_cache_table));
-    return ret;
-  }
-
-  const char *sql_del = "DELETE FROM categories_table WHERE ip_str = ?";
-  ret = sqlite3_prepare_v2(ip_cache_table, sql_del, -1, &stmt, NULL);
+static int delete_ip_categories(const char *ip_str) {
+  const char *sql = "DELETE FROM ip_categories_table WHERE ip_str = ?";
+  sqlite3_stmt *stmt = NULL;
+  int ret = sqlite3_prepare_v2(ip_cache_table, sql, -1, &stmt, NULL);
   if (ret != SQLITE_OK) {
     LOG_ERROR("Failed to prepare delete: %s", sqlite3_errmsg(ip_cache_table));
-    sqlite3_finalize(stmt);
     return ret;
   }
 
   sqlite3_bind_text(stmt, 1, ip_str, -1, SQLITE_STATIC);
   ret = sqlite3_step(stmt);
-  if (ret != SQLITE_DONE) {
-    LOG_ERROR("Failed to delete old categories: %s",
-              sqlite3_errmsg(ip_cache_table));
-    sqlite3_finalize(stmt);
-    return ret;
-  }
+  sqlite3_finalize(stmt);
 
-  ret = sqlite3_finalize(stmt);
-  if (ret != SQLITE_OK) {
-    LOG_ERROR("Failed to delete prepared statement: %s",
-              sqlite3_errmsg(ip_cache_table));
-    return ret;
-  }
+  return (ret == SQLITE_DONE) ? SQLITE_OK : ret;
+}
 
-  const char *sql_cat =
-      "INSERT INTO categories_table (ip_str, certain_category) VALUES (?, ?)";
-  ret = sqlite3_prepare_v2(ip_cache_table, sql_cat, -1, &stmt, NULL);
+static int insert_ip_categories(const char *ip_str,
+                                struct node_cache_ip *node) {
+  const char *sql = "INSERT INTO ip_categories_table (ip_str, "
+                    "certain_category) VALUES (?, ?)";
+  sqlite3_stmt *stmt = NULL;
+  int ret = sqlite3_prepare_v2(ip_cache_table, sql, -1, &stmt, NULL);
   if (ret != SQLITE_OK) {
     LOG_ERROR("Failed to prepare categories insert: %s",
               sqlite3_errmsg(ip_cache_table));
     return ret;
   }
 
-  for (int i = 0; i < MAX_CATEGORIES; i++) {
-    if (strlen(node->categories[i]) == 0) {
-      break;
-    }
-
+  for (int i = 0; i < MAX_CATEGORIES && node->categories[i][0] != '\0'; i++) {
     sqlite3_bind_text(stmt, 1, ip_str, -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 2, node->categories[i], -1, SQLITE_STATIC);
 
     ret = sqlite3_step(stmt);
     if (ret != SQLITE_DONE) {
-      LOG_ERROR("Failed to prepare categories_table insert: %s",
+      LOG_ERROR("Failed to insert category: %s",
                 sqlite3_errmsg(ip_cache_table));
       sqlite3_finalize(stmt);
       return ret;
     }
-
-    ret = sqlite3_reset(stmt);
-    if (ret != SQLITE_OK) {
-      LOG_ERROR("Failed to reset prepared statement: %s",
-                sqlite3_errmsg(ip_cache_table));
-      sqlite3_finalize(stmt);
-      return ret;
-    }
+    sqlite3_reset(stmt);
   }
 
-  ret = sqlite3_finalize(stmt);
+  sqlite3_finalize(stmt);
+  return SQLITE_OK;
+}
+
+int save_single_node_ip_to_sqlite(const struct ip_key *key,
+                                  struct node_cache_ip *node) {
+  int ret;
+
+  char ip_str[INET6_ADDRSTRLEN];
+  if (key->version == 4) {
+    inet_ntop(AF_INET, &key->addr.ip4, ip_str, sizeof(ip_str));
+  } else {
+    inet_ntop(AF_INET6, &key->addr.ip6, ip_str, sizeof(ip_str));
+  }
+
+  ret = insert_ip_main_record(ip_str, node);
   if (ret != SQLITE_OK) {
-    LOG_ERROR("Failed to delete prepared statement: %s",
-              sqlite3_errmsg(ip_cache_table));
+    return ret;
+  }
+
+  ret = delete_ip_categories(ip_str);
+  if (ret != SQLITE_OK) {
+    return ret;
+  }
+
+  ret = insert_ip_categories(ip_str, node);
+  if (ret != SQLITE_OK) {
     return ret;
   }
 

@@ -2,8 +2,8 @@
 #include "domain_cache.h"
 #include "ip_cache.h"
 
-extern bool worker_classify_domain(const char *domain,
-                                   struct requested_classification *out_req);
+extern bool worker_classify(const char *type, const char *target,
+                            struct requested_classification *out_req);
 
 const uint16_t LIST_EXCEPTION_PORTS[LEN_LIST_EXCEPTION_PORTS] = {22};
 

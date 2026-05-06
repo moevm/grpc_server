@@ -57,13 +57,18 @@ int main(int argc, char **argv) {
       worker.statsReport();
     }
 
-    if (const char *domain = getenv("TEST_CLASSIFY_DOMAIN")) {
+    if (const char *target = getenv("TEST_CLASSIFY_TARGET")) {
+      const char *type = getenv("TEST_CLASSIFY_TYPE");
+      if (!type)
+        type = "domain";
+
       test_mode = true;
-      spdlog::info("Test mode: classifying domain '{}'", domain);
+      spdlog::info("Test mode: classifying {} '{}'", type, target);
       std::this_thread::sleep_for(std::chrono::seconds(1));
       struct requested_classification req_clas;
       memset(&req_clas, 0, sizeof(req_clas));
-      bool success = worker.classifyDomain(domain, &req_clas);
+
+      bool success = worker.classify(type, target, &req_clas);
       if (success) {
         spdlog::info("Classification successful: trust_level={}",
                      req_clas.get_trust_level);
