@@ -25,7 +25,7 @@ LDFLAGS = -L$(DPDK_PREFIX)/lib \
           -L$(SQLITE_PREFIX)/lib \
           -lsqlite3
 
-SRCS = src/dpdk_filter/main.c src/dpdk_filter/net_port.c src/dpdk_filter/filtr_packets.c src/dpdk_filter/pars_packets.c src/dpdk_filter/proc_packets.c src/dpdk_filter/dns_cache.c
+SRCS = src/dpdk_filter/main.c src/dpdk_filter/net_port.c src/dpdk_filter/filtr_packets.c src/dpdk_filter/pars_packets.c src/dpdk_filter/proc_packets.c src/dpdk_filter/domain_cache.c src/dpdk_filter/ip_cache.c
 
 TARGET_REAL = main-riscv
 TARGET_VIRT = main-riscv-virt
