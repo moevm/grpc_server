@@ -178,21 +178,16 @@ void close_sqlite_cache(void) {
   cache_table = NULL;
 }
 
-int save_single_node_to_sqlite(const char *domain,
-                               struct node_cache_domain *node) {
-  sqlite3_stmt *stmt = NULL;
-  int ret;
-
-  const char *sql_main =
+static int insert_domain_main_record(const char *domain,
+                                     struct node_cache_domain *node) {
+  const char *sql =
       "INSERT OR REPLACE INTO main_table "
       "(domain, solution_is_send, trust_lvl, timestamp, ttl_seconds) "
       "VALUES (?, ?, ?, ?, ?)";
-
-  ret = sqlite3_prepare_v2(cache_table, sql_main, -1, &stmt, NULL);
+  sqlite3_stmt *stmt = NULL;
+  int ret = sqlite3_prepare_v2(cache_table, sql, -1, &stmt, NULL);
   if (ret != SQLITE_OK) {
-    LOG_ERROR("Failed to prepare main_table insert: %s",
-              sqlite3_errmsg(cache_table));
-    sqlite3_finalize(stmt);
+    LOG_ERROR("Failed to prepare main insert: %s", sqlite3_errmsg(cache_table));
     return ret;
   }
 
@@ -203,84 +198,75 @@ int save_single_node_to_sqlite(const char *domain,
   sqlite3_bind_int(stmt, 5, (int)node->ttl_seconds);
 
   ret = sqlite3_step(stmt);
+  sqlite3_finalize(stmt);
+
   if (ret != SQLITE_DONE) {
-    LOG_ERROR("Failed to insert into main_table: %s",
-              sqlite3_errmsg(cache_table));
-    sqlite3_finalize(stmt);
+    LOG_ERROR("Failed to execute insert: %s", sqlite3_errmsg(cache_table));
     return ret;
   }
+  return SQLITE_OK;
+}
 
-  ret = sqlite3_finalize(stmt);
-  if (ret != SQLITE_OK) {
-    LOG_ERROR("Failed to delete prepared statement: %s",
-              sqlite3_errmsg(cache_table));
-    return ret;
-  }
-
-  const char *sql_del = "DELETE FROM categories_table WHERE domain = ?";
-  ret = sqlite3_prepare_v2(cache_table, sql_del, -1, &stmt, NULL);
+static int delete_domain_categories(const char *domain) {
+  const char *sql = "DELETE FROM categories_table WHERE domain = ?";
+  sqlite3_stmt *stmt = NULL;
+  int ret = sqlite3_prepare_v2(cache_table, sql, -1, &stmt, NULL);
   if (ret != SQLITE_OK) {
     LOG_ERROR("Failed to prepare delete: %s", sqlite3_errmsg(cache_table));
-    sqlite3_finalize(stmt);
     return ret;
   }
 
   sqlite3_bind_text(stmt, 1, domain, -1, SQLITE_STATIC);
   ret = sqlite3_step(stmt);
-  if (ret != SQLITE_DONE) {
-    LOG_ERROR("Failed to delete old categories: %s",
-              sqlite3_errmsg(cache_table));
-    sqlite3_finalize(stmt);
-    return ret;
-  }
+  sqlite3_finalize(stmt);
 
-  ret = sqlite3_finalize(stmt);
-  if (ret != SQLITE_OK) {
-    LOG_ERROR("Failed to delete prepared statement: %s",
-              sqlite3_errmsg(cache_table));
-    return ret;
-  }
+  return (ret == SQLITE_DONE) ? SQLITE_OK : ret;
+}
 
-  const char *sql_cat =
+static int insert_domain_categories(const char *domain,
+                                    struct node_cache_domain *node) {
+  const char *sql =
       "INSERT INTO categories_table (domain, certain_category) VALUES (?, ?)";
-  ret = sqlite3_prepare_v2(cache_table, sql_cat, -1, &stmt, NULL);
+  sqlite3_stmt *stmt = NULL;
+  int ret = sqlite3_prepare_v2(cache_table, sql, -1, &stmt, NULL);
   if (ret != SQLITE_OK) {
     LOG_ERROR("Failed to prepare categories insert: %s",
               sqlite3_errmsg(cache_table));
     return ret;
   }
 
-  for (int i = 0; i < MAX_CATEGORIES; i++) {
-    if (strlen(node->categories[i]) == 0) {
-      break;
-    }
-
+  for (int i = 0; i < MAX_CATEGORIES && node->categories[i][0] != '\0'; i++) {
     sqlite3_bind_text(stmt, 1, domain, -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 2, node->categories[i], -1, SQLITE_STATIC);
 
     ret = sqlite3_step(stmt);
     if (ret != SQLITE_DONE) {
-      LOG_ERROR("Failed to prepare categories_table insert: %s",
-                sqlite3_errmsg(cache_table));
+      LOG_ERROR("Failed to insert category: %s", sqlite3_errmsg(cache_table));
       sqlite3_finalize(stmt);
       return ret;
     }
-
-    ret = sqlite3_reset(stmt);
-    if (ret != SQLITE_OK) {
-      LOG_ERROR("Failed to reset prepared statement: %s",
-                sqlite3_errmsg(cache_table));
-      sqlite3_finalize(stmt);
-      return ret;
-    }
+    sqlite3_reset(stmt);
   }
 
-  ret = sqlite3_finalize(stmt);
-  if (ret != SQLITE_OK) {
-    LOG_ERROR("Failed to delete prepared statement: %s",
-              sqlite3_errmsg(cache_table));
+  sqlite3_finalize(stmt);
+  return SQLITE_OK;
+}
+
+int save_single_node_to_sqlite(const char *domain,
+                               struct node_cache_domain *node) {
+  int ret;
+
+  ret = insert_domain_main_record(domain, node);
+  if (ret != SQLITE_OK)
     return ret;
-  }
+
+  ret = delete_domain_categories(domain);
+  if (ret != SQLITE_OK)
+    return ret;
+
+  ret = insert_domain_categories(domain, node);
+  if (ret != SQLITE_OK)
+    return ret;
 
   return SQLITE_OK;
 }
