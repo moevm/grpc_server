@@ -83,6 +83,8 @@ void Worker::initDPDK(int argc, char **argv) {
     throw std::runtime_error("Start ports");
   }
 
+  init_dns_cache();
+
   spdlog::info("DPDK initialized: in_port={}, out_port={}", port_in->port_id,
                port_out->port_id);
 }
@@ -168,6 +170,7 @@ void Worker::requestPolicyFromController() {
       current_policy.min_trust_level = pol.min_trust_level();
 
       current_config_version = pol.config_version();
+      clear_cache();
 
       spdlog::info("POLICY LOADED");
       spdlog::info("Config version: {}", current_config_version);
@@ -298,6 +301,9 @@ Worker::~Worker() {
   spdlog::info("Worker {} shutting down", worker_id);
 
   if (port_in && port_out) {
+    save_all_cache_to_sqlite();
+    free_dns_cache();
+
     net_port_close(port_in);
     net_port_close(port_out);
     net_port_close(port_exception);
@@ -319,6 +325,8 @@ void Worker::MainLoop() {
   struct rte_mbuf *pkts[32];
   uint16_t nb_pkts = 32;
   uint16_t queue_number = 0;
+  uint64_t timer_check_counter = 0;
+  const uint64_t timer_check_interval = 10000;
   while (!stop_flag && GetState() != WorkerState::SHUTTING_DOWN) {
     {
       std::lock_guard<std::mutex> lock(policy_mutex);
@@ -328,6 +336,10 @@ void Worker::MainLoop() {
     pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts,
                       pkts, &local_policy);
     forward_to_out(port_out, port_in, queue_number);
+    if (++timer_check_counter >= timer_check_interval) {
+      rte_timer_manage();
+      timer_check_counter = 0;
+    }
 
     auto now = steady_clock::now();
 
