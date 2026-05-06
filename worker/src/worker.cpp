@@ -9,15 +9,14 @@
 #include <spdlog/spdlog.h>
 #include <thread>
 
-extern "C" bool
-worker_classify_domain(const char *domain,
-                       struct requested_classification *out_req) {
+extern "C" bool worker_classify(const char *type, const char *target,
+                                struct requested_classification *out_req) {
   Worker *worker = Worker::getInstance();
   if (!worker) {
-    fprintf(stderr, "worker_classify_domain: worker is null\n");
+    fprintf(stderr, "worker_classify: worker is null\n");
     return false;
   }
-  return worker->classifyDomain(std::string(domain), out_req);
+  return worker->classify(std::string(type), std::string(target), out_req);
 }
 
 static volatile bool stop_flag = false;
@@ -213,14 +212,15 @@ void Worker::requestPolicyFromController() {
   }
 }
 
-bool Worker::classifyDomain(const std::string &domain,
-                            struct requested_classification *out_req) {
+bool Worker::classify(const std::string &type, const std::string &target,
+                      struct requested_classification *out_req) {
   try {
-    spdlog::info("Worker {} classifying domain '{}'", worker_id, domain);
+    spdlog::info("Worker {} classifying '{}' as {}", worker_id, target, type);
 
     ClassifyRequest req;
     req.set_worker_id(worker_id);
-    req.set_domain(domain);
+    req.set_type(type);
+    req.set_target(target);
 
     ClassifyResponse resp;
     grpc::ClientContext context;
@@ -238,7 +238,7 @@ bool Worker::classifyDomain(const std::string &domain,
       categories_str += resp.categories(i);
     }
     spdlog::info(
-        "Domain '{}' classified as categories [{}] with trust level {}", domain,
+        "Target '{}' classified as categories [{}] with trust level {}", target,
         categories_str, resp.trust_level());
 
     out_req->get_trust_level = resp.trust_level();
