@@ -3,9 +3,11 @@
 
 #include "communication.grpc.pb.h"
 #include "communication.pb.h"
+#include "../include/metrics_collector.hpp"
 #include <cstdint>
 #include <grpcpp/grpcpp.h>
 #include <memory>
+#include <atomic>
 
 #define EXPECTED_POLICY_TIME 60
 #define MIN_POLICY_TIME 30
@@ -35,6 +37,12 @@ class Worker {
   void LogStateChange(WorkerState new_state);
   void SetState(WorkerState new_state);
 
+  std::unique_ptr<MetricsCollector> metrics_collector_;
+
+  std::atomic<uint64_t> packets_received_count{0};
+  std::atomic<uint64_t> packets_passed_count{0};
+  std::atomic<uint64_t> packets_dropped_count{0};
+
 public:
   Worker(uint64_t id);
   ~Worker();
@@ -45,6 +53,13 @@ public:
   void statsReport();
   WorkerState GetState() const { return state; }
   void MainLoop();
+
+  void RecordPacketReceived();
+  void RecordPacketPassed();
+  void RecordPacketDropped(const std::string& reason);
+  void RecordDomainBlocked(const std::string& domain_or_ip);
+  void RecordTaskStart();
+  void RecordTaskEnd();
 };
 
 #endif

@@ -56,4 +56,7 @@ message StatsReport {
     uint64 total_blocked = 3;
     uint64 total_allowed = 4;
     repeated ResourceStats resources = 5;
+    uint64 packets_received = 6;
+    uint64 packets_passed = 7;
+    uint64 packets_dropped = 8;
 }
