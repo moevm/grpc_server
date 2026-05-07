@@ -172,22 +172,23 @@ void Worker::requestPolicyFromController() {
       int block_ip6_idx = 0;
 
       for (int i = 0; i < block_ips_count; ++i) {
-          const std::string &ip_str = pol.block_ips(i);
-          
-          struct in_addr ip4;
-          if (inet_pton(AF_INET, ip_str.c_str(), &ip4) == 1) {
-              if (block_ip4_idx < MAX_IP4) {
-                  current_policy.block_ip4[block_ip4_idx++] = ip4.s_addr;
-              }
-              continue;
+        const std::string &ip_str = pol.block_ips(i);
+
+        struct in_addr ip4;
+        if (inet_pton(AF_INET, ip_str.c_str(), &ip4) == 1) {
+          if (block_ip4_idx < MAX_IP4) {
+            current_policy.block_ip4[block_ip4_idx++] = ip4.s_addr;
           }
-          
-          struct in6_addr ip6;
-          if (inet_pton(AF_INET6, ip_str.c_str(), &ip6) == 1) {
-              if (block_ip6_idx < MAX_IP6) {
-                  memcpy(current_policy.block_ip6[block_ip6_idx++], ip6.s6_addr, IP6_LEN);
-              }
+          continue;
+        }
+
+        struct in6_addr ip6;
+        if (inet_pton(AF_INET6, ip_str.c_str(), &ip6) == 1) {
+          if (block_ip6_idx < MAX_IP6) {
+            memcpy(current_policy.block_ip6[block_ip6_idx++], ip6.s6_addr,
+                   IP6_LEN);
           }
+        }
       }
 
       int allow_ips_count = pol.allow_ips_size();
@@ -195,27 +196,27 @@ void Worker::requestPolicyFromController() {
       int allow_ip6_idx = 0;
 
       for (int i = 0; i < allow_ips_count; ++i) {
-          const std::string &ip_str = pol.allow_ips(i);
-          
-          struct in_addr ip4;
-          if (inet_pton(AF_INET, ip_str.c_str(), &ip4) == 1) {
-              if (allow_ip4_idx < MAX_IP4) {
-                  current_policy.allow_ip4[allow_ip4_idx++] = ip4.s_addr;
-              }
-              continue;
+        const std::string &ip_str = pol.allow_ips(i);
+
+        struct in_addr ip4;
+        if (inet_pton(AF_INET, ip_str.c_str(), &ip4) == 1) {
+          if (allow_ip4_idx < MAX_IP4) {
+            current_policy.allow_ip4[allow_ip4_idx++] = ip4.s_addr;
           }
-          
-          struct in6_addr ip6;
-          if (inet_pton(AF_INET6, ip_str.c_str(), &ip6) == 1) {
-              if (allow_ip6_idx < MAX_IP6) {
-                  memcpy(current_policy.allow_ip6[allow_ip6_idx++], ip6.s6_addr, IP6_LEN);
-              }
+          continue;
+        }
+
+        struct in6_addr ip6;
+        if (inet_pton(AF_INET6, ip_str.c_str(), &ip6) == 1) {
+          if (allow_ip6_idx < MAX_IP6) {
+            memcpy(current_policy.allow_ip6[allow_ip6_idx++], ip6.s6_addr,
+                   IP6_LEN);
           }
+        }
       }
       current_policy.min_trust_level = pol.min_trust_level();
 
       current_config_version = pol.config_version();
-
 
       clear_ip_cache();
       clear_dns_cache();
@@ -250,7 +251,6 @@ void Worker::requestPolicyFromController() {
       break;
     }
 
-    
     case GetPolicyResponse::POLICY_UNCHANGED: {
       spdlog::info("Policy unchanged");
       break;
