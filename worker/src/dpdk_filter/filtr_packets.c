@@ -156,12 +156,12 @@ bool main_filtring_by_domain(struct requested_classification *req_clas,
                              struct info_of_pakage *info_pac) {
 
   if (check_domain_is_block(info_pac->domain, policy->block_domains) == true) {
-    LOG_INFO("This domain is blocked");
+    LOG_INFO("Domain '%s' is blocked", info_pac->domain);
     return false;
   }
 
   if (check_domain_is_allow(info_pac->domain, policy->allow_domains) == true) {
-    LOG_INFO("This domain is allowed");
+    LOG_INFO("Domain '%s' is allowed", info_pac->domain);
     return true;
   }
 
@@ -173,12 +173,12 @@ bool main_filtring_by_ip(struct requested_classification *req_clas,
                          struct info_of_pakage *info_pac) {
 
   if (check_ip_is_block(info_pac, policy) == true) {
-    LOG_INFO("This ip is blocked");
+    LOG_INFO("IPv%d dst is blocked", info_pac->ip_version == IP_4 ? 4 : 6);
     return false;
   }
 
   if (check_ip_is_allow(info_pac, policy) == true) {
-    LOG_INFO("This ip is allowed");
+    LOG_INFO("IPv%d dst is allowed", info_pac->ip_version == IP_4 ? 4 : 6);
     return true;
   }
 
