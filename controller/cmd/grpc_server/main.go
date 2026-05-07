@@ -25,7 +25,11 @@ func main() {
 
 	adminServer.SetManager(mgr)
 
-	dataServer := grpcserver.NewDataServer(mgr)
+	dataServer, err := grpcserver.NewDataServer(mgr, "internal/service/config/categories.json", "internal/service/config/providers.json")
+
+	if err != nil {
+		log.Fatalf("Failed to create data server: %v", err)
+	}
 
 	go func() {
 		http.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {

@@ -29,14 +29,17 @@ message WorkerPolicy {
     map<string, int32> block_by_trust = 2;
     repeated string block_domains = 3;
     repeated string allow_domains = 4;
-    int32 min_trust_level = 5;
-    uint64 config_version = 6;
-    google.protobuf.Struct extra = 7;
+    repeated string block_ips = 5;
+    repeated string allow_ips = 6;
+    int32 min_trust_level = 7;
+    uint64 config_version = 8;
+    google.protobuf.Struct extra = 9;
 }
 
 message ClassifyRequest {
     uint64 worker_id = 1;
-    string domain = 2;
+    string type = 2;  
+    string target = 3;   
 }
 
 message ClassifyResponse {

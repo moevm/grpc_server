@@ -46,7 +46,7 @@ func (pl *ProviderList) LoadFromFile(filename string) error {
 		return fmt.Errorf("reading providers: %w", err)
 	}
 
-    interpolatedData := interpolateEnvVars(data)
+	interpolatedData := interpolateEnvVars(data)
 
 	return json.Unmarshal(data, pl)
 }
