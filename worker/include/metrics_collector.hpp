@@ -1,15 +1,15 @@
 #ifndef METRICS_COLLECTOR_HPP
 #define METRICS_COLLECTOR_HPP
 
-#include <chrono>
 #include <atomic>
-#include <thread>
-#include <unordered_map>
+#include <chrono>
+#include <prometheus/counter.h>
 #include <prometheus/gateway.h>
 #include <prometheus/gauge.h>
-#include <prometheus/counter.h>
 #include <prometheus/histogram.h>
 #include <prometheus/registry.h>
+#include <thread>
+#include <unordered_map>
 
 class MetricsCollector {
 public:
@@ -19,9 +19,9 @@ public:
 
   void IncrementPacketsReceived(int count = 1);
   void IncrementPacketsPassed(int count = 1);
-  void IncrementPacketsDropped(const std::string& reason, int count = 1);
+  void IncrementPacketsDropped(const std::string &reason, int count = 1);
 
-  void IncrementBlockedDomain(const std::string& domain_or_ip);
+  void IncrementBlockedDomain(const std::string &domain_or_ip);
 
   void StartTask();
   void StopTask();

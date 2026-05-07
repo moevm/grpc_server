@@ -19,7 +19,7 @@ public:
         metrics_collector(gateway_address, gateway_port,
                           ("worker-" + std::to_string(id)).c_str()) {}
 
-  MetricsCollector* getMetricsCollector() { return &metrics_collector; }
+  MetricsCollector *getMetricsCollector() { return &metrics_collector; }
 };
 
 int main(int argc, char **argv) {

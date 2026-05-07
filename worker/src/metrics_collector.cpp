@@ -42,69 +42,68 @@ MetricsCollector::MetricsCollector(const char *gateway_address,
           .Help("Current task processing time (in seconds)")
           .Register(*registry);
 
-
   auto &packets_received_family = prometheus::BuildCounter()
-      .Name("packets_received_total")
-      .Help("Total number of packets received")
-      .Register(*registry);
+                                      .Name("packets_received_total")
+                                      .Help("Total number of packets received")
+                                      .Register(*registry);
   packets_received_counter = &packets_received_family.Add({});
 
-  auto &packets_passed_family = prometheus::BuildCounter()
-      .Name("packets_passed_total")
-      .Help("Total number of packets passed/forwarded")
-      .Register(*registry);
+  auto &packets_passed_family =
+      prometheus::BuildCounter()
+          .Name("packets_passed_total")
+          .Help("Total number of packets passed/forwarded")
+          .Register(*registry);
   packets_passed_counter = &packets_passed_family.Add({});
 
   auto &packets_dropped_family = prometheus::BuildCounter()
-      .Name("packets_dropped_total")
-      .Help("Total number of packets dropped")
-      .Register(*registry);
+                                     .Name("packets_dropped_total")
+                                     .Help("Total number of packets dropped")
+                                     .Register(*registry);
   packets_dropped_counter = &packets_dropped_family.Add({});
 
-  packets_dropped_by_reason_family = &prometheus::BuildCounter()
-      .Name("packets_dropped_by_reason_total")
-      .Help("Packets dropped by reason")
-      .Register(*registry);
-
+  packets_dropped_by_reason_family =
+      &prometheus::BuildCounter()
+           .Name("packets_dropped_by_reason_total")
+           .Help("Packets dropped by reason")
+           .Register(*registry);
 
   blocked_domains_family = &prometheus::BuildCounter()
-      .Name("blocked_domains_total")
-      .Help("Number of blocked requests by domain/IP")
-      .Register(*registry);
-
+                                .Name("blocked_domains_total")
+                                .Help("Number of blocked requests by domain/IP")
+                                .Register(*registry);
 
   auto &tasks_completed_family = prometheus::BuildCounter()
-      .Name("tasks_completed_total")
-      .Help("Total number of completed tasks")
-      .Register(*registry);
+                                     .Name("tasks_completed_total")
+                                     .Help("Total number of completed tasks")
+                                     .Register(*registry);
   tasks_completed_counter = &tasks_completed_family.Add({});
 
   auto &task_duration_family = prometheus::BuildHistogram()
-       .Name("task_duration_seconds")
-       .Help("Task execution duration in seconds")
-       .Register(*registry);
+                                   .Name("task_duration_seconds")
+                                   .Help("Task execution duration in seconds")
+                                   .Register(*registry);
 
-   prometheus::Histogram::BucketBoundaries task_buckets = {
-       0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25,
-       0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0
-   };
-   task_duration_histogram = &task_duration_family.Add({}, std::move(task_buckets));
+  prometheus::Histogram::BucketBoundaries task_buckets = {
+      0.001, 0.005, 0.01, 0.025, 0.05, 0.1,  0.25,
+      0.5,   1.0,   2.5,  5.0,   10.0, 30.0, 60.0};
+  task_duration_histogram =
+      &task_duration_family.Add({}, std::move(task_buckets));
 
-   auto &collection_duration_family = prometheus::BuildHistogram()
-       .Name("metrics_collection_duration_seconds")
-       .Help("Time spent collecting metrics in seconds")
-       .Register(*registry);
+  auto &collection_duration_family =
+      prometheus::BuildHistogram()
+          .Name("metrics_collection_duration_seconds")
+          .Help("Time spent collecting metrics in seconds")
+          .Register(*registry);
 
-   prometheus::Histogram::BucketBoundaries collection_buckets = {
-       0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5
-   };
-   metrics_collection_duration = &collection_duration_family.Add({}, std::move(collection_buckets));
-
+  prometheus::Histogram::BucketBoundaries collection_buckets = {
+      0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5};
+  metrics_collection_duration =
+      &collection_duration_family.Add({}, std::move(collection_buckets));
 
   auto &push_errors_family = prometheus::BuildCounter()
-      .Name("push_errors_total")
-      .Help("Total number of push gateway errors")
-      .Register(*registry);
+                                 .Name("push_errors_total")
+                                 .Help("Total number of push gateway errors")
+                                 .Register(*registry);
   push_errors_total = &push_errors_family.Add({});
 
   std::ifstream file("/proc/stat");
@@ -151,8 +150,10 @@ void MetricsCollector::MainLoop() {
       task_processing_time_gauge->Set(0);
     }
 
-    auto collection_duration = std::chrono::duration<double>(
-        std::chrono::high_resolution_clock::now() - collection_start).count();
+    auto collection_duration =
+        std::chrono::duration<double>(
+            std::chrono::high_resolution_clock::now() - collection_start)
+            .count();
     metrics_collection_duration->Observe(collection_duration);
 
     PushMetrics();
@@ -212,7 +213,6 @@ void MetricsCollector::GetCPUUsage() {
   file.close();
 }
 
-
 void MetricsCollector::IncrementPacketsReceived(int count) {
   if (packets_received_counter) {
     packets_received_counter->Increment(count);
@@ -225,16 +225,18 @@ void MetricsCollector::IncrementPacketsPassed(int count) {
   }
 }
 
-void MetricsCollector::IncrementPacketsDropped(const std::string& reason, int count) {
+void MetricsCollector::IncrementPacketsDropped(const std::string &reason,
+                                               int count) {
   if (packets_dropped_counter) {
     packets_dropped_counter->Increment(count);
   }
   if (packets_dropped_by_reason_family) {
-    packets_dropped_by_reason_family->Add({{"reason", reason}}).Increment(count);
+    packets_dropped_by_reason_family->Add({{"reason", reason}})
+        .Increment(count);
   }
 }
 
-void MetricsCollector::IncrementBlockedDomain(const std::string& domain_or_ip) {
+void MetricsCollector::IncrementBlockedDomain(const std::string &domain_or_ip) {
   if (blocked_domains_family) {
     blocked_domains_family->Add({{"domain", domain_or_ip}}).Increment();
   }
@@ -249,8 +251,8 @@ void MetricsCollector::StartTask() {
 
 void MetricsCollector::StopTask() {
   auto duration = std::chrono::duration<double>(
-      std::chrono::high_resolution_clock::now() - task_start
-  ).count();
+                      std::chrono::high_resolution_clock::now() - task_start)
+                      .count();
 
   if (task_duration_histogram) {
     task_duration_histogram->Observe(duration);

@@ -1,13 +1,13 @@
 #ifndef WORKER_HPP
 #define WORKER_HPP
 
+#include "../include/metrics_collector.hpp"
 #include "communication.grpc.pb.h"
 #include "communication.pb.h"
-#include "../include/metrics_collector.hpp"
+#include <atomic>
 #include <cstdint>
 #include <grpcpp/grpcpp.h>
 #include <memory>
-#include <atomic>
 extern "C" {
 #include "dpdk_filter/dns_cache.h"
 #include "dpdk_filter/filtr_packets.h"
@@ -84,8 +84,8 @@ public:
 
   void RecordPacketReceived();
   void RecordPacketPassed();
-  void RecordPacketDropped(const std::string& reason);
-  void RecordDomainBlocked(const std::string& domain_or_ip);
+  void RecordPacketDropped(const std::string &reason);
+  void RecordDomainBlocked(const std::string &domain_or_ip);
   void RecordTaskStart();
   void RecordTaskEnd();
 };

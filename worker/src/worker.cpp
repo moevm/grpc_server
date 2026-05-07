@@ -378,7 +378,6 @@ void Worker::MainLoop() {
   }
 }
 
-
 void Worker::RecordPacketReceived() {
   packets_received_count++;
   if (metrics_collector_) {
@@ -393,14 +392,14 @@ void Worker::RecordPacketPassed() {
   }
 }
 
-void Worker::RecordPacketDropped(const std::string& reason) {
+void Worker::RecordPacketDropped(const std::string &reason) {
   packets_dropped_count++;
   if (metrics_collector_) {
     metrics_collector_->IncrementPacketsDropped(reason);
   }
 }
 
-void Worker::RecordDomainBlocked(const std::string& domain_or_ip) {
+void Worker::RecordDomainBlocked(const std::string &domain_or_ip) {
   if (metrics_collector_) {
     metrics_collector_->IncrementBlockedDomain(domain_or_ip);
   }
