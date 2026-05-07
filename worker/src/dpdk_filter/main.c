@@ -1,4 +1,5 @@
-#include "dns_cache.h"
+#include "domain_cache.h"
+#include "ip_cache.h"
 #include "net_port.h"
 #include "proc_packets.h"
 #include <rte_eal.h>
@@ -20,9 +21,9 @@ static void signal_handler(int signum) {
 
 void forward_to_out(struct net_port *incoming_port,
                     struct net_port *outgoing_port, uint16_t queue_number) {
-  struct rte_mbuf *tap_pkts[32];
-  uint16_t nb_tap =
-      rte_eth_rx_burst(incoming_port->port_id, queue_number, tap_pkts, 32);
+  struct rte_mbuf *tap_pkts[FORWARD_TO_OUT_BURST_SIZE];
+  uint16_t nb_tap = rte_eth_rx_burst(incoming_port->port_id, queue_number,
+                                     tap_pkts, FORWARD_TO_OUT_BURST_SIZE);
   for (int i = 0; i < nb_tap; i++) {
     int ret =
         rte_eth_tx_burst(outgoing_port->port_id, queue_number, &tap_pkts[i], 1);
@@ -71,6 +72,7 @@ int main(int argc, char **argv) {
     return -1;
   }
   init_dns_cache();
+  init_ip_cache();
 
 #ifdef VIRT_PORTS
   LOG_INFO("Using virtual ports: veth0/veth1");
@@ -121,8 +123,11 @@ int main(int argc, char **argv) {
     }
   }
 
-  save_all_cache_to_sqlite();
+  save_all_cache_to_sqlite(NULL);
+  save_all_cache_ip_to_sqlite(NULL);
+
   free_dns_cache();
+  free_ip_cache();
 
   net_port_close(port_in);
   net_port_close(port_out);

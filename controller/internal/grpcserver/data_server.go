@@ -68,9 +68,10 @@ func (s *DataServer) GetPolicy(ctx context.Context, req *pb.GetPolicyRequest) (*
 }
 
 func (s *DataServer) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb.ClassifyResponse, error) {
-	log.Printf("gRPC Classify from worker %d for domain: %s", req.WorkerId, req.Domain)
+	log.Printf("gRPC Classify from worker %d: type=%s, target=%s",
+		req.WorkerId, req.Type, req.Target)
 
-	categoryIDs, err := s.classifier.Check(req.Domain, "domain")
+	categoryIDs, err := s.classifier.Check(req.Target, req.Type)
 	if err != nil {
 		log.Printf("Classification error: %v", err)
 		return &pb.ClassifyResponse{

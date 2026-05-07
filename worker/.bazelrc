@@ -1,0 +1,2 @@
+build:riscv64 --platforms=//platforms:riscv64_linux
+build:riscv64 --extra_toolchains=//toolchains/riscv:cc_toolchain_for_linux_riscv64

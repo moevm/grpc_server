@@ -1,5 +1,5 @@
-#ifndef PROC_PAK_H
-#define PROC_PAK_H
+#ifndef PROC_PACKETS_H
+#define PROC_PACKETS_H
 
 #include "constants.h"
 #include "filtr_packets.h"
@@ -11,6 +11,11 @@
 #include <rte_mempool.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
+                              struct net_port *port_out, uint16_t queue_number);
+
+bool check_is_exception(uint16_t *port);
 
 void pakage_processing(struct net_port *port_in, struct net_port *port_out,
                        struct net_port *port_exception, uint16_t queue_number,
