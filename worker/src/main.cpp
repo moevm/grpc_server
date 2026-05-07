@@ -1,6 +1,5 @@
 #include "../include/metrics_collector.hpp"
 #include "../include/worker.hpp"
-#include "metrics_bridge.h"
 
 #include <spdlog/spdlog.h>
 
@@ -23,7 +22,7 @@ public:
   MetricsCollector* getMetricsCollector() { return &metrics_collector; }
 };
 
-int main() {
+int main(int argc, char **argv) {
   const char *worker_id_str = getenv("WORKER_ID");
   if (worker_id_str == nullptr) {
     spdlog::error("WORKER_ID environment variable not set");
@@ -63,18 +62,31 @@ int main() {
       worker.statsReport();
     }
 
-    if (const char *domain = getenv("TEST_CLASSIFY_DOMAIN")) {
+    if (const char *target = getenv("TEST_CLASSIFY_TARGET")) {
+      const char *type = getenv("TEST_CLASSIFY_TYPE");
+      if (!type)
+        type = "domain";
+
       test_mode = true;
-      spdlog::info("Test mode: classifying domain '{}'", domain);
+      spdlog::info("Test mode: classifying {} '{}'", type, target);
       std::this_thread::sleep_for(std::chrono::seconds(1));
-      worker.classifyDomain(domain);
+      struct requested_classification req_clas;
+      memset(&req_clas, 0, sizeof(req_clas));
+
+      bool success = worker.classify(type, target, &req_clas);
+      if (success) {
+        spdlog::info("Classification successful: trust_level={}",
+                     req_clas.get_trust_level);
+      } else {
+        spdlog::error("Classification failed");
+      }
     }
 
     if (test_mode) {
       spdlog::info("Test mode completed, exiting");
       return 0;
     }
-
+    worker.initDPDK(argc, argv);
     worker.MainLoop();
 
   } catch (std::exception &e) {

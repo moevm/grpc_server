@@ -1,9 +1,15 @@
 CC = riscv64-linux-gnu-gcc
 
 DPDK_PREFIX = ./dpdk-riscv-install
+SQLITE_PREFIX = ./sqlite3-riscv-install
 PKG_CONFIG = env PKG_CONFIG_LIBDIR=$(DPDK_PREFIX)/lib/pkgconfig pkg-config
 
-CFLAGS_BASE = -Iinclude -O2 $(shell $(PKG_CONFIG) --cflags libdpdk)
+CFLAGS_BASE = -Iinclude/dpdk_filter -O2 $(shell $(PKG_CONFIG) --cflags libdpdk)
+
+DEBUG ?= 0
+ifeq ($(DEBUG),1)
+    CFLAGS_BASE += -DDEBUG
+endif
 
 LDFLAGS = -L$(DPDK_PREFIX)/lib \
           -Wl,--start-group \
@@ -13,12 +19,13 @@ LDFLAGS = -L$(DPDK_PREFIX)/lib \
           -lrte_net \
           -lrte_log -ldl \
           -lrte_hash \
-          -sqlite3 \
+          -lrte_timer \
           -Wl,--end-group \
-          -latomic
-          
+          -latomic  \
+          -L$(SQLITE_PREFIX)/lib \
+          -lsqlite3
 
-SRCS = src/dpdk_filter/main.c src/dpdk_filter/net_port.c src/dpdk_filter/filtr_packets.c src/dpdk_filter/pars_packets.c src/dpdk_filter/proc_packets.c src/dpdk_filter/dns_cache.c
+SRCS = src/dpdk_filter/main.c src/dpdk_filter/net_port.c src/dpdk_filter/filtr_packets.c src/dpdk_filter/pars_packets.c src/dpdk_filter/proc_packets.c src/dpdk_filter/domain_cache.c src/dpdk_filter/ip_cache.c
 
 TARGET_REAL = main-riscv
 TARGET_VIRT = main-riscv-virt

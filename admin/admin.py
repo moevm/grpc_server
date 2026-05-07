@@ -23,12 +23,65 @@ def validate_config(content: bytes) -> list[str]:
         errors.append("Config file is empty")
         return errors
 
+    if 'global' not in config:
+        errors.append("Missing required section: 'global'")
+    else:
+        if 'rules' not in config['global']:
+            errors.append("Missing 'global.rules' section")
+        else:
+            rules = config['global']['rules']
+
+            if 'block_categories' in rules and not isinstance(rules['block_categories'], list):
+                errors.append("global.rules.block_categories must be a list")
+
+            if 'block_domains' in rules and not isinstance(rules['block_domains'], list):
+                errors.append("global.rules.block_domains must be a list")
+
+            if 'allow_domains' in rules and not isinstance(rules['allow_domains'], list):
+                errors.append("global.rules.allow_domains must be a list")
+
+            if 'min_trust_level' in rules:
+                if not isinstance(rules['min_trust_level'], int):
+                    errors.append("global.rules.min_trust_level must be an integer")
+                elif rules['min_trust_level'] < 0:
+                    errors.append("global.rules.min_trust_level must be >= 0")
+
+            if 'block_by_trust' in rules and not isinstance(rules['block_by_trust'], dict):
+                errors.append("global.rules.block_by_trust must be a table")
+
     if 'filters' in config:
-        filter_names = set()
-        for filter_name in config['filters'].keys():
-            if filter_name in filter_names:
-                errors.append(f"Duplicate filter name: '{filter_name}'")
-            filter_names.add(filter_name)
+        if not isinstance(config['filters'], dict):
+            errors.append("'filters' must be a table")
+        else:
+            filter_names = set()
+            for filter_name in config['filters'].keys():
+                if filter_name in filter_names:
+                    errors.append(f"Duplicate filter name: '{filter_name}'")
+                filter_names.add(filter_name)
+
+                filter_config = config['filters'][filter_name]
+                if not isinstance(filter_config, dict):
+                    errors.append(f"Filter '{filter_name}' must be a table")
+                    continue
+
+                if 'block_categories' in filter_config and not isinstance(filter_config['block_categories'], list):
+                    errors.append(f"Filter '{filter_name}'.block_categories must be a list")
+
+                if 'block_domains' in filter_config and not isinstance(filter_config['block_domains'], list):
+                    errors.append(f"Filter '{filter_name}'.block_domains must be a list")
+
+                if 'allow_domains' in filter_config and not isinstance(filter_config['allow_domains'], list):
+                    errors.append(f"Filter '{filter_name}'.allow_domains must be a list")
+
+                if 'min_trust_level' in filter_config:
+                    if not isinstance(filter_config['min_trust_level'], int):
+                        errors.append(f"Filter '{filter_name}'.min_trust_level must be an integer")
+                    elif filter_config['min_trust_level'] < 0:
+                        errors.append(f"Filter '{filter_name}'.min_trust_level must be >= 0")
+
+                if 'block_by_trust' in filter_config and not isinstance(filter_config['block_by_trust'], dict):
+                    errors.append(f"Filter '{filter_name}'.block_by_trust must be a table")
+
     return errors
     
 class AdminClient:
