@@ -37,6 +37,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  spdlog::info("Starting worker ID: {}", worker_id);
   spdlog::info("Initialize MetricsCollector with {}:{}", gateway_address,
                gateway_port);
 

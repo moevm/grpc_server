@@ -169,6 +169,7 @@ void Worker::requestPolicyFromController() {
       current_policy.min_trust_level = pol.min_trust_level();
 
       current_config_version = pol.config_version();
+      spdlog::info("Clearing cache due to policy update");
       clear_cache();
 
       spdlog::info("POLICY LOADED");
@@ -287,6 +288,7 @@ Worker::Worker(uint64_t id) : worker_id(id), state(WorkerState::FREE) {
   auto channel =
       grpc::CreateChannel(controller_addr, grpc::InsecureChannelCredentials());
   stub_ = DataService::NewStub(channel);
+  spdlog::info("Worker ID: {}", worker_id);
   spdlog::info("gRPC channel created to {}", controller_addr);
   signal(SIGINT, signal_handler);
   signal(SIGTERM, signal_handler);
@@ -349,6 +351,7 @@ void Worker::MainLoop() {
       last_stats_time = now;
       stats_interval =
           MIN_STATS_TIME + (rand() % (MAX_STATS_TIME - MIN_STATS_TIME + 1));
+      spdlog::info("Next stats report in {}s", stats_interval);
     }
 
     int64_t seconds_since_policy = (now - last_policy_time) / 1s;
@@ -357,6 +360,7 @@ void Worker::MainLoop() {
       last_policy_time = now;
       policy_interval =
           MIN_POLICY_TIME + (rand() % (MAX_POLICY_TIME - MIN_POLICY_TIME + 1));
+      spdlog::info("Next policy request in {}s", policy_interval);
     }
   }
 
