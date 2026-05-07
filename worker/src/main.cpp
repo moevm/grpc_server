@@ -1,5 +1,6 @@
 #include "../include/metrics_collector.hpp"
 #include "../include/worker.hpp"
+#include "metrics_bridge.h"
 
 #include <spdlog/spdlog.h>
 
@@ -18,6 +19,8 @@ public:
       : Worker(id),
         metrics_collector(gateway_address, gateway_port,
                           ("worker-" + std::to_string(id)).c_str()) {}
+
+  MetricsCollector* getMetricsCollector() { return &metrics_collector; }
 };
 
 int main() {
@@ -42,6 +45,8 @@ int main() {
 
   try {
     Worker worker(worker_id);
+
+    metrics_set_collector(worker.getMetricsCollector());
 
     bool test_mode = false;
     if (getenv("TEST_REQUEST_POLICY") != nullptr) {

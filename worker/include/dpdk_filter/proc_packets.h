@@ -12,13 +12,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-
-
-
-
+#define LEN_LIST_EXCEPTION_PORTS 1
 
 void pakage_processing(struct net_port *port_in,
-                       struct net_port *port_out, struct net_port *port_exception, uint16_t queue_number,
-                       uint16_t nb_pkts, struct rte_mbuf **pkts, struct BASE_POLICY* policy);
-
-#endif
+                       struct net_port *port_out,
+                       struct net_port *port_exception,
+                       uint16_t queue_number,
+                       uint16_t nb_pkts,
+                       struct rte_mbuf **pkts,
+                       struct BASE_POLICY* policy);

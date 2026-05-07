@@ -68,13 +68,8 @@ void Worker::requestPolicyFromController() {
 }
 
 void Worker::classifyDomain(const std::string &domain) {
-
-    RecordPacketReceived();
-
   try {
     spdlog::info("Worker {} classifying domain '{}'", worker_id, domain);
-
-    RecordTaskStart();
 
     ClassifyRequest req;
     req.set_worker_id(worker_id);
@@ -86,8 +81,6 @@ void Worker::classifyDomain(const std::string &domain) {
     auto status = stub_->Classify(&context, req, &resp);
     if (!status.ok()) {
       spdlog::error("Classify failed: " + status.error_message());
-      RecordPacketDropped("classification_failed");
-      RecordTaskEnd();
       return;
     }
 
@@ -96,18 +89,8 @@ void Worker::classifyDomain(const std::string &domain) {
     spdlog::info("Domain '{}' classified as category '{}' with trust level {}",
                  domain, cat, resp.trust_level());
 
-    if (resp.trust_level() < 5) {
-      RecordDomainBlocked(domain);
-      RecordPacketDropped("low_trust_level");
-    } else {
-      RecordPacketPassed();
-    }
-    RecordTaskEnd();
-
   } catch (const std::exception &e) {
     spdlog::error(std::string("classifyDomain: ") + e.what());
-    RecordPacketDropped("exception");
-    RecordTaskEnd();
   }
 }
 
