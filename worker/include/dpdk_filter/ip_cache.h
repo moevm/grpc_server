@@ -16,6 +16,7 @@
 
 void init_ip_cache(void);
 void free_ip_cache(void);
+void clear_ip_cache(void);
 
 int lookup_ip_cache(const struct ip_key *key,
                     struct node_cache_ip **return_node);

@@ -16,6 +16,7 @@
 
 void init_dns_cache(void);
 void free_dns_cache(void);
+void clear_dns_cache(void);
 
 int lookup_dns_cache(const char *domain,
                      struct node_cache_domain **return_node);
