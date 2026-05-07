@@ -135,7 +135,8 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
         package_sending_decision(cached_node_domain->solution_is_send, pkts[i],
                                  port_out, queue_number);
       } else if (ret == -ENOENT) {
-        LOG_INFO("Domain cache miss for '%s', applying filter", info_pac.domain);
+        LOG_INFO("Domain cache miss for '%s', applying filter",
+                 info_pac.domain);
 
         struct requested_classification req_clas; // query to domain controller
 
