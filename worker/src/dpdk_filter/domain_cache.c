@@ -488,6 +488,11 @@ void free_dns_cache(void) {
 }
 
 void clear_dns_cache(void) {
+  if (!dns_hash)
+    return;
+  
+  rte_spinlock_lock(&cache_spinlock_domain);
   rte_hash_reset(dns_hash);
+  rte_spinlock_unlock(&cache_spinlock_domain);
   LOG_INFO("DNS cache clear");
 }
