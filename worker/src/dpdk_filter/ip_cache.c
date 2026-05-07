@@ -534,7 +534,7 @@ void free_ip_cache(void) {
 void clear_ip_cache(void) {
   if (!ip_hash)
     return;
-    
+
   rte_spinlock_lock(&cache_spinlock_ip);
   rte_hash_reset(ip_hash);
   rte_spinlock_unlock(&cache_spinlock_ip);
