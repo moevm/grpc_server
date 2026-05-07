@@ -1,4 +1,5 @@
 #include "pars_packets.h"
+#include <arpa/inet.h>
 #include <rte_ether.h>
 #include <rte_ip.h>
 #include <rte_net.h>
@@ -95,6 +96,18 @@ void parsing_pakage(struct rte_mbuf *packet, struct info_of_pakage *info_pac) {
           pos += label_len;
         }
         *dst = '\0';
+
+        struct in_addr ipv4;
+        if (inet_pton(AF_INET, info_pac->domain, &ipv4) == 1) {
+          info_pac->domain[0] = '\0';
+          LOG_INFO("Ignoring IPv4 address as domain");
+        }
+
+        struct in6_addr ipv6;
+        if (inet_pton(AF_INET6, info_pac->domain, &ipv6) == 1) {
+          info_pac->domain[0] = '\0';
+          LOG_INFO("Ignoring IPv6 address as domain");
+        }
       }
     }
   }
