@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 )
 
 type ProviderList struct {
@@ -46,9 +47,9 @@ func (pl *ProviderList) LoadFromFile(filename string) error {
 		return fmt.Errorf("reading providers: %w", err)
 	}
 
-    interpolatedData := interpolateEnvVars(data)
+	interpolatedData := interpolateEnvVars(data)
 
-	return json.Unmarshal(data, pl)
+	return json.Unmarshal(interpolatedData, pl)
 }
 
 func (pl *ProviderList) GetProvider(name string) (Provider, bool) {
