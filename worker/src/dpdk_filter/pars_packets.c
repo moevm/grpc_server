@@ -1,4 +1,4 @@
-#include "../../include/dpdk_filter/pars_packets.h"
+#include "pars_packets.h"
 #include <rte_ether.h>
 #include <rte_ip.h>
 #include <rte_net.h>
@@ -13,7 +13,7 @@ void parsing_pakage(struct rte_mbuf *packet, struct info_of_pakage *info_pac) {
   uint32_t pkt_type = rte_net_get_ptype(packet, &hdr_lens, RTE_PTYPE_ALL_MASK);
 
   if (pkt_type == RTE_PTYPE_UNKNOWN) {
-    printf("[ERROR PARS] Problem with get lens of headers");
+    LOG_ERROR(" PARS] Problem with get lens of headers");
     return;
   }
 
@@ -24,10 +24,14 @@ void parsing_pakage(struct rte_mbuf *packet, struct info_of_pakage *info_pac) {
   uint32_t l3_offset = hdr_lens.l2_len;
 
   if (pkt_type & RTE_PTYPE_L3_IPV4) {
+    info_pac->ip_version = IP_4;
     info_pac->ethernet_type_protocol = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
 
     struct rte_ipv4_hdr *ipv4_hdr =
         rte_pktmbuf_mtod_offset(packet, struct rte_ipv4_hdr *, l3_offset);
+
+    info_pac->ip4_src = ipv4_hdr->src_addr;
+    info_pac->ip4_dist = ipv4_hdr->dst_addr;
 
     if (pkt_type & RTE_PTYPE_L4_TCP) {
       struct rte_tcp_hdr *tcp_hdr = rte_pktmbuf_mtod_offset(
@@ -39,7 +43,16 @@ void parsing_pakage(struct rte_mbuf *packet, struct info_of_pakage *info_pac) {
       info_pac->number_port = udp_hdr->dst_port;
     }
   } else if (pkt_type & RTE_PTYPE_L3_IPV6) {
+    info_pac->ip_version = IP_6;
     info_pac->ethernet_type_protocol = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6);
+
+    struct rte_ipv6_hdr *ipv6_hdr =
+        rte_pktmbuf_mtod_offset(packet, struct rte_ipv6_hdr *, l3_offset);
+
+    rte_memcpy(info_pac->ip6_src, ipv6_hdr->src_addr,
+               sizeof(ipv6_hdr->src_addr));
+    rte_memcpy(info_pac->ip6_dist, ipv6_hdr->dst_addr,
+               sizeof(ipv6_hdr->dst_addr));
 
     if (pkt_type & RTE_PTYPE_L4_TCP) {
       struct rte_tcp_hdr *tcp_hdr = rte_pktmbuf_mtod_offset(
