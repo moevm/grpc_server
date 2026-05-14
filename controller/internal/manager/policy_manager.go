@@ -17,6 +17,8 @@ type TOMLRules struct {
 	BlockIps        []string               `toml:"block_ips"`
 	AllowIps        []string               `toml:"allow_ips"`
 	MinTrustLevel   *int32                 `toml:"min_trust_level"`
+	TtlIp   		*int32                 `toml:"ttl_ip"`
+	TtlDomain	    *int32                 `toml:"ttl_domain"`
 	Extra           map[string]interface{} `toml:",remain"`
 }
 
@@ -68,6 +70,14 @@ func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy 
 
 	if pm.config.Global.Rules.MinTrustLevel != nil {
 		policy.MinTrustLevel = *pm.config.Global.Rules.MinTrustLevel
+	}
+
+	if pm.config.Global.Rules.TtlIp != nil {
+		policy.TtlIp = *pm.config.Global.Rules.TtlIp
+	}
+
+	if pm.config.Global.Rules.TtlDomain != nil {
+		policy.TtlDomain = *pm.config.Global.Rules.TtlDomain
 	}
 
 	filterName := fmt.Sprintf("filter_%d", workerID)
@@ -135,8 +145,17 @@ func (pm *PolicyManager) GetWorkerPolicyProto(workerID uint64) *pb.WorkerPolicy 
 				}
 			}
 		}
+
 		if filter.MinTrustLevel != nil {
 			policy.MinTrustLevel = *filter.MinTrustLevel
+		}
+
+		if filter.TtlIp != nil {
+			policy.TtlIp = *filter.TtlIp
+		}
+
+		if filter.TtlDomain != nil {
+			policy.TtlDomain = *filter.TtlDomain
 		}
 
 		if len(filter.Extra) > 0 {
