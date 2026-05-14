@@ -84,7 +84,7 @@ void Worker::RecordPacketDropped(const std::string &reason) {
   }
 }
 
-extern "C" void record_packet_droped(char * reson) {
+extern "C" void record_packet_droped(char *reson) {
   Worker *worker = Worker::getInstance();
   if (!worker) {
     fprintf(stderr, "worker_classify: worker is null\n");
@@ -107,7 +107,6 @@ extern "C" void record_domain_blocked(char *endpoint) {
   }
   worker->RecordDomainBlocked(endpoint);
 }
-
 
 void Worker::RecordTaskStart() {
   if (metrics_collector_) {
@@ -183,7 +182,7 @@ void Worker::forward_to_out(struct net_port *incoming_port,
 
 void Worker::requestPolicyFromController() {
   RecordTaskStart();
-  
+
   try {
     spdlog::info("Worker {} requests policy", worker_id);
     GetPolicyRequest req;
@@ -341,14 +340,14 @@ void Worker::requestPolicyFromController() {
   } catch (const std::exception &e) {
     spdlog::error("requestPolicyFromController exception: {}", e.what());
   }
-  
+
   RecordTaskEnd();
 }
 
 bool Worker::classify(const std::string &type, const std::string &target,
                       struct requested_classification *out_req) {
   RecordTaskStart();
-  
+
   try {
     spdlog::info("Worker {} classifying '{}' as {}", worker_id, target, type);
 
@@ -383,7 +382,7 @@ bool Worker::classify(const std::string &type, const std::string &target,
       strncpy(out_req->get_categories[i], resp.categories(i).c_str(),
               CATEGORY_MAX_LEN - 1);
     }
-    
+
     RecordTaskEnd();
     return true;
   } catch (const std::exception &e) {
@@ -395,7 +394,7 @@ bool Worker::classify(const std::string &type, const std::string &target,
 
 void Worker::statsReport() {
   RecordTaskStart();
-  
+
   try {
     spdlog::info("Worker {} send stats", worker_id);
 
@@ -418,7 +417,7 @@ void Worker::statsReport() {
   } catch (const std::exception &e) {
     spdlog::error("statsReport failed: {}", e.what());
   }
-  
+
   RecordTaskEnd();
 }
 

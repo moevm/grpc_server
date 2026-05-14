@@ -25,7 +25,7 @@ MetricsCollector::MetricsCollector(const char *gateway_address,
                                    const char *worker_name)
     : gateway(gateway_address, gateway_port, worker_name),
       registry(std::make_shared<prometheus::Registry>()) {
-  
+
   auto &cpu_usage_family = prometheus::BuildGauge()
                                .Name("cpu_usage")
                                .Help("CPU Usage in percents")

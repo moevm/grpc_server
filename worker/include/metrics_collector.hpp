@@ -8,9 +8,9 @@
 #include <prometheus/gauge.h>
 #include <prometheus/histogram.h>
 #include <prometheus/registry.h>
+#include <string>
 #include <thread>
 #include <unordered_map>
-#include <string>
 
 class MetricsCollector {
 public:

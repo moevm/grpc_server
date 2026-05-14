@@ -17,7 +17,7 @@ void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
                               uint16_t queue_number) {
   if (solution_is_send) {
     record_packet_passed();
-    
+
     struct rte_mbuf *tx_pkt[1] = {pkt};
     uint16_t ret = rte_eth_tx_burst(port_out->port_id, queue_number, tx_pkt, 1);
 
@@ -27,7 +27,7 @@ void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
     }
     return;
   }
-  
+
   record_packet_droped("blocked");
   rte_pktmbuf_free(pkt);
 }
@@ -50,7 +50,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       rte_eth_rx_burst(port_in->port_id, queue_number, pkts, nb_pkts);
 
   for (int i = 0; i < nb_rx; i++) {
-    
+
     record_packet_received();
 
     struct info_of_pakage info_pac;
@@ -58,7 +58,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
 
     parsing_pakage(pkts[i], &info_pac);
     LOG_INFO("[PKT] port = %hu", ntohs(info_pac.number_port));
-    
+
     if (info_pac.domain[0] == '\0') {
       LOG_INFO("Packet without dns request");
       struct node_cache_ip *cached_node_ip = NULL;
@@ -155,7 +155,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       if (ret >= 0 && cached_node_domain) {
         package_sending_decision(cached_node_domain->solution_is_send, pkts[i],
                                  port_out, queue_number);
-        
+
         if (!cached_node_domain->solution_is_send) {
           record_domain_blocked(info_pac.domain);
         }
