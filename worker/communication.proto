@@ -7,6 +7,7 @@ service DataService {
     rpc GetPolicy(GetPolicyRequest) returns (GetPolicyResponse);
     rpc Classify(ClassifyRequest) returns (ClassifyResponse);
     rpc SendStats(StatsReport) returns (google.protobuf.Empty);
+    rpc ToggleFiltering(ToggleFilteringRequest) returns (ToggleFilteringResponse);
 }
 
 message GetPolicyRequest {
@@ -59,4 +60,14 @@ message StatsReport {
     uint64 total_blocked = 3;
     uint64 total_allowed = 4;
     repeated ResourceStats resources = 5;
+}
+
+message ToggleFilteringRequest {
+    uint64 worker_id = 1;
+    bool enabled = 2;
+}
+
+message ToggleFilteringResponse {
+    bool success = 1;
+    bool enabled = 2;
 }
