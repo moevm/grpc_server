@@ -17,8 +17,8 @@ type TOMLRules struct {
 	BlockIps        []string               `toml:"block_ips"`
 	AllowIps        []string               `toml:"allow_ips"`
 	MinTrustLevel   *int32                 `toml:"min_trust_level"`
-	TtlIp   		*int32                 `toml:"ttl_ip"`
-	TtlDomain	    *int32                 `toml:"ttl_domain"`
+	TtlIp           *int32                 `toml:"ttl_ip"`
+	TtlDomain       *int32                 `toml:"ttl_domain"`
 	Extra           map[string]interface{} `toml:",remain"`
 }
 
