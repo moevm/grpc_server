@@ -108,7 +108,15 @@ func (s *DataServer) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb
 }
 
 func (s *DataServer) SendStats(ctx context.Context, report *pb.StatsReport) (*emptypb.Empty, error) {
-	log.Printf("gRPC Stats from worker %d: blocked=%d allowed=%d",
-		report.WorkerId, report.TotalBlocked, report.TotalAllowed)
+	log.Printf("gRPC Stats from worker %d: received=%d passed=%d dropped=%d",
+		report.WorkerId,
+		report.PacketsReceived,
+		report.PacketsPassed,
+		report.PacketsDropped)
+
+	if err := s.manager.HandleStatsReport(report); err != nil {
+		log.Printf("Error handling stats from worker %d: %v", report.WorkerId, err)
+	}
+
 	return &emptypb.Empty{}, nil
 }

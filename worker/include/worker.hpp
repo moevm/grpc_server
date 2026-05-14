@@ -1,6 +1,7 @@
 #ifndef WORKER_HPP
 #define WORKER_HPP
 
+#include "../include/metrics_collector.hpp"
 #include "communication.grpc.pb.h"
 #include "communication.pb.h"
 extern "C" {
@@ -11,13 +12,16 @@ extern "C" {
 #include "dpdk_filter/proc_packets.h"
 #include "dpdk_filter/types.h"
 }
+#include <atomic>
 #include <cstdint>
 #include <grpcpp/grpcpp.h>
 #include <memory>
+#include <mutex>
 #include <rte_eal.h>
 #include <rte_ethdev.h>
 #include <rte_mbuf.h>
 #include <rte_mempool.h>
+#include <rte_timer.h>
 
 #define EXPECTED_POLICY_TIME 60
 #define MIN_POLICY_TIME 30
@@ -56,6 +60,12 @@ class Worker {
   void LogStateChange(WorkerState new_state);
   void SetState(WorkerState new_state);
 
+  std::unique_ptr<MetricsCollector> metrics_collector_;
+
+  std::atomic<uint64_t> packets_received_count{0};
+  std::atomic<uint64_t> packets_passed_count{0};
+  std::atomic<uint64_t> packets_dropped_count{0};
+
 public:
   Worker(uint64_t id);
   ~Worker();
@@ -71,6 +81,13 @@ public:
   WorkerState GetState() const { return state; }
   static Worker *getInstance();
   void MainLoop();
+
+  void RecordPacketReceived();
+  void RecordPacketPassed();
+  void RecordPacketDropped(const std::string &reason);
+  void RecordDomainBlocked(const std::string &domain_or_ip);
+  void RecordTaskStart();
+  void RecordTaskEnd();
 };
 
 #endif

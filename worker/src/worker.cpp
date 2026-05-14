@@ -45,6 +45,82 @@ void Worker::SetState(WorkerState new_state) {
   }
 }
 
+void Worker::RecordPacketReceived() {
+  packets_received_count++;
+  if (metrics_collector_) {
+    metrics_collector_->IncrementPacketsReceived(1);
+  }
+}
+
+extern "C" void record_packet_received() {
+  Worker *worker = Worker::getInstance();
+  if (!worker) {
+    fprintf(stderr, "worker_classify: worker is null\n");
+    return;
+  }
+  worker->RecordPacketReceived();
+}
+
+void Worker::RecordPacketPassed() {
+  packets_passed_count++;
+  if (metrics_collector_) {
+    metrics_collector_->IncrementPacketsPassed(1);
+  }
+}
+
+extern "C" void record_packet_passed() {
+  Worker *worker = Worker::getInstance();
+  if (!worker) {
+    fprintf(stderr, "worker_classify: worker is null\n");
+    return;
+  }
+  worker->RecordPacketPassed();
+}
+
+void Worker::RecordPacketDropped(const std::string &reason) {
+  packets_dropped_count++;
+  if (metrics_collector_) {
+    metrics_collector_->IncrementPacketsDropped(reason, 1);
+  }
+}
+
+extern "C" void record_packet_droped(char * reson) {
+  Worker *worker = Worker::getInstance();
+  if (!worker) {
+    fprintf(stderr, "worker_classify: worker is null\n");
+    return;
+  }
+  worker->RecordPacketDropped(reson);
+}
+
+void Worker::RecordDomainBlocked(const std::string &domain_or_ip) {
+  if (metrics_collector_) {
+    metrics_collector_->IncrementBlockedDomain(domain_or_ip);
+  }
+}
+
+extern "C" void record_domain_blocked(char *endpoint) {
+  Worker *worker = Worker::getInstance();
+  if (!worker) {
+    fprintf(stderr, "worker_classify: worker is null\n");
+    return;
+  }
+  worker->RecordDomainBlocked(endpoint);
+}
+
+
+void Worker::RecordTaskStart() {
+  if (metrics_collector_) {
+    metrics_collector_->StartTask();
+  }
+}
+
+void Worker::RecordTaskEnd() {
+  if (metrics_collector_) {
+    metrics_collector_->StopTask();
+  }
+}
+
 void Worker::initDPDK(int argc, char **argv) {
   unsigned mbuf_quantity_in_pool = 8192;
   unsigned cache_size_per_kernel = 250;
@@ -100,13 +176,14 @@ void Worker::forward_to_out(struct net_port *incoming_port,
         rte_eth_tx_burst(outgoing_port->port_id, queue_number, &tap_pkts[i], 1);
     if (ret < 1) {
       spdlog::warn("Failed to send packet");
-      // PLUG (to be added later) - need to add processing for this case
       rte_pktmbuf_free(tap_pkts[i]);
     }
   }
 }
 
 void Worker::requestPolicyFromController() {
+  RecordTaskStart();
+  
   try {
     spdlog::info("Worker {} requests policy", worker_id);
     GetPolicyRequest req;
@@ -120,6 +197,7 @@ void Worker::requestPolicyFromController() {
 
     if (!status.ok()) {
       spdlog::error("GetPolicy failed: " + status.error_message());
+      RecordTaskEnd();
       return;
     }
 
@@ -263,10 +341,14 @@ void Worker::requestPolicyFromController() {
   } catch (const std::exception &e) {
     spdlog::error("requestPolicyFromController exception: {}", e.what());
   }
+  
+  RecordTaskEnd();
 }
 
 bool Worker::classify(const std::string &type, const std::string &target,
                       struct requested_classification *out_req) {
+  RecordTaskStart();
+  
   try {
     spdlog::info("Worker {} classifying '{}' as {}", worker_id, target, type);
 
@@ -281,6 +363,7 @@ bool Worker::classify(const std::string &type, const std::string &target,
     auto status = stub_->Classify(&context, req, &resp);
     if (!status.ok()) {
       spdlog::error("Classify failed: " + status.error_message());
+      RecordTaskEnd();
       return false;
     }
 
@@ -300,14 +383,19 @@ bool Worker::classify(const std::string &type, const std::string &target,
       strncpy(out_req->get_categories[i], resp.categories(i).c_str(),
               CATEGORY_MAX_LEN - 1);
     }
+    
+    RecordTaskEnd();
     return true;
   } catch (const std::exception &e) {
     spdlog::error(std::string("classifyDomain: ") + e.what());
+    RecordTaskEnd();
     return false;
   }
 }
 
 void Worker::statsReport() {
+  RecordTaskStart();
+  
   try {
     spdlog::info("Worker {} send stats", worker_id);
 
@@ -321,6 +409,7 @@ void Worker::statsReport() {
     auto status = stub_->SendStats(&context, report, &response);
     if (!status.ok()) {
       spdlog::error("SendStats failed: " + status.error_message());
+      RecordTaskEnd();
       return;
     }
 
@@ -329,6 +418,8 @@ void Worker::statsReport() {
   } catch (const std::exception &e) {
     spdlog::error("statsReport failed: {}", e.what());
   }
+  
+  RecordTaskEnd();
 }
 
 Worker::Worker(uint64_t id) : worker_id(id), state(WorkerState::FREE) {
