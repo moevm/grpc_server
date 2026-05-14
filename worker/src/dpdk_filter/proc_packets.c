@@ -36,10 +36,15 @@ bool check_is_exception(uint16_t *port) {
 void pakage_processing(struct net_port *port_in, struct net_port *port_out,
                        struct net_port *port_exception, uint16_t queue_number,
                        uint16_t nb_pkts, struct rte_mbuf **pkts,
-                       struct BASE_POLICY *policy) {
+                       struct BASE_POLICY *policy,
+                       bool filtring_is_turned_off) {
 
   uint16_t nb_rx =
       rte_eth_rx_burst(port_in->port_id, queue_number, pkts, nb_pkts);
+
+  if (filtring_is_turned_off) {
+    package_sending_decision(true, pkts, port_out, queue_number);
+  }
 
   for (int i = 0; i < nb_rx; i++) {
 
