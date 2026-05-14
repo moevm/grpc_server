@@ -112,3 +112,12 @@ func (s *DataServer) SendStats(ctx context.Context, report *pb.StatsReport) (*em
 		report.WorkerId, report.TotalBlocked, report.TotalAllowed)
 	return &emptypb.Empty{}, nil
 }
+
+func (s *DataServer) ToggleFiltering(ctx context.Context, req *pb.ToggleFilteringRequest) (*pb.ToggleFilteringResponse, error) {
+	s.manager.SetFilteringEnabled(req.WorkerId, req.Enabled)
+	enabled := s.manager.IsFilteringEnabled(req.WorkerId)
+	return &pb.ToggleFilteringResponse{
+		Success: true,
+		Enabled: enabled,
+	}, nil
+}
