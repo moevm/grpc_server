@@ -212,28 +212,6 @@ void Worker::requestPolicyFromController() {
   }
 }
 
-void Worker::checkFilteringStatus() {
-    ToggleFilteringRequest req;
-    req.set_worker_id(worker_id);
-    req.set_enabled(filtering_enabled_);
-
-    ToggleFilteringResponse resp;
-    grpc::ClientContext context;
-    auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(1);
-    context.set_deadline(deadline);
-
-    auto status = stub_->ToggleFiltering(&context, req, &resp);
-    if (status.ok() && resp.success()) {
-        bool new_state = resp.enabled();
-        if (new_state != filtering_enabled_) {
-            spdlog::info("Filtering changed by controller: {} -> {}",
-                         filtering_enabled_ ? "ON" : "OFF",
-                         new_state ? "ON" : "OFF");
-            filtering_enabled_ = new_state;
-        }
-    }
-}
-
 bool Worker::classify(const std::string &type, const std::string &target,
                       struct requested_classification *out_req) {
   try {
@@ -301,25 +279,24 @@ void Worker::statsReport() {
 }
 
 void Worker::checkFilteringStatus() {
-    ToggleFilteringRequest req;
-    req.set_worker_id(worker_id);
-    req.set_enabled(filtering_enabled_);
+  ToggleFilteringRequest req;
+  req.set_worker_id(worker_id);
+  req.set_enabled(enable);
 
-    ToggleFilteringResponse resp;
-    grpc::ClientContext context;
-    auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(1);
-    context.set_deadline(deadline);
+  ToggleFilteringResponse resp;
+  grpc::ClientContext context;
+  auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(1);
+  context.set_deadline(deadline);
 
-    auto status = stub_->ToggleFiltering(&context, req, &resp);
-    if (status.ok() && resp.success()) {
-        bool new_state = resp.enabled();
-        if (new_state != filtering_enabled_) {
-            spdlog::info("Filtering changed by controller: {} -> {}",
-                         filtering_enabled_ ? "ON" : "OFF",
-                         new_state ? "ON" : "OFF");
-            filtering_enabled_ = new_state;
-        }
+  auto status = stub_->ToggleFiltering(&context, req, &resp);
+  if (status.ok() && resp.success()) {
+    bool new_state = resp.enabled();
+    if (new_state != enable) {
+      spdlog::info("Filtering changed by controller: {} -> {}",
+                   enable ? "ON" : "OFF", new_state ? "ON" : "OFF");
+      enable = new_state;
     }
+  }
 }
 
 Worker::Worker(uint64_t id) : worker_id(id), state(WorkerState::FREE) {
@@ -379,7 +356,7 @@ void Worker::MainLoop() {
     }
     forward_to_out(port_exception, port_in, queue_number);
     pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts,
-                      pkts, &local_policy);
+                      pkts, &local_policy, !enable);
     forward_to_out(port_out, port_in, queue_number);
     if (++timer_check_counter >= timer_check_interval) {
       rte_timer_manage();
@@ -406,13 +383,12 @@ void Worker::MainLoop() {
 
     int64_t seconds_since_filtering = (now - last_filtering_check_time) / 1s;
     if (seconds_since_filtering >= filtering_check_interval) {
-        std::thread([this]() { checkFilteringStatus(); }).detach();
-        last_filtering_check_time = now;
-        filtering_check_interval =
-            MIN_FILTERING_CHECK_TIME + 
-            (rand() % (MAX_FILTERING_CHECK_TIME - MIN_FILTERING_CHECK_TIME + 1));
+      std::thread([this]() { checkFilteringStatus(); }).detach();
+      last_filtering_check_time = now;
+      filtering_check_interval =
+          MIN_FILTERING_CHECK_TIME +
+          (rand() % (MAX_FILTERING_CHECK_TIME - MIN_FILTERING_CHECK_TIME + 1));
     }
-
   }
 
   if (stop_flag) {
