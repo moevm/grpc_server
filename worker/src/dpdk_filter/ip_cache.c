@@ -405,7 +405,7 @@ void init_tables_sqlite_ip_cache(void) {
   }
 
   const char *create_categories_table =
-      "CREATE TABLE IF NOT EXISTS categories_table("
+      "CREATE TABLE IF NOT EXISTS ip_categories_table("
       "ip_str TEXT NOT NULL, "
       "certain_category TEXT NOT NULL, "
       "PRIMARY KEY (ip_str, certain_category), "
@@ -413,7 +413,7 @@ void init_tables_sqlite_ip_cache(void) {
 
   ret = sqlite3_exec(ip_cache_table, create_categories_table, NULL, NULL, NULL);
   if (ret != SQLITE_OK) {
-    LOG_ERROR("Failed to create table 'categories_table'");
+    LOG_ERROR("Failed to create table 'ip_categories_table'");
     return;
   }
 

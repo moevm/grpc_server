@@ -76,8 +76,27 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
 
         struct requested_classification req_clas; // query to ip controller
 
-        bool solution_is_send =
-            main_filtring_by_ip(&req_clas, policy, &info_pac);
+        bool solution_is_send;
+
+        char ip_str[INET6_ADDRSTRLEN] = {0};
+        if (info_pac.ip_version == IP_4) {
+          struct in_addr addr;
+          addr.s_addr = info_pac.ip4_dist;
+          inet_ntop(AF_INET, &addr, ip_str, sizeof(ip_str));
+        } else {
+          struct in6_addr addr;
+          memcpy(&addr, info_pac.ip6_dist, 16);
+          inet_ntop(AF_INET6, &addr, ip_str, sizeof(ip_str));
+        }
+
+        bool classification_success = worker_classify("ip", ip_str, &req_clas);
+
+        if (classification_success) {
+          solution_is_send = main_filtring_by_ip(&req_clas, policy, &info_pac);
+        } else {
+          solution_is_send = true;
+          LOG_WARNING("Classification failed for IP %s", ip_str);
+        }
 
         package_sending_decision(solution_is_send, pkts[i], port_out,
                                  queue_number);
@@ -126,9 +145,8 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
         struct requested_classification req_clas; // query to domain controller
 
         bool solution_is_send;
-        // bool classification_success =
-        //     worker_classify_domain(info_pac.domain, &req_clas);
-        bool classification_success = true; // PLUG
+        bool classification_success =
+            worker_classify("domain", info_pac.domain, &req_clas);
 
         if (classification_success) {
           solution_is_send =

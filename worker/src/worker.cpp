@@ -83,6 +83,7 @@ void Worker::initDPDK(int argc, char **argv) {
   }
 
   init_dns_cache();
+  init_ip_cache();
 
   spdlog::info("DPDK initialized: in_port={}, out_port={}", port_in->port_id,
                port_out->port_id);
@@ -166,11 +167,59 @@ void Worker::requestPolicyFromController() {
         current_policy.allow_domains[i][DOMAIN_MAX_LEN - 1] = '\0';
       }
 
+      int block_ips_count = pol.block_ips_size();
+      int block_ip4_idx = 0;
+      int block_ip6_idx = 0;
+
+      for (int i = 0; i < block_ips_count; ++i) {
+        const std::string &ip_str = pol.block_ips(i);
+
+        struct in_addr ip4;
+        if (inet_pton(AF_INET, ip_str.c_str(), &ip4) == 1) {
+          if (block_ip4_idx < MAX_IP4) {
+            current_policy.block_ip4[block_ip4_idx++] = ip4.s_addr;
+          }
+          continue;
+        }
+
+        struct in6_addr ip6;
+        if (inet_pton(AF_INET6, ip_str.c_str(), &ip6) == 1) {
+          if (block_ip6_idx < MAX_IP6) {
+            memcpy(current_policy.block_ip6[block_ip6_idx++], ip6.s6_addr,
+                   IP6_LEN);
+          }
+        }
+      }
+
+      int allow_ips_count = pol.allow_ips_size();
+      int allow_ip4_idx = 0;
+      int allow_ip6_idx = 0;
+
+      for (int i = 0; i < allow_ips_count; ++i) {
+        const std::string &ip_str = pol.allow_ips(i);
+
+        struct in_addr ip4;
+        if (inet_pton(AF_INET, ip_str.c_str(), &ip4) == 1) {
+          if (allow_ip4_idx < MAX_IP4) {
+            current_policy.allow_ip4[allow_ip4_idx++] = ip4.s_addr;
+          }
+          continue;
+        }
+
+        struct in6_addr ip6;
+        if (inet_pton(AF_INET6, ip_str.c_str(), &ip6) == 1) {
+          if (allow_ip6_idx < MAX_IP6) {
+            memcpy(current_policy.allow_ip6[allow_ip6_idx++], ip6.s6_addr,
+                   IP6_LEN);
+          }
+        }
+      }
       current_policy.min_trust_level = pol.min_trust_level();
 
       current_config_version = pol.config_version();
-      clear_cache();
 
+      clear_ip_cache();
+      clear_dns_cache();
       spdlog::info("POLICY LOADED");
       spdlog::info("Config version: {}", current_config_version);
       spdlog::info("Min trust level: {}", current_policy.min_trust_level);
@@ -196,8 +245,12 @@ void Worker::requestPolicyFromController() {
           spdlog::info("allow_domains: {}", current_policy.allow_domains[i]);
         }
       }
+
+      spdlog::info("Blocked IPs ({} total)", block_ips_count);
+      spdlog::info("Allowed IPs ({} total)", allow_ips_count);
       break;
     }
+
     case GetPolicyResponse::POLICY_UNCHANGED: {
       spdlog::info("Policy unchanged");
       break;
@@ -301,8 +354,10 @@ Worker::~Worker() {
   spdlog::info("Worker {} shutting down", worker_id);
 
   if (port_in && port_out) {
-    save_all_cache_to_sqlite();
+    save_all_cache_to_sqlite(NULL);
+    save_all_cache_ip_to_sqlite(NULL);
     free_dns_cache();
+    free_ip_cache();
 
     net_port_close(port_in);
     net_port_close(port_out);
