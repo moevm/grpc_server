@@ -215,6 +215,8 @@ void Worker::requestPolicyFromController() {
         }
       }
       current_policy.min_trust_level = pol.min_trust_level();
+      current_policy.ttl_ip = pol.ttl_ip();
+      current_policy.ttl_domain = pol.ttl_domain();
 
       current_config_version = pol.config_version();
 

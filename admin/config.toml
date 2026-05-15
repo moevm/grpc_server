@@ -2,6 +2,9 @@
 block_categories = ["MALWARE", "SOCIAL"]
 block_domains = ["youtube.com", "tiktok.com"]
 allow_domains = ["github.com", "stackoverflow.com"]
+# 7 * 24 * 60 * 60 = 604800
+ttl_ip = 604800
+ttl_domain = 604800
 min_trust_level = 5
 
 [global.rules.block_by_trust]

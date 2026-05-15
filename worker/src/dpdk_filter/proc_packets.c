@@ -115,11 +115,11 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
         if (info_pac.ip_version == IP_4) {
           key.version = 4;
           key.addr.ip4 = info_pac.ip4_dist;
-          add_to_ip_cache(&key, new_node);
+          add_to_ip_cache(&key, new_node, policy->ttl_ip);
         } else {
           key.version = 6;
           memcpy(key.addr.ip6, info_pac.ip6_dist, 16);
-          add_to_ip_cache(&key, new_node);
+          add_to_ip_cache(&key, new_node, policy->ttl_ip);
         }
 
       } else {
@@ -166,7 +166,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
 
         new_node->solution_is_send = solution_is_send;
 
-        add_to_dns_cache(info_pac.domain, new_node);
+        add_to_dns_cache(info_pac.domain, new_node, policy->ttl_domain);
       } else {
         LOG_ERROR("Failed to search a key-value pair in the hash table: %s",
                   strerror(-ret));
