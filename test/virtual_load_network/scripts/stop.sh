@@ -14,6 +14,7 @@ fi
 INET_SUBNET="${INET_SUBNET:-10.0.3}"
 INET_BRIDGE="${INET_BRIDGE:-br-inet}"
 MGMT_BRIDGE="${MGMT_BRIDGE:-br-mgmt}"
+INET_SUBNET_V6="${INET_SUBNET_V6:-fd00:b::}"
 
 for VM in filter1 filter2 controller; do
     PID_FILE="/tmp/qemu-${VM}.pid"
@@ -29,7 +30,11 @@ iptables -t nat -D POSTROUTING -s ${INET_SUBNET}.0/24 ! -d ${INET_SUBNET}.0/24 -
 iptables -D FORWARD -i "$INET_BRIDGE" -j ACCEPT 2>/dev/null
 iptables -D FORWARD -o "$INET_BRIDGE" -j ACCEPT 2>/dev/null
 
-for TAP in tap-f1-in tap-f1-out tap-f2-in tap-f2-out tap-f1-mgmt tap-f2-mgmt tap-ctrl; do
+ip6tables -t nat -D POSTROUTING -s ${INET_SUBNET_V6}/64 ! -d ${INET_SUBNET_V6}/64 -j MASQUERADE 2>/dev/null
+ip6tables -D FORWARD -i "$INET_BRIDGE" -j ACCEPT 2>/dev/null
+ip6tables -D FORWARD -o "$INET_BRIDGE" -j ACCEPT 2>/dev/null
+
+for TAP in tap-f1-in tap-f1-out tap-f2-in tap-f2-out tap-f1-mgmt tap-f2-mgmt tap-ctrl tap-ctrl-inet; do
     ip tuntap del dev "$TAP" mode tap 2>/dev/null
 done
 

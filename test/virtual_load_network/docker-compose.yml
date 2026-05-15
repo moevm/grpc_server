@@ -9,6 +9,7 @@ services:
       - NET_ADMIN
     dns:
       - ${DNS:-8.8.8.8}
+      - ${DNS_V6:-2001:4860:4860::8888}
     deploy:
       replicas: ${NUM_HOSTS_NET1:-2}
     restart: unless-stopped
@@ -23,6 +24,7 @@ services:
       - NET_ADMIN
     dns:
       - ${DNS:-8.8.8.8}
+      - ${DNS_V6:-2001:4860:4860::8888}
     deploy:
       replicas: ${NUM_HOSTS_NET2:-2}
     restart: unless-stopped
@@ -30,6 +32,7 @@ services:
 networks:
   testnet1:
     driver: bridge
+    enable_ipv6: true
     driver_opts:
       com.docker.network.bridge.name: "br-testnet1"
       com.docker.network.bridge.enable_ip_masquerade: "false"
@@ -37,9 +40,12 @@ networks:
       config:
         - subnet: ${SUBNET1:-10.0.0}.0/24
           gateway: ${SUBNET1:-10.0.0}.254
+        - subnet: ${SUBNET1_V6:-fd00:1::}0/64
+          gateway: ${SUBNET1_V6:-fd00:1::}ff
 
   testnet2:
     driver: bridge
+    enable_ipv6: true
     driver_opts:
       com.docker.network.bridge.name: "br-testnet2"
       com.docker.network.bridge.enable_ip_masquerade: "false"
@@ -47,3 +53,5 @@ networks:
       config:
         - subnet: ${SUBNET2:-10.0.1}.0/24
           gateway: ${SUBNET2:-10.0.1}.254
+        - subnet: ${SUBNET2_V6:-fd00:2::}0/64
+          gateway: ${SUBNET2_V6:-fd00:2::}ff

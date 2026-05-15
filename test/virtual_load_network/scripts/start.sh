@@ -21,6 +21,12 @@ INET_BRIDGE="${INET_BRIDGE:-br-inet}"
 MGMT_SUBNET="${MGMT_SUBNET:-10.0.2}"
 MGMT_BRIDGE="${MGMT_BRIDGE:-br-mgmt}"
 HUGEPAGES="${HUGEPAGES:-1024}"
+
+SUBNET1_V6="${SUBNET1_V6:-fd00:1::}"
+SUBNET2_V6="${SUBNET2_V6:-fd00:2::}"
+INET_SUBNET_V6="${INET_SUBNET_V6:-fd00:b::}"
+MGMT_SUBNET_V6="${MGMT_SUBNET_V6:-fd00:a::}"
+
 YOCTO_DEPLOY_DIR="${YOCTO_DEPLOY_DIR:-/home/lespend/program/yadro/vm_build_risc_v/qemu/poky/build/tmp/deploy/images/qemuriscv64}"
 QEMU_ROOTFS="${QEMU_ROOTFS:-${YOCTO_DEPLOY_DIR}/cluster-image-qemuriscv64.rootfs.ext4}"
 QEMU_KERNEL="${QEMU_KERNEL:-${YOCTO_DEPLOY_DIR}/Image}"
@@ -29,7 +35,7 @@ QEMU_MEMORY="${QEMU_MEMORY:-4G}"
 QEMU_CPUS="${QEMU_CPUS:-2}"
 FILTER_RISCV_BIN="${FILTER_RISCV_BIN:-../../worker/main-riscv}"
 WORKER_RISCV_BIN="${WORKER_RISCV_BIN:-../../worker/bazel-bin/worker}"
-CONTROLLER_BIN="${CONTROLLER_BIN:-../../controller/bin/grpc_server}"
+CONTROLLER_BIN="${CONTROLLER_BIN:-$(readlink -f ../../controller/bazel-bin/cmd/grpc_server/grpc_server_/grpc_server 2>/dev/null)}"
 VM_HUGEPAGES="${VM_HUGEPAGES:-64}"
 FILTER1_MAC_IN="52:54:00:f1:00:01"
 FILTER1_MAC_OUT="52:54:00:f1:00:02"
@@ -57,18 +63,25 @@ for BRIDGE in "$BRIDGE1" "$BRIDGE2"; do
 done
 
 sysctl -w net.ipv4.ip_forward=1 >/dev/null
+sysctl -w net.ipv6.conf.all.forwarding=1 >/dev/null
 
 ip link add "$INET_BRIDGE" type bridge 2>/dev/null || true
 ip link set "$INET_BRIDGE" up
 ip addr add "${INET_SUBNET}.254/24" dev "$INET_BRIDGE" 2>/dev/null || true
+ip -6 addr add "${INET_SUBNET_V6}fe/64" dev "$INET_BRIDGE" 2>/dev/null || true
 
 iptables -t nat -A POSTROUTING -s ${INET_SUBNET}.0/24 ! -d ${INET_SUBNET}.0/24 -j MASQUERADE
 iptables -I FORWARD -i "$INET_BRIDGE" -j ACCEPT
 iptables -I FORWARD -o "$INET_BRIDGE" -j ACCEPT
 
+ip6tables -t nat -A POSTROUTING -s ${INET_SUBNET_V6}/64 ! -d ${INET_SUBNET_V6}/64 -j MASQUERADE
+ip6tables -I FORWARD -i "$INET_BRIDGE" -j ACCEPT
+ip6tables -I FORWARD -o "$INET_BRIDGE" -j ACCEPT
+
 ip link add "$MGMT_BRIDGE" type bridge 2>/dev/null || true
 ip link set "$MGMT_BRIDGE" up
 ip addr add "${MGMT_SUBNET}.254/24" dev "$MGMT_BRIDGE" 2>/dev/null || true
+ip -6 addr add "${MGMT_SUBNET_V6}fe/64" dev "$MGMT_BRIDGE" 2>/dev/null || true
 
 iptables -I FORWARD -i "$MGMT_BRIDGE" -j ACCEPT
 iptables -I FORWARD -o "$MGMT_BRIDGE" -j ACCEPT
@@ -90,8 +103,11 @@ fi
 cat > "$SHARED_DIR/setup-inet.sh" << EOF
 #!/bin/sh
 ip addr add ${INET_SUBNET}.1/24 dev eth1 2>/dev/null || true
+ip -6 addr add ${INET_SUBNET_V6}1/64 dev eth1 2>/dev/null || true
 ip route replace default via ${INET_SUBNET}.254 dev eth1
+ip -6 route replace default via ${INET_SUBNET_V6}fe dev eth1 2>/dev/null || true
 echo "nameserver 8.8.8.8" > /etc/resolv.conf
+echo "nameserver 2001:4860:4860::8888" >> /etc/resolv.conf
 EOF
 chmod +x "$SHARED_DIR/setup-inet.sh"
 
@@ -188,12 +204,19 @@ start_filter_vm "filter2" "tap-f2-in" "tap-f2-out" "tap-f2-mgmt" "$BRIDGE2" "${M
 
 for SVC in $(docker compose ps -q 2>/dev/null); do
     docker exec "$SVC" ip neigh flush all 2>/dev/null || true
+    docker exec "$SVC" ip -6 neigh flush all 2>/dev/null || true
 done
 for SVC in $(docker compose -p "$(basename "$PROJECT_DIR")" ps --format '{{.Name}}' 2>/dev/null | grep "gen-1"); do
     docker exec "$SVC" arp -s "${SUBNET1}.254" "$FILTER1_MAC_IN" 2>/dev/null || true
+    docker exec "$SVC" ip -6 neigh del "${SUBNET1_V6}fe" dev eth0 2>/dev/null || true
+    docker exec "$SVC" ip -6 neigh add "${SUBNET1_V6}fe" lladdr "$FILTER1_MAC_IN" nud permanent dev eth0 2>/dev/null || true
+    docker exec "$SVC" ip -6 route replace default via "${SUBNET1_V6}fe" dev eth0 2>/dev/null || true
 done
 for SVC in $(docker compose -p "$(basename "$PROJECT_DIR")" ps --format '{{.Name}}' 2>/dev/null | grep "gen-2"); do
     docker exec "$SVC" arp -s "${SUBNET2}.254" "$FILTER2_MAC_IN" 2>/dev/null || true
+    docker exec "$SVC" ip -6 neigh del "${SUBNET2_V6}fe" dev eth0 2>/dev/null || true
+    docker exec "$SVC" ip -6 neigh add "${SUBNET2_V6}fe" lladdr "$FILTER2_MAC_IN" nud permanent dev eth0 2>/dev/null || true
+    docker exec "$SVC" ip -6 route replace default via "${SUBNET2_V6}fe" dev eth0 2>/dev/null || true
 done
 
 ip tuntap add dev "tap-ctrl" mode tap 2>/dev/null || true

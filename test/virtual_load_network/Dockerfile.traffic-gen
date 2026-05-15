@@ -1,6 +1,6 @@
 FROM alpine:3.20
 
-RUN apk add --no-cache curl bash
+RUN apk add --no-cache curl bash iproute2
 
 COPY ./scripts/traffic-gen.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
