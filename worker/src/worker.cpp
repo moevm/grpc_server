@@ -123,6 +123,9 @@ void Worker::requestPolicyFromController() {
       return;
     }
 
+    enable = resp.filtering_enabled();
+    spdlog::info("Filtering: {}", enable ? "ON" : "OFF");
+
     switch (resp.result()) {
     case GetPolicyResponse::POLICY_PROVIDED: {
       spdlog::info("Policy received");
@@ -333,27 +336,6 @@ void Worker::statsReport() {
   }
 }
 
-void Worker::checkFilteringStatus() {
-  ToggleFilteringRequest req;
-  req.set_worker_id(worker_id);
-  req.set_enabled(enable);
-
-  ToggleFilteringResponse resp;
-  grpc::ClientContext context;
-  auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(1);
-  context.set_deadline(deadline);
-
-  auto status = stub_->ToggleFiltering(&context, req, &resp);
-  if (status.ok() && resp.success()) {
-    bool new_state = resp.enabled();
-    if (new_state != enable) {
-      spdlog::info("Filtering changed by controller: {} -> {}",
-                   enable ? "ON" : "OFF", new_state ? "ON" : "OFF");
-      enable = new_state;
-    }
-  }
-}
-
 Worker::Worker(uint64_t id) : worker_id(id), state(WorkerState::FREE) {
   instance = this;
   std::string controller_addr = "localhost:50051";
@@ -399,7 +381,6 @@ void Worker::MainLoop() {
 
   last_policy_time = steady_clock::now();
   last_stats_time = steady_clock::now();
-  last_filtering_check_time = steady_clock::now();
 
   struct rte_mbuf *pkts[32];
   uint16_t nb_pkts = 32;
@@ -437,19 +418,6 @@ void Worker::MainLoop() {
       policy_interval =
           MIN_POLICY_TIME + (rand() % (MAX_POLICY_TIME - MIN_POLICY_TIME + 1));
     }
-
-    int64_t seconds_since_filtering = (now - last_filtering_check_time) / 1s;
-    if (seconds_since_filtering >= filtering_check_interval) {
-      std::thread([this]() { checkFilteringStatus(); }).detach();
-      last_filtering_check_time = now;
-      filtering_check_interval =
-          MIN_FILTERING_CHECK_TIME +
-          (rand() % (MAX_FILTERING_CHECK_TIME - MIN_FILTERING_CHECK_TIME + 1));
-    }
-  }
-
-  if (stop_flag) {
-    SetState(WorkerState::SHUTTING_DOWN);
   }
 
   if (stop_flag) {

@@ -27,9 +27,6 @@ extern "C" {
 #define MIN_STATS_TIME 30
 #define MAX_STATS_TIME 45
 
-#define MIN_FILTERING_CHECK_TIME 30
-#define MAX_FILTERING_CHECK_TIME 45
-
 enum class WorkerState {
   FREE,          // Ожидает задачи
   SHUTTING_DOWN, // Завершение работы
@@ -41,13 +38,11 @@ class Worker {
   uint64_t current_config_version = 0;
   std::chrono::time_point<std::chrono::steady_clock> last_policy_time;
   std::chrono::time_point<std::chrono::steady_clock> last_stats_time;
-  std::chrono::steady_clock::time_point last_filtering_check_time;
 
   int64_t policy_interval = MIN_POLICY_TIME;
   int64_t stats_interval = MIN_STATS_TIME;
-  int64_t filtering_check_interval = MIN_FILTERING_CHECK_TIME;
 
-  bool enable = true;
+  std::atomic<bool> enable{true};
   struct net_port *port_in = nullptr;
   struct net_port *port_out = nullptr;
   struct net_port *port_exception = nullptr;
@@ -70,7 +65,6 @@ public:
   void initDPDK(int argc, char **argv);
   inline uint64_t GetID() const { return worker_id; }
   void requestPolicyFromController();
-  void checkFilteringStatus();
   bool classify(const std::string &type, const std::string &target,
                 struct requested_classification *out_req);
   void forward_to_out(struct net_port *incoming_port,
