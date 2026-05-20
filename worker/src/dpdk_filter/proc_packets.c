@@ -43,7 +43,6 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
   uint16_t nb_rx =
       rte_eth_rx_burst(port_in->port_id, queue_number, pkts, nb_pkts);
 
-  
   if (atomic_load(&filtring_is_turned_off)) {
     for (int i = 0; i < nb_rx; i++) {
       package_sending_decision(true, pkts[i], port_out, queue_number);

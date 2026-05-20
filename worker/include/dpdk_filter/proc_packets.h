@@ -20,7 +20,6 @@ bool check_is_exception(uint16_t *port);
 void pakage_processing(struct net_port *port_in, struct net_port *port_out,
                        struct net_port *port_exception, uint16_t queue_number,
                        uint16_t nb_pkts, struct rte_mbuf **pkts,
-                       struct BASE_POLICY *policy,
-                       bool filtring_is_turned_off);
+                       struct BASE_POLICY *policy, bool filtring_is_turned_off);
 
 #endif
