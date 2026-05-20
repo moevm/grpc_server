@@ -20,7 +20,8 @@ void clear_dns_cache(void);
 
 int lookup_dns_cache(const char *domain,
                      struct node_cache_domain **return_node);
-void add_to_dns_cache(const char *domain, struct node_cache_domain *node);
+void add_to_dns_cache(const char *domain, struct node_cache_domain *node,
+                      int ttl_dns);
 
 void init_tables_sqlite_dns_cache(void);
 void load_cache_from_sqlite(void);

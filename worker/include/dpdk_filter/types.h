@@ -64,6 +64,8 @@ struct BASE_POLICY {
   char locked_categories[MAX_CATEGORIES][CATEGORY_MAX_LEN];
   struct trust_categories_with_lvl
       categories_with_lvl[MAX_CATEGORIES_BY_TRUST_LVL];
+  int ttl_ip;
+  int ttl_domain;
   char block_domains[MAX_DOMAINS][DOMAIN_MAX_LEN];
   char allow_domains[MAX_DOMAINS][DOMAIN_MAX_LEN];
   uint32_t block_ip4[MAX_IP4];

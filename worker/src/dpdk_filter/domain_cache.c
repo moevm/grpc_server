@@ -432,7 +432,8 @@ int lookup_dns_cache(const char *domain,
   return ret;
 }
 
-void add_to_dns_cache(const char *domain, struct node_cache_domain *node) {
+void add_to_dns_cache(const char *domain, struct node_cache_domain *node,
+                      int ttl_dns) {
   char *key_copy = rte_malloc("dns_key(domain)", DOMAIN_MAX_LEN, 0);
   if (!key_copy) {
     LOG_ERROR("Failed to allocate memory for key cache");
@@ -442,7 +443,7 @@ void add_to_dns_cache(const char *domain, struct node_cache_domain *node) {
   strncpy(key_copy, domain, DOMAIN_MAX_LEN);
   key_copy[DOMAIN_MAX_LEN - 1] = '\0';
   node->timestamp = rte_get_timer_cycles();
-  node->ttl_seconds = DNS_CACHE_DEFAULT_TTL;
+  node->ttl_seconds = ttl_dns;
   node->key_domain = key_copy;
 
   rte_spinlock_lock(&cache_spinlock_domain);
