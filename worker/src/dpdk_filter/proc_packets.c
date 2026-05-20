@@ -1,6 +1,7 @@
 #include "proc_packets.h"
 #include "domain_cache.h"
 #include "ip_cache.h"
+#include <stdatomic.h>
 
 extern bool worker_classify(const char *type, const char *target,
                             struct requested_classification *out_req);
@@ -42,8 +43,11 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
   uint16_t nb_rx =
       rte_eth_rx_burst(port_in->port_id, queue_number, pkts, nb_pkts);
 
-  if (filtring_is_turned_off) {
-    package_sending_decision(true, pkts, port_out, queue_number);
+  if (atomic_load(&filtring_is_turned_off)) {
+    for (int i = 0; i < nb_rx; i++) {
+      package_sending_decision(true, pkts[i], port_out, queue_number);
+    }
+    return;
   }
 
   for (int i = 0; i < nb_rx; i++) {
