@@ -20,7 +20,8 @@ void clear_ip_cache(void);
 
 int lookup_ip_cache(const struct ip_key *key,
                     struct node_cache_ip **return_node);
-void add_to_ip_cache(const struct ip_key *key, struct node_cache_ip *node);
+void add_to_ip_cache(const struct ip_key *key, struct node_cache_ip *node,
+                     int ttl_ip);
 
 void init_tables_sqlite_ip_cache(void);
 void load_cache_ip_from_sqlite(void);
