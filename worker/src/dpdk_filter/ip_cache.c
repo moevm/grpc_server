@@ -243,7 +243,7 @@ static int insert_ip_main_record(const char *ip_str,
 }
 
 static int delete_ip_categories(const char *ip_str) {
-  const char *sql = "DELETE FROM ip_categories_table WHERE ip_str = ?";
+  const char *sql = "DELETE FROM categories_table WHERE ip_str = ?";
   sqlite3_stmt *stmt = NULL;
   int ret = sqlite3_prepare_v2(ip_cache_table, sql, -1, &stmt, NULL);
   if (ret != SQLITE_OK) {
@@ -260,7 +260,7 @@ static int delete_ip_categories(const char *ip_str) {
 
 static int insert_ip_categories(const char *ip_str,
                                 struct node_cache_ip *node) {
-  const char *sql = "INSERT INTO ip_categories_table (ip_str, "
+  const char *sql = "INSERT INTO categories_table (ip_str, "
                     "certain_category) VALUES (?, ?)";
   sqlite3_stmt *stmt = NULL;
   int ret = sqlite3_prepare_v2(ip_cache_table, sql, -1, &stmt, NULL);

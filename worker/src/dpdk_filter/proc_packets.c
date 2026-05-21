@@ -47,6 +47,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
     for (int i = 0; i < nb_rx; i++) {
       package_sending_decision(true, pkts[i], port_out, queue_number);
     }
+    return;
   }
 
   for (int i = 0; i < nb_rx; i++) {
