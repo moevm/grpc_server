@@ -74,10 +74,6 @@ cc_binary(
         "@curl//:curl",
     ],
     copts = [
-        "-mssse3",
-        "-msse4.2",
-        "-mpclmul",
-        "-maes",
         "-I$(GENDIR)/..",
     ] + select({
         "@platforms//cpu:x86_64": [
