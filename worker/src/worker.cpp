@@ -123,6 +123,9 @@ void Worker::requestPolicyFromController() {
       return;
     }
 
+    enable = resp.filtering_enabled();
+    spdlog::info("Filtering: {}", enable ? "ON" : "OFF");
+
     switch (resp.result()) {
     case GetPolicyResponse::POLICY_PROVIDED: {
       spdlog::info("Policy received");
@@ -391,7 +394,7 @@ void Worker::MainLoop() {
     }
     forward_to_out(port_exception, port_in, queue_number);
     pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts,
-                      pkts, &local_policy);
+                      pkts, &local_policy, !enable);
     forward_to_out(port_out, port_in, queue_number);
     if (++timer_check_counter >= timer_check_interval) {
       rte_timer_manage();
@@ -415,10 +418,6 @@ void Worker::MainLoop() {
       policy_interval =
           MIN_POLICY_TIME + (rand() % (MAX_POLICY_TIME - MIN_POLICY_TIME + 1));
     }
-  }
-
-  if (stop_flag) {
-    SetState(WorkerState::SHUTTING_DOWN);
   }
 
   if (stop_flag) {

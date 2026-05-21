@@ -22,6 +22,7 @@ message GetPolicyResponse {
     
     Result result = 1;
     WorkerPolicy policy = 2;
+    bool filtering_enabled = 3; 
 }
 
 message WorkerPolicy {
