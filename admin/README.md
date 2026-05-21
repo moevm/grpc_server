@@ -20,10 +20,72 @@ cd ../controller
 bazel run //cmd/grpc_server:grpc_server
 ```
 
-## Запуск клиента
-```bash
-python admin.py --file config.toml
+## Пример toml файла с политикой
+```toml
+[global.rules]
+block_categories = ["Gambling", "Weapons"]
+block_domains = ["youtube.com", "tiktok.com"]
+allow_domains = ["github.com", "stackoverflow.com"]
+block_ips = ["192.168.0.1", "2001:0db8:85a3:0000:0000:8a2e:0370:7334"]
+allow_ips = ["8.8.8.8"]
+# 7 * 24 * 60 * 60 = 604800
+ttl_ip = 604800
+ttl_domain = 604800
+min_trust_level = 5
+
+[global.rules.block_by_trust]
+ENTERTAINMENT = 6
+NEWS = 4
+
+[filters.filter_1]
+block_categories = ["Weapons", "Malware"]
+block_domains = ["instagram.com"]
+allow_domains = ["vk.com"]
+min_trust_level = 0
+
+[filters.filter_1.block_by_trust]
+SOCIAL = 8
+ENTERTAINMENT = 7
+
+[filters.filter_2]
+block_categories = ["Malware"]
+allow_domains = ["github.com", "gitlab.com"]
+
 ```
+
+Возможные категории
+- Adult Content
+- Gambling 
+- Drugs
+- Violence
+- Weapons
+- Malware
+- Social media
+- Hate Speech
+- Anonymizers
+- Online shop
+
+
+## Запуск клиента
+Отправить новую политику на контроллер
+
+```bash
+python admin.py load --file <your_policy>.toml
+```
+
+Получить текущую политику с контроллера
+
+```bash
+python admin.py load --file <your_policy>.toml
+```
+
+Включить/отключить фильтрацию на воркере
+
+```bash
+python admin.py toogle --id 1 --on  #id - worker id
+python admin.py toogle --id 1 --off #id - worker id
+```
+
 
 ## Описание применения политики из конфига
 Политика для каждого фильтра формируется путём объединения глобальных правил и индивидуальных настроек конкретного фильтра.
@@ -31,10 +93,11 @@ python admin.py --file config.toml
 ### Глобальный уровень 
 Сначала загружается общий TOML-файл конфигурации. В нём есть раздел [global.rules], который содержит правила, применяемые ко всем фильтрам без исключения:
 - Какие категории сайтов блокировать всегда
-- Какие домены в чёрном списке
-- Какие домены в белом списке
+- Какие домены и ip в чёрном списке
+- Какие домены и ip в белом списке
 - Пороги доверия для разных категорий
 - Минимальный уровень доверия по умолчанию
+- Время жизни кэша для ip и домена
 
 Эти правила образуют глобальную политику, одинаковую для всех фильтров.
 
@@ -43,7 +106,7 @@ python admin.py --file config.toml
 
 Локальные правила не заменяют глобальные, а дополняют и уточняют их:
 - Если в локальных правилах указаны дополнительные категории для блокировки, они добавляются к глобальным
-- Если указаны дополнительные домены, они добавляются в соответствующие списки
+- Если указаны дополнительные домены или ip, они добавляются в соответствующие списки
 - Пороги доверия для категорий могут переопределяться (если для той же категории указано новое значение)
 - Минимальный уровень доверия может быть изменён для конкретного фильтра
 
