@@ -22,64 +22,63 @@ bazel run //cmd/grpc_server:grpc_server
 
 ## Пример toml файла с политикой
 ```toml
-[global.rules]
-block_categories = ["Gambling", "Weapons"]
-block_domains = ["youtube.com", "tiktok.com"]
-allow_domains = ["github.com", "stackoverflow.com"]
-block_ips = ["192.168.0.1", "2001:0db8:85a3:0000:0000:8a2e:0370:7334"]
-allow_ips = ["8.8.8.8"]
-# 7 * 24 * 60 * 60 = 604800
-ttl_ip = 604800
-ttl_domain = 604800
-min_trust_level = 5
+[global.rules]                                   # Глобальные правила для всех воркеров
+block_categories = ["Gambling", "Weapons"]       # Категории для блокировки
+block_domains = ["youtube.com", "tiktok.com"]    # Домены для блокировки
+allow_domains = ["github.com", "stackoverflow.com"] # Разрешённые домены (приоритет над блокировкой)
+block_ips = ["192.168.0.1", "2001:0db8:85a3:0000:0000:8a2e:0370:7334"]      # IP для блокировки (IPv4 и IPv6)
+allow_ips = ["8.8.8.8"]                           # Разрешённые IP 
+ttl_ip = 604800                                   # TTL кэша IP 
+ttl_domain = 604800                               # TTL кэша доменов 
+min_trust_level = 5                               # Мин. уровень доверия 
 
-[global.rules.block_by_trust]
-ENTERTAINMENT = 6
-NEWS = 4
+[global.rules.block_by_trust]                     # Блокировка по уровню доверия
+ENTERTAINMENT = 6                                 
+NEWS = 4                                          
 
-[filters.filter_1]
-block_categories = ["Weapons", "Malware"]
-block_domains = ["instagram.com"]
-allow_domains = ["vk.com"]
-min_trust_level = 0
+[filters.filter_1]                                # Правила для воркера #1
+block_categories = ["Weapons", "Malware"]         # Доп. категории к глобальным
+block_domains = ["instagram.com"]                 # Доп. домены к глобальным
+allow_domains = ["vk.com"]                        # Доп. разрешённые домены
+min_trust_level = 0                               # Переопределяет глобальный 
 
-[filters.filter_1.block_by_trust]
-SOCIAL = 8
-ENTERTAINMENT = 7
+[filters.filter_1.block_by_trust]                 # Уровни доверия для воркера #1
+SOCIAL = 8                                       
+ENTERTAINMENT = 7                                
 
-[filters.filter_2]
-block_categories = ["Malware"]
-allow_domains = ["github.com", "gitlab.com"]
+[filters.filter_2]                                # Правила для воркера #2
+block_categories = ["Malware"]                    # Доп. категории к глобальным
+allow_domains = ["github.com", "gitlab.com"]      # Доп. разрешённые домены
 
 ```
 
-Возможные категории
-- Adult Content
-- Gambling 
-- Drugs
-- Violence
-- Weapons
-- Malware
-- Social media
-- Hate Speech
-- Anonymizers
+### Возможные категории
+- Adult Content (Pornography and adult entertainment)
+- Gambling (Online casinos, betting, lotteries)
+- Drugs (Illegal substances)
+- Violence (Violent content)
+- Weapons (Firearms, explosives)
+- Malware (Viruses and malicious software)
+- Social media 
+- Hate Speech (Discrimination, extremism)
+- Anonymizers (VPN, proxies to bypass blocks)
 - Online shop
 
 
 ## Запуск клиента
-Отправить новую политику на контроллер
+### Отправить новую политику на контроллер
 
 ```bash
 python admin.py load --file <your_policy>.toml
 ```
 
-Получить текущую политику с контроллера
+### Получить текущую политику с контроллера
 
 ```bash
-python admin.py load --file <your_policy>.toml
+python admin.py get --file <your_policy>.toml
 ```
 
-Включить/отключить фильтрацию на воркере
+### Включить/отключить фильтрацию на воркере
 
 ```bash
 python admin.py toogle --id 1 --on  #id - worker id
