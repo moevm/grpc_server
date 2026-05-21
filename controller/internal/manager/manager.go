@@ -26,7 +26,7 @@ func (m *Manager) HandleGetPolicy(workerID uint64, currentVersion uint64) ([]byt
 	log.Printf("Worker %d requested policy", workerID)
 	m.mu.Lock()
 	if _, exists := m.filteringEnabled[workerID]; !exists {
-		m.filteringEnabled[workerID] = true;
+		m.filteringEnabled[workerID] = true
 	}
 	m.mu.Unlock()
 
@@ -81,7 +81,7 @@ func (m *Manager) IsFilteringEnabled(workerID uint64) bool {
 	defer m.mu.RUnlock()
 	enabled, exists := m.filteringEnabled[workerID]
 	if !exists {
-		return false
+		return true
 	}
 	return enabled
 }
