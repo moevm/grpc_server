@@ -24,6 +24,11 @@ func NewManager() (*Manager, error) {
 
 func (m *Manager) HandleGetPolicy(workerID uint64, currentVersion uint64) ([]byte, bool, error) {
 	log.Printf("Worker %d requested policy", workerID)
+	m.mu.Lock()
+	if _, exists := m.filteringEnabled[workerID]; !exists {
+		m.filteringEnabled[workerID] = true;
+	}
+	m.mu.Unlock()
 
 	m.policyManager.mu.RLock()
 	currentPolicyVersion := m.policyManager.version

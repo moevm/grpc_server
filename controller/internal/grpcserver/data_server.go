@@ -51,6 +51,7 @@ func (s *DataServer) GetPolicy(ctx context.Context, req *pb.GetPolicyRequest) (*
 		log.Printf("Policy unchanged for worker %d", req.WorkerId)
 		return &pb.GetPolicyResponse{
 			Result: pb.GetPolicyResponse_POLICY_UNCHANGED,
+			FilteringEnabled:  s.manager.IsFilteringEnabled(req.WorkerId), 
 		}, nil
 	}
 
@@ -64,6 +65,7 @@ func (s *DataServer) GetPolicy(ctx context.Context, req *pb.GetPolicyRequest) (*
 	return &pb.GetPolicyResponse{
 		Result: pb.GetPolicyResponse_POLICY_PROVIDED,
 		Policy: &fullPolicy,
+		FilteringEnabled:  s.manager.IsFilteringEnabled(req.WorkerId), 
 	}, nil
 }
 
@@ -111,13 +113,4 @@ func (s *DataServer) SendStats(ctx context.Context, report *pb.StatsReport) (*em
 	log.Printf("gRPC Stats from worker %d: blocked=%d allowed=%d",
 		report.WorkerId, report.TotalBlocked, report.TotalAllowed)
 	return &emptypb.Empty{}, nil
-}
-
-func (s *DataServer) ToggleFiltering(ctx context.Context, req *pb.ToggleFilteringRequest) (*pb.ToggleFilteringResponse, error) {
-	s.manager.SetFilteringEnabled(req.WorkerId, req.Enabled)
-	enabled := s.manager.IsFilteringEnabled(req.WorkerId)
-	return &pb.ToggleFilteringResponse{
-		Success: true,
-		Enabled: enabled,
-	}, nil
 }
