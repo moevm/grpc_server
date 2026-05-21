@@ -63,5 +63,3 @@ message StatsReport {
     uint64 total_allowed = 4;
     repeated ResourceStats resources = 5;
 }
-
-
