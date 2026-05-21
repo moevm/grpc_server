@@ -1,11 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net"
-	"net/http"
-
 	"github.com/moevm/grpc_server/internal/config"
 	"github.com/moevm/grpc_server/internal/grpcserver"
 	"github.com/moevm/grpc_server/internal/manager"

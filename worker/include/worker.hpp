@@ -81,6 +81,7 @@ public:
   static Worker *getInstance();
   void MainLoop();
 
+  void statsReport();
   void RecordPacketReceived();
   void RecordPacketPassed();
   void RecordPacketDropped(const std::string &reason);
