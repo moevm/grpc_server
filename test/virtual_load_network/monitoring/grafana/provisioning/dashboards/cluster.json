@@ -1,0 +1,105 @@
+{
+  "title": "Cluster Workers",
+  "uid": "cluster-workers",
+  "panels": [
+    {
+      "title": "Packets Received",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "rate(packets_received_total[1m])",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "datasource": "Prometheus"
+    },
+    {
+      "title": "Packets Passed",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0},
+      "targets": [
+        {
+          "expr": "rate(packets_passed_total[1m])",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "datasource": "Prometheus"
+    },
+    {
+      "title": "Packets Dropped",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
+      "targets": [
+        {
+          "expr": "rate(packets_dropped_total[1m])",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "datasource": "Prometheus"
+    },
+    {
+      "title": "Blocked Domains",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8},
+      "targets": [
+        {
+          "expr": "rate(blocked_domains_total[1m])",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "datasource": "Prometheus"
+    },
+    {
+      "title": "CPU Usage %",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8},
+      "targets": [
+        {
+          "expr": "cpu_usage{cpu='cpu'}",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "datasource": "Prometheus"
+    },
+    {
+      "title": "Memory Used (MB)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8},
+      "targets": [
+        {
+          "expr": "memory_used / 1024 / 1024",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "datasource": "Prometheus"
+    },
+    {
+      "title": "Task Duration (s)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "targets": [
+        {
+          "expr": "task_duration_seconds",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "datasource": "Prometheus"
+    },
+    {
+      "title": "Push Errors",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "targets": [
+        {
+          "expr": "push_errors_total",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "datasource": "Prometheus"
+    }
+  ],
+  "time": {"from": "now-15m", "to": "now"},
+  "refresh": "5s",
+  "schemaVersion": 39
+}
