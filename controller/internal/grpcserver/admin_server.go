@@ -2,7 +2,7 @@ package grpcserver
 
 import (
 	"context"
-
+	"fmt"
 	"github.com/moevm/grpc_server/internal/manager"
 	pb "github.com/moevm/grpc_server/pkg/proto/admin_service"
 )
@@ -40,4 +40,25 @@ func (s *AdminServer) LoadConfig(ctx context.Context, req *pb.LoadConfigRequest)
 
 func (s *AdminServer) GetConfig() []byte {
 	return s.configData
+}
+
+func (s *AdminServer) GetConfigAdmin(ctx context.Context, req *pb.GetConfigRequest) (*pb.GetConfigResponse, error) {
+	return &pb.GetConfigResponse{
+		ConfigData: s.configData,
+	}, nil
+}
+
+func (s *AdminServer) ToggleFiltering(ctx context.Context, req *pb.ToggleFilteringRequest) (*pb.ToggleFilteringResponse, error) {
+	if s.manager == nil {
+		return &pb.ToggleFilteringResponse{Success: false, Message: "manager not initialized"}, nil
+	}
+
+	s.manager.SetFilteringEnabled(req.WorkerId, req.Enabled)
+
+	return &pb.ToggleFilteringResponse{
+		Success: true,
+		Message: fmt.Sprintf("Filtering %s for worker %d",
+			map[bool]string{true: "enabled", false: "disabled"}[req.Enabled],
+			req.WorkerId),
+	}, nil
 }
