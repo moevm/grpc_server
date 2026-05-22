@@ -125,3 +125,12 @@ func (s *Service) hasIntersection(a, b []string) bool {
 	}
 	return false
 }
+
+func (s *Service) GetCategory(id int) (string, int) {
+	for _, category := range s.categories.Categories {
+		if category.ID == id {
+			return category.Name, category.TrustLevel
+		}
+	}
+	return "", 0
+}
