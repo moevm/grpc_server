@@ -43,6 +43,9 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
   uint16_t nb_rx =
       rte_eth_rx_burst(port_in->port_id, queue_number, pkts, nb_pkts);
 
+  if (nb_rx > 0) {
+    LOG_INFO("Received %hu packets on queue %hu", nb_rx, queue_number);
+  }
   if (atomic_load(&filtring_is_turned_off)) {
     for (int i = 0; i < nb_rx; i++) {
       package_sending_decision(true, pkts[i], port_out, queue_number);
@@ -62,6 +65,8 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       struct node_cache_ip *cached_node_ip = NULL;
 
       if (check_is_exception(&info_pac.number_port) == true) {
+        LOG_INFO("Exception port %hu, forwarding to exception port",
+                 ntohs(info_pac.number_port));
         package_sending_decision(true, pkts[i], port_exception, queue_number);
         continue;
       }
@@ -79,9 +84,12 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       }
 
       if (ret >= 0 && cached_node_ip) {
+        LOG_INFO("IP cache hit, decision: %s",
+                 cached_node_ip->solution_is_send ? "send" : "drop");
         package_sending_decision(cached_node_ip->solution_is_send, pkts[i],
                                  port_out, queue_number);
       } else if (ret == -ENOENT) {
+        LOG_INFO("IP cache miss, applying filter");
 
         struct requested_classification req_clas; // query to ip controller
 
@@ -140,6 +148,8 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       struct node_cache_domain *cached_node_domain = NULL;
 
       if (check_is_exception(&info_pac.number_port) == true) {
+        LOG_INFO("Exception port %hu, forwarding to exception port",
+                 ntohs(info_pac.number_port));
         package_sending_decision(true, pkts[i], port_exception, queue_number);
         continue;
       }
@@ -147,9 +157,13 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       int ret = lookup_dns_cache(info_pac.domain, &cached_node_domain);
 
       if (ret >= 0 && cached_node_domain) {
+        LOG_INFO("Domain cache hit for '%s', decision: %s", info_pac.domain,
+                 cached_node_domain->solution_is_send ? "send" : "drop");
         package_sending_decision(cached_node_domain->solution_is_send, pkts[i],
                                  port_out, queue_number);
       } else if (ret == -ENOENT) {
+        LOG_INFO("Domain cache miss for '%s', applying filter",
+                 info_pac.domain);
 
         struct requested_classification req_clas; // query to domain controller
 
