@@ -1,3 +1,6 @@
+#include "filtr_packets.h"
+#include "pars_packets.h"
+
 bool check_domain_is_block(char domain[DOMAIN_MAX_LEN],
                            char block_domains[MAX_DOMAINS][DOMAIN_MAX_LEN]) {
 
@@ -188,3 +191,15 @@ bool main_filtring_by_ip(struct requested_classification *req_clas,
 
   return check_categories_and_trust_level(req_clas, policy);
 }
+
+
+
+
+
+
+
+
+
+
+
+void nothing(){}
