@@ -243,7 +243,7 @@ static int insert_ip_main_record(const char *ip_str,
 }
 
 static int delete_ip_categories(const char *ip_str) {
-  const char *sql = "DELETE FROM ip_categories_table WHERE ip_str = ?";
+  const char *sql = "DELETE FROM categories_table WHERE ip_str = ?";
   sqlite3_stmt *stmt = NULL;
   int ret = sqlite3_prepare_v2(ip_cache_table, sql, -1, &stmt, NULL);
   if (ret != SQLITE_OK) {
@@ -260,7 +260,7 @@ static int delete_ip_categories(const char *ip_str) {
 
 static int insert_ip_categories(const char *ip_str,
                                 struct node_cache_ip *node) {
-  const char *sql = "INSERT INTO ip_categories_table (ip_str, "
+  const char *sql = "INSERT INTO categories_table (ip_str, "
                     "certain_category) VALUES (?, ?)";
   sqlite3_stmt *stmt = NULL;
   int ret = sqlite3_prepare_v2(ip_cache_table, sql, -1, &stmt, NULL);
@@ -475,7 +475,8 @@ int lookup_ip_cache(const struct ip_key *key,
   return ret;
 }
 
-void add_to_ip_cache(const struct ip_key *key, struct node_cache_ip *node) {
+void add_to_ip_cache(const struct ip_key *key, struct node_cache_ip *node,
+                     int ttl_ip) {
 
   struct ip_key *key_copy = rte_malloc("ip_key(ip)", IP_MAX_LEN, 0);
   if (!key_copy) {
@@ -486,7 +487,7 @@ void add_to_ip_cache(const struct ip_key *key, struct node_cache_ip *node) {
 
   memcpy(key_copy, key, IP_MAX_LEN);
   node->timestamp = rte_get_timer_cycles();
-  node->ttl_seconds = IP_CACHE_DEFAULT_TTL;
+  node->ttl_seconds = ttl_ip;
   node->key = key_copy;
 
   rte_spinlock_lock(&cache_spinlock_ip);

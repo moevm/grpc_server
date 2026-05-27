@@ -189,6 +189,9 @@ void Worker::requestPolicyFromController() {
       return;
     }
 
+    enable = resp.filtering_enabled();
+    spdlog::info("Filtering: {}", enable ? "ON" : "OFF");
+
     switch (resp.result()) {
     case GetPolicyResponse::POLICY_PROVIDED: {
       spdlog::info("Policy received");
@@ -281,9 +284,11 @@ void Worker::requestPolicyFromController() {
         }
       }
       current_policy.min_trust_level = pol.min_trust_level();
+      current_policy.ttl_ip = pol.ttl_ip();
+      current_policy.ttl_domain = pol.ttl_domain();
 
       current_config_version = pol.config_version();
-
+      spdlog::info("Clearing cache due to policy update");
       clear_ip_cache();
       clear_dns_cache();
       spdlog::info("POLICY LOADED");
@@ -425,6 +430,7 @@ Worker::Worker(uint64_t id, const char *gateway_address, const char *gateway_por
   auto channel =
       grpc::CreateChannel(controller_addr, grpc::InsecureChannelCredentials());
   stub_ = DataService::NewStub(channel);
+  spdlog::info("Worker ID: {}", worker_id);
   spdlog::info("gRPC channel created to {}", controller_addr);
   signal(SIGINT, signal_handler);
   signal(SIGTERM, signal_handler);
@@ -475,7 +481,7 @@ void Worker::MainLoop() {
     }
     forward_to_out(port_exception, port_in, queue_number);
     pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts,
-                      pkts, &local_policy);
+                      pkts, &local_policy, !enable);
     forward_to_out(port_out, port_in, queue_number);
     if (++timer_check_counter >= timer_check_interval) {
       rte_timer_manage();
@@ -490,6 +496,7 @@ void Worker::MainLoop() {
       last_stats_time = now;
       stats_interval =
           MIN_STATS_TIME + (rand() % (MAX_STATS_TIME - MIN_STATS_TIME + 1));
+      spdlog::info("Next stats report in {}s", stats_interval);
     }
 
     int64_t seconds_since_policy = (now - last_policy_time) / 1s;
@@ -498,6 +505,7 @@ void Worker::MainLoop() {
       last_policy_time = now;
       policy_interval =
           MIN_POLICY_TIME + (rand() % (MAX_POLICY_TIME - MIN_POLICY_TIME + 1));
+      spdlog::info("Next policy request in {}s", policy_interval);
     }
     int64_t seconds_since_metrics = (now - last_metrics_push_time) / 1s;
     if (seconds_since_metrics >= METRICS_PUSH_INTERVAL_SEC) {

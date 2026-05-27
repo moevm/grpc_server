@@ -24,6 +24,7 @@ void parsing_pakage(struct rte_mbuf *packet, struct info_of_pakage *info_pac) {
   uint32_t l3_offset = hdr_lens.l2_len;
 
   if (pkt_type & RTE_PTYPE_L3_IPV4) {
+    LOG_INFO("IPv4 packet detected");
     info_pac->ip_version = IP_4;
     info_pac->ethernet_type_protocol = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
 
@@ -37,12 +38,15 @@ void parsing_pakage(struct rte_mbuf *packet, struct info_of_pakage *info_pac) {
       struct rte_tcp_hdr *tcp_hdr = rte_pktmbuf_mtod_offset(
           packet, struct rte_tcp_hdr *, l3_offset + hdr_lens.l3_len);
       info_pac->number_port = tcp_hdr->dst_port;
+      LOG_INFO("TCP dst port: %hu", ntohs(info_pac->number_port));
     } else if (pkt_type & RTE_PTYPE_L4_UDP) {
       struct rte_udp_hdr *udp_hdr = rte_pktmbuf_mtod_offset(
           packet, struct rte_udp_hdr *, l3_offset + hdr_lens.l3_len);
       info_pac->number_port = udp_hdr->dst_port;
+      LOG_INFO("UDP dst port: %hu", ntohs(info_pac->number_port));
     }
   } else if (pkt_type & RTE_PTYPE_L3_IPV6) {
+    LOG_INFO("IPv6 packet detected");
     info_pac->ip_version = IP_6;
     info_pac->ethernet_type_protocol = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6);
 
@@ -58,15 +62,18 @@ void parsing_pakage(struct rte_mbuf *packet, struct info_of_pakage *info_pac) {
       struct rte_tcp_hdr *tcp_hdr = rte_pktmbuf_mtod_offset(
           packet, struct rte_tcp_hdr *, l3_offset + hdr_lens.l3_len);
       info_pac->number_port = tcp_hdr->dst_port;
+      LOG_INFO("TCP dst port: %hu", ntohs(info_pac->number_port));
     } else if (pkt_type & RTE_PTYPE_L4_UDP) {
       struct rte_udp_hdr *udp_hdr = rte_pktmbuf_mtod_offset(
           packet, struct rte_udp_hdr *, l3_offset + hdr_lens.l3_len);
       info_pac->number_port = udp_hdr->dst_port;
+      LOG_INFO("UDP dst port: %hu", ntohs(info_pac->number_port));
     }
   }
 
   if ((pkt_type & RTE_PTYPE_L4_UDP) &&
       info_pac->number_port == rte_cpu_to_be_16(53)) {
+    LOG_INFO("DNS query detected");
     uint32_t l4_offset = l3_offset + hdr_lens.l3_len + hdr_lens.l4_len;
     uint8_t *udp_payload =
         rte_pktmbuf_mtod_offset(packet, uint8_t *, l4_offset);
@@ -95,6 +102,9 @@ void parsing_pakage(struct rte_mbuf *packet, struct info_of_pakage *info_pac) {
           pos += label_len;
         }
         *dst = '\0';
+        LOG_INFO("Domain extracted: %s", info_pac->domain);
+      } else {
+        LOG_WARNING("Malformed DNS name field in packet");
       }
     }
   }

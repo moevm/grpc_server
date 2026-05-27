@@ -42,9 +42,11 @@ class Worker {
   uint64_t current_config_version = 0;
   std::chrono::time_point<std::chrono::steady_clock> last_policy_time;
   std::chrono::time_point<std::chrono::steady_clock> last_stats_time;
+
   int64_t policy_interval = MIN_POLICY_TIME;
   int64_t stats_interval = MIN_STATS_TIME;
 
+  std::atomic<bool> enable{true};
   struct net_port *port_in = nullptr;
   struct net_port *port_out = nullptr;
   struct net_port *port_exception = nullptr;

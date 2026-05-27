@@ -1,6 +1,7 @@
 #include "proc_packets.h"
 #include "domain_cache.h"
 #include "ip_cache.h"
+#include <stdatomic.h>
 
 extern void record_packet_received();
 extern void record_packet_passed();
@@ -43,10 +44,21 @@ bool check_is_exception(uint16_t *port) {
 void pakage_processing(struct net_port *port_in, struct net_port *port_out,
                        struct net_port *port_exception, uint16_t queue_number,
                        uint16_t nb_pkts, struct rte_mbuf **pkts,
-                       struct BASE_POLICY *policy) {
+                       struct BASE_POLICY *policy,
+                       bool filtring_is_turned_off) {
 
   uint16_t nb_rx =
       rte_eth_rx_burst(port_in->port_id, queue_number, pkts, nb_pkts);
+
+  if (nb_rx > 0) {
+    LOG_INFO("Received %hu packets on queue %hu", nb_rx, queue_number);
+  }
+  if (atomic_load(&filtring_is_turned_off)) {
+    for (int i = 0; i < nb_rx; i++) {
+      package_sending_decision(true, pkts[i], port_out, queue_number);
+    }
+    return;
+  }
 
   for (int i = 0; i < nb_rx; i++) {
 
@@ -63,6 +75,8 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       struct node_cache_ip *cached_node_ip = NULL;
 
       if (check_is_exception(&info_pac.number_port) == true) {
+        LOG_INFO("Exception port %hu, forwarding to exception port",
+                 ntohs(info_pac.number_port));
         package_sending_decision(true, pkts[i], port_exception, queue_number);
         continue;
       }
@@ -80,9 +94,12 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       }
 
       if (ret >= 0 && cached_node_ip) {
+        LOG_INFO("IP cache hit, decision: %s",
+                 cached_node_ip->solution_is_send ? "send" : "drop");
         package_sending_decision(cached_node_ip->solution_is_send, pkts[i],
                                  port_out, queue_number);
       } else if (ret == -ENOENT) {
+        LOG_INFO("IP cache miss, applying filter");
 
         struct requested_classification req_clas;
 
@@ -125,11 +142,11 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
         if (info_pac.ip_version == IP_4) {
           key.version = 4;
           key.addr.ip4 = info_pac.ip4_dist;
-          add_to_ip_cache(&key, new_node);
+          add_to_ip_cache(&key, new_node, policy->ttl_ip);
         } else {
           key.version = 6;
           memcpy(key.addr.ip6, info_pac.ip6_dist, 16);
-          add_to_ip_cache(&key, new_node);
+          add_to_ip_cache(&key, new_node, policy->ttl_ip);
         }
 
       } else {
@@ -141,6 +158,8 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       struct node_cache_domain *cached_node_domain = NULL;
 
       if (check_is_exception(&info_pac.number_port) == true) {
+        LOG_INFO("Exception port %hu, forwarding to exception port",
+                 ntohs(info_pac.number_port));
         package_sending_decision(true, pkts[i], port_exception, queue_number);
         continue;
       }
@@ -148,9 +167,13 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       int ret = lookup_dns_cache(info_pac.domain, &cached_node_domain);
 
       if (ret >= 0 && cached_node_domain) {
+        LOG_INFO("Domain cache hit for '%s', decision: %s", info_pac.domain,
+                 cached_node_domain->solution_is_send ? "send" : "drop");
         package_sending_decision(cached_node_domain->solution_is_send, pkts[i],
                                  port_out, queue_number);
       } else if (ret == -ENOENT) {
+        LOG_INFO("Domain cache miss for '%s', applying filter",
+                 info_pac.domain);
 
         struct requested_classification req_clas;
 
@@ -180,7 +203,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
 
         new_node->solution_is_send = solution_is_send;
 
-        add_to_dns_cache(info_pac.domain, new_node);
+        add_to_dns_cache(info_pac.domain, new_node, policy->ttl_domain);
       } else {
         LOG_ERROR("Failed to search a key-value pair in the hash table: %s",
                   strerror(-ret));

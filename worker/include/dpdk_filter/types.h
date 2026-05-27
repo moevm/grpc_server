@@ -7,15 +7,15 @@
 
 #ifdef DEBUG
 #define LOG_INFO(info, ...)                                                    \
-  fprintf(stdout, "[INFO] %s: %d: " info "\n", __func__, __LINE__,             \
+  fprintf(stderr, "[INFO] %s: %d: " info "\n", __func__, __LINE__,             \
           ##__VA_ARGS__)
 
 #define LOG_ERROR(error, ...)                                                  \
-  fprintf(stdout, "[ERROR] %s: %d: " error "\n", __func__, __LINE__,           \
+  fprintf(stderr, "[ERROR] %s: %d: " error "\n", __func__, __LINE__,           \
           ##__VA_ARGS__)
 
 #define LOG_WARNING(warning, ...)                                              \
-  fprintf(stdout, "[WARNING] %s: %d: " warning "\n", __func__, __LINE__,       \
+  fprintf(stderr, "[WARNING] %s: %d: " warning "\n", __func__, __LINE__,       \
           ##__VA_ARGS__)
 
 #else
@@ -24,11 +24,11 @@
   } while (0)
 
 #define LOG_ERROR(error, ...)                                                  \
-  fprintf(stdout, "[ERROR] %s: %d: " error "\n", __func__, __LINE__,           \
+  fprintf(stderr, "[ERROR] %s: %d: " error "\n", __func__, __LINE__,           \
           ##__VA_ARGS__)
 
 #define LOG_WARNING(warning, ...)                                              \
-  fprintf(stdout, "[WARNING] %s: %d: " warning "\n", __func__, __LINE__,       \
+  fprintf(stderr, "[WARNING] %s: %d: " warning "\n", __func__, __LINE__,       \
           ##__VA_ARGS__)
 
 #endif
@@ -64,6 +64,8 @@ struct BASE_POLICY {
   char locked_categories[MAX_CATEGORIES][CATEGORY_MAX_LEN];
   struct trust_categories_with_lvl
       categories_with_lvl[MAX_CATEGORIES_BY_TRUST_LVL];
+  int ttl_ip;
+  int ttl_domain;
   char block_domains[MAX_DOMAINS][DOMAIN_MAX_LEN];
   char allow_domains[MAX_DOMAINS][DOMAIN_MAX_LEN];
   uint32_t block_ip4[MAX_IP4];

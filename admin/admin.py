@@ -109,19 +109,62 @@ class AdminClient:
             raise Exception(f"Server error: {error_msg}")
         return response
 
+    def get_config_toml(self, output_file: str):
+        request = admin_service_pb2.GetConfigRequest()
+        response = self.stub.GetConfigAdmin(request)
+        
+        toml_data = response.config_data
+        
+        if output_file:
+            with open(output_file, "wb") as f:
+                f.write(toml_data)
+            print(f"TOML config saved to {output_file}")
+        
+        return toml_data
+
+    def toggle_filtering(self, worker_id: int, enabled: bool):
+        request = admin_service_pb2.ToggleFilteringRequest(
+            worker_id=worker_id,
+            enabled=enabled,
+        )
+        response = self.stub.ToggleFiltering(request)
+        return response
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--file", default="config.toml")
+    subparsers = parser.add_subparsers(dest="action")
+
+    load_parser = subparsers.add_parser("load")
+    load_parser.add_argument("--file", default="config.toml")
+
+    get_parser = subparsers.add_parser("get")
+    get_parser.add_argument("--save", "-s", default="policy.toml")
+
+    toggle_parser = subparsers.add_parser("toggle")
+    toggle_parser.add_argument("--id", type=int, required=True)
+    toggle_parser.add_argument("--on", action="store_true", dest="enabled")
+    toggle_parser.add_argument("--off", action="store_false", dest="enabled")
+    toggle_parser.set_defaults(enabled=True)
+
     args = parser.parse_args()
 
+    client = AdminClient()
     try:
-        client = AdminClient()
-        client.load_config(args.file)
-        print("Config loaded")
+        if args.action == "load":
+            client.load_config(args.file)
+            print("Config loaded")
+        elif args.action == "get":
+            toml_data = client.get_config_toml(args.save)
+            print("Config saved")
+        elif args.action == "toggle":
+            resp = client.toggle_filtering(args.id, args.enabled)
+            state = "enabled" if args.enabled else "disabled"
+            print(f"Filtering {state}: {resp.message}")
+        else:
+            parser.print_help()
     except Exception as e:
-        print(f"Error loading config: {e}")
+        print(f"Error: {e}")
         return 1
-    
     return 0
 
 if __name__ == "__main__":
