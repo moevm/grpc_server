@@ -237,14 +237,14 @@ python admin.py load --file <your_policy>.toml
 ### Get the current policy from the controller
 
 ```bash
-python admin.py get --file <your_policy>.toml
+python admin.py get --save <your_policy>.toml
 ```
 
 ### Enable/disable filtering on the worker
 
 ```bash
-python admin.py toogle --id 1 --on  #id - worker id
-python admin.py toogle --id 1 --off #id - worker id
+python admin.py toggle --id 1 --on  #id - worker id
+python admin.py toggle --id 1 --off #id - worker id
 ```
 
 
