@@ -64,9 +64,22 @@ The binary is placed at `controller/bin/grpc_server`.
 
 ## 2. Build Worker
 
+standard assembly:
 ```bash
 cd worker
 bazel build --config=riscv64 //:worker
+```
+
+build with debug output:
+```bash
+cd worker
+bazel build --config=riscv64 //:worker --copt="-DDEBUG=1"
+```
+
+If you experience a hang during assembly, limit the memory with a flag, for example:
+```bash
+cd worker
+bazel build --config=riscv64 //:worker --copt="-DDEBUG=1" --local_ram_resources=4096
 ```
 
 The binary is placed at `worker/bazel-bin/worker`.
@@ -74,8 +87,8 @@ The binary is placed at `worker/bazel-bin/worker`.
 ## 3. Start Test Stand
 
 ```bash
-cd test/virtual_load_network
-make run
+cd test/virtual_load_network/scripts
+sudo ./start.sh
 ```
 
 This will:
@@ -86,212 +99,206 @@ This will:
 
 Expected output:
 ```
-➜  virtual_load_network git:(test_stand) ✗ sudo scripts/start.sh 
-[sudo] password for lespend: 
-[+] Building 2.9s (13/13) FINISHED                                                                                                                           
- => [internal] load local bake definitions                                                                                                              0.0s
- => => reading from stdin 1.21kB                                                                                                                        0.0s
- => [traffic-gen-1 internal] load build definition from Dockerfile.traffic-gen                                                                          0.0s
- => => transferring dockerfile: 208B                                                                                                                    0.0s
- => [traffic-gen-2 internal] load metadata for docker.io/library/alpine:3.20                                                                            1.9s
- => [traffic-gen-1 internal] load .dockerignore                                                                                                         0.0s
- => => transferring context: 2B                                                                                                                         0.0s
- => [traffic-gen-1 internal] load build context                                                                                                         0.0s
- => => transferring context: 500B                                                                                                                       0.0s
- => [traffic-gen-2 1/4] FROM docker.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc                      0.0s
- => CACHED [traffic-gen-2 2/4] RUN apk add --no-cache curl bash                                                                                         0.0s
- => CACHED [traffic-gen-2 3/4] COPY ./scripts/traffic-gen.sh /entrypoint.sh                                                                             0.0s
- => CACHED [traffic-gen-1 4/4] RUN chmod +x /entrypoint.sh                                                                                              0.0s
- => [traffic-gen-2] exporting to image                                                                                                                  0.0s
- => => exporting layers                                                                                                                                 0.0s
- => => writing image sha256:e99e2c8bdbe3ed141026d06d3ececcadbc769171b650ac5359ff79940eb87889                                                            0.0s
- => => naming to docker.io/library/virtual_load_network-traffic-gen-2                                                                                   0.0s
- => [traffic-gen-1] exporting to image                                                                                                                  0.0s
- => => exporting layers                                                                                                                                 0.0s
- => => writing image sha256:8528a890010cfd50b8c21c85de488da8e22070021e37709b7a7c9926c16629b2                                                            0.0s
- => => naming to docker.io/library/virtual_load_network-traffic-gen-1                                                                                   0.0s
- => [traffic-gen-2] resolving provenance for metadata file                                                                                              0.0s
- => [traffic-gen-1] resolving provenance for metadata file                                                                                              0.0s
-[+] up 8/8
- ✔ Image virtual_load_network-traffic-gen-2       Built                                                                                                  3.0s
- ✔ Image virtual_load_network-traffic-gen-1       Built                                                                                                  3.0s
- ✔ Network virtual_load_network_testnet1          Created                                                                                                0.1s
- ✔ Network virtual_load_network_testnet2          Created                                                                                                0.1s
- ✔ Container virtual_load_network-traffic-gen-2-2 Started                                                                                                0.7s
- ✔ Container virtual_load_network-traffic-gen-1-2 Started                                                                                                0.7s
- ✔ Container virtual_load_network-traffic-gen-2-1 Started                                                                                                0.5s
- ✔ Container virtual_load_network-traffic-gen-1-1 Started                                                                                                0.5s
-10.0.0.254 dev eth0 lladdr 1e:68:2a:65:96:99 ref 1 used 0/0/0 probes 4 REACHABLE
-
-*** Round 1, deleting 1 entries ***
-*** Flush is complete after 1 round(s) ***
-10.0.0.254 dev eth0 lladdr 1e:68:2a:65:96:99 ref 1 used 0/0/0 probes 4 REACHABLE
-
-*** Round 1, deleting 1 entries ***
-*** Flush is complete after 1 round(s) ***
-10.0.1.254 dev eth0 lladdr 36:e3:51:79:b3:3c ref 1 used 0/0/0 probes 4 REACHABLE
-
-*** Round 1, deleting 1 entries ***
-*** Flush is complete after 1 round(s) ***
-10.0.1.254 dev eth0 lladdr 36:e3:51:79:b3:3c ref 1 used 0/0/0 probes 4 REACHABLE
-
-*** Round 1, deleting 1 entries ***
-*** Flush is complete after 1 round(s) ***
+ => [traffic-gen-1 internal] load build definition from Dockerfile.traffic-gen                                                                               0.0s
+ => => transferring dockerfile: 217B                                                                                                                         0.0s
+ => [traffic-gen-2 internal] load build definition from Dockerfile.traffic-gen                                                                               0.0s
+ => => transferring dockerfile: 217B                                                                                                                         0.0s
+ => [traffic-gen-1 internal] load metadata for docker.io/library/alpine:3.20                                                                                 0.7s
+ => [traffic-gen-2 internal] load .dockerignore                                                                                                              0.0s
+ => => transferring context: 2B                                                                                                                              0.0s
+ => [traffic-gen-1 internal] load .dockerignore                                                                                                              0.0s
+ => => transferring context: 2B                                                                                                                              0.0s
+ => [traffic-gen-2 1/4] FROM docker.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc                           0.0s
+ => => resolve docker.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc                                         0.0s
+ => [traffic-gen-2 internal] load build context                                                                                                              0.0s
+ => => transferring context: 71B                                                                                                                             0.0s
+ => [traffic-gen-1 internal] load build context                                                                                                              0.0s
+ => => transferring context: 71B                                                                                                                             0.0s
+ => CACHED [traffic-gen-1 2/4] RUN apk add --no-cache curl bash iproute2                                                                                     0.0s
+ => CACHED [traffic-gen-1 3/4] COPY ./scripts/traffic-gen.sh /entrypoint.sh                                                                                  0.0s
+ => CACHED [traffic-gen-1 4/4] RUN chmod +x /entrypoint.sh                                                                                                   0.0s
+ => [traffic-gen-2] exporting to image                                                                                                                       0.0s
+ => => exporting layers                                                                                                                                      0.0s
+ => => exporting manifest sha256:2a5b7514893477d98546e00304bab0c5d3df5e691685413fdcd4c5d7f8a44b8e                                                            0.0s
+ => => exporting config sha256:0820b0d32a4e01e75aa6f7fb86776dcb475af2f7513593360acbecaf13110a4c                                                              0.0s
+ => => exporting attestation manifest sha256:47fe7dece22aee82abbc0e0fbad91b19cf38bea269f9c2a480c8d063a4b4391d                                                0.0s
+ => => exporting manifest list sha256:26a7229340f15481c403acf5125032cb86a70fcd48358256764d944d2a97a3c9                                                       0.0s
+ => => naming to docker.io/library/virtual_load_network-traffic-gen-2:latest                                                                                 0.0s
+ => => unpacking to docker.io/library/virtual_load_network-traffic-gen-2:latest                                                                              0.0s
+ => [traffic-gen-1] exporting to image                                                                                                                       0.0s
+ => => exporting layers                                                                                                                                      0.0s
+ => => exporting manifest sha256:ba6645395e7cabb7c7babca4f5ae9e76586e524ee00b385e28b34ef6741d9964                                                            0.0s
+ => => exporting config sha256:ab641cf5526440f2ce75212d98a7ce2c485b1a51d4215adfe0fc720d836c5774                                                              0.0s
+ => => exporting attestation manifest sha256:4fd13be17b47ec34c6b497e30cbf496c9ebd542db2d7d1d03bee83e9dc8a4148                                                0.0s
+ => => exporting manifest list sha256:3f4c8d5955f564bcbf2b33634da0edab10ca65e99e21042d2ed671601e2078e1                                                       0.0s
+ => => naming to docker.io/library/virtual_load_network-traffic-gen-1:latest                                                                                 0.0s
+ => => unpacking to docker.io/library/virtual_load_network-traffic-gen-1:latest                                                                              0.0s
+ => [traffic-gen-1] resolving provenance for metadata file                                                                                                   0.0s
+ => [traffic-gen-2] resolving provenance for metadata file                                                                                                   0.0s
+[+] Running 12/12
+ ✔ traffic-gen-1                                   Built                                                                                                     0.0s 
+ ✔ traffic-gen-2                                   Built                                                                                                     0.0s 
+ ✔ Network virtual_load_network_testnet2           Created                                                                                                   0.0s 
+ ✔ Network virtual_load_network_default            Created                                                                                                   0.0s 
+ ✔ Network virtual_load_network_testnet1           Created                                                                                                   0.0s 
+ ✔ Container virtual_load_network-traffic-gen-2-2  Started                                                                                                   0.3s 
+ ✔ Container virtual_load_network-pushgateway-1    Started                                                                                                   0.3s 
+ ✔ Container virtual_load_network-traffic-gen-2-1  Started                                                                                                   0.4s 
+ ✔ Container virtual_load_network-traffic-gen-1-2  Started                                                                                                   0.3s 
+ ✔ Container virtual_load_network-traffic-gen-1-1  Started                                                                                                   0.4s 
+ ✔ Container virtual_load_network-prometheus-1     Started                                                                                                   0.3s 
+ ✔ Container virtual_load_network-grafana-1        Started                                                                                                   0.4s 
+Nothing to flush
+Nothing to flush
+Nothing to flush
+Nothing to flush
+Nothing to flush
+Nothing to flush
 Test stand is running
-  Filter VMs: filter1 (pid 37833), filter2 (pid 37857)
-  Controller: pid 38215
-  Traffic generators: 4 containers
-```
-```
+  Filter VMs: filter1 (pid 176929), filter2 (pid 177022)
+  Controller: pid 178189
+  Traffic generators: 7 containers
 ```
 
-### 1. Start Controller
+### 1. If you need to connect via SSH
 
 Connect to the controller VM via SSH:
-
 ```bash
 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@10.0.2.3
 ```
 
-Set up internet access (required for Kaspersky API):
-
+Connect to the filter1 VM via SSH:
 ```bash
-sh /mnt/shared/setup-inet.sh
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@10.0.2.1
 ```
 
-Start the controller:
-
+Connect to the filter2 VM via SSH:
 ```bash
-cd /mnt/shared
-KASPERSKY_API_KEY=<your_key> ./controller
-KASPERSKY_API_KEY=wyo915OXTCe5stpLCtc5Ww== ./controller
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@10.0.2.2
 ```
+
 
 ### 2. Load Filtering Policy
 
-On the host, install dependencies and load a policy:
+Detailed instructions for administering the policy are provided in grpc_server/admin/README.md
+
+## Installing dependencies
+```bash
+pip install -r requirements.txt
+```
+
+## Generating proto files
+```bash
+python -m grpc_tools.protoc \
+    --python_out=. \
+    --grpc_python_out=. \
+    -I . \
+    admin_service.proto
+```
+
+## Example of a toml file with policy
+```toml
+[global.rules]                                   # Глобальные правила для всех воркеров
+block_categories = ["Gambling", "Weapons"]       # Категории для блокировки
+block_domains = ["youtube.com", "tiktok.com"]    # Домены для блокировки
+allow_domains = ["github.com", "stackoverflow.com"] # Разрешённые домены (приоритет над блокировкой)
+block_ips = ["192.168.0.1", "2001:0db8:85a3:0000:0000:8a2e:0370:7334"]      # IP для блокировки (IPv4 и IPv6)
+allow_ips = ["8.8.8.8"]                           # Разрешённые IP 
+ttl_ip = 604800                                   # TTL кэша IP 
+ttl_domain = 604800                               # TTL кэша доменов 
+min_trust_level = 5                               # Мин. уровень доверия 
+
+[global.rules.block_by_trust]                     # Блокировка по уровню доверия
+ENTERTAINMENT = 6                                 
+NEWS = 4                                          
+
+[filters.filter_1]                                # Правила для воркера #1
+block_categories = ["Weapons", "Malware"]         # Доп. категории к глобальным
+block_domains = ["instagram.com"]                 # Доп. домены к глобальным
+allow_domains = ["vk.com"]                        # Доп. разрешённые домены
+min_trust_level = 0                               # Переопределяет глобальный 
+
+[filters.filter_1.block_by_trust]                 # Уровни доверия для воркера #1
+SOCIAL = 8                                       
+ENTERTAINMENT = 7                                
+
+[filters.filter_2]                                # Правила для воркера #2
+block_categories = ["Malware"]                    # Доп. категории к глобальным
+allow_domains = ["github.com", "gitlab.com"]      # Доп. разрешённые домены
+
+```
+
+### Send a new policy to the controller
 
 ```bash
-cd admin
-uv venv --python 3.12 .venv
-source .venv/bin/activate
-uv pip install -r requirements.txt
-uv pip install "setuptools<75"
-python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. admin_service.proto
+python admin.py load --file <your_policy>.toml
 ```
 
-Edit `admin/.env` to point to the controller:
-
-```
-SERVER_HOST=10.0.2.3
-SERVER_PORT=50051
-```
-
-Edit `config.toml` with desired rules, then load:
+### Get the current policy from the controller
 
 ```bash
-python admin.py --file config.toml
+python admin.py get --file <your_policy>.toml
 ```
 
-Expected output:
-```
-(.venv) ➜  admin git:(test_stand) ✗ python admin.py --file config.toml
-Config loaded
-```
-```
-```
-
-### 3. Start Worker
-
-Connect to the filter VM via SSH:
+### Enable/disable filtering on the worker
 
 ```bash
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@10.0.2.1    # filter1
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@10.0.2.2    # filter2
-```
-
-Start the worker:
-
-```bash
-cd /mnt/shared
-WORKER_ID=1 METRICS_GATEWAY_ADDRESS=10.0.2.254 METRICS_GATEWAY_PORT=9091 CONTROLLER_GRPC_ADDR=10.0.2.3:50051 DPDK_PORT_IN=eth0 DPDK_PORT_OUT=eth1 ./worker
-```
-
-For `filter2`, use `WORKER_ID=2`.
-
-To redirect logs to a shared file (viewable from host):
-
-```bash
-WORKER_ID=1 METRICS_GATEWAY_ADDRESS=10.0.2.254 METRICS_GATEWAY_PORT=9091 CONTROLLER_GRPC_ADDR=10.0.2.3:50051 DPDK_PORT_IN=eth0 DPDK_PORT_OUT=eth1 ./worker > /mnt/shared/filter1.log 2>&1 &
-```
-
-Expected output:
-```
-root@qemuriscv64:~# cd /mnt/shared
-root@qemuriscv64:/mnt/shared# WORKER_ID=1 METRICS_GATEWAY_ADDRESS=10.0.2.254 METRICS_GATEWAY_PORT=9091 CONTROLLER_GRPC_ADDR=10.0.2.3:50051 DPDK_PORT_IN=eth0 
-DPDK_PORT_OUT=eth1 ./worker
-[2026-04-23 16:46:28.534] [info] Initialize MetricsCollector with 10.0.2.254:9091
-[2026-04-23 16:46:28.823] [info] gRPC channel created to 10.0.2.3:50051
-[2026-04-23 16:46:28.826] [info] Signal handlers registered
-[2026-04-23 16:46:28.828] [info] Worker 1 requests policy
-[2026-04-23 16:46:29.321] [info] Policy received
-EAL: Detected CPU lcores: 2
-EAL: Detected NUMA nodes: 1
-EAL: Detected shared linkage of DPDK
-EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
-EAL: Selected IOVA mode 'PA'
-EAL: TSC using RISC-V rdtime.
-TELEMETRY: No legacy callbacks, legacy socket not created
-libbpf: Attribute of type 0x2a found multiple times in message, previous attribute is being ignored.
-libbpf: Attribute of type 0x2a found multiple times in message, previous attribute is being ignored.
-libbpf: elf: skipping unrecognized data section(8) .xdp_run_config
-libbpf: elf: skipping unrecognized data section(9) xdp_metadata
-libbpf: Attribute of type 0x2a found multiple times in message, previous attribute is being ignored.
-libbpf: Attribute of type 0x2a found multiple times in message, previous attribute is being ignored.
-libbpf: elf: skipping unrecognized data section(7) xdp_metadata
-libbpf: elf: skipping unrecognized data section(7) xdp_metadata
-libxdp: No bpffs found at /sys/fs/bpf
-libxdp: Can't use dispatcher without a working bpffs
-libxdp: Falling back to loading single prog without dispatcher
-libbpf: elf: skipping unrecognized data section(7) xdp_metadata
-Port 0 initialized
-libbpf: Attribute of type 0x2a found multiple times in message, previous attribute is being ignored.
-libbpf: Attribute of type 0x2a found multiple times in message, previous attribute is being ignored.
-libbpf: elf: skipping unrecognized data section(8) .xdp_run_config
-libbpf: elf: skipping unrecognized data section(9) xdp_metadata
-libbpf: Attribute of type 0x2a found multiple times in message, previous attribute is being ignored.
-libbpf: Attribute of type 0x2a found multiple times in message, previous attribute is being ignored.
-libbpf: elf: skipping unrecognized data section(7) xdp_metadata
-libbpf: elf: skipping unrecognized data section(7) xdp_metadata
-libxdp: No bpffs found at /sys/fs/bpf
-libxdp: Can't use dispatcher without a working bpffs
-libxdp: Falling back to loading single prog without dispatcher
-libbpf: elf: skipping unrecognized data section(7) xdp_metadata
-Port 1 initialized
-Port 2 initialized
-Port 0 started
-Port 1 started
-Port 2 started
-[INFO] Loaded 0 records from SQLite, 0 expired skipped
-[2026-04-23 16:46:30.684] [info] DPDK initialized: in_port=0, out_port=1
-[2026-04-23 16:46:31.204] [info] Worker 1 classifying domain 'betboom.ru'
-[2026-04-23 16:46:33.307] [info] Domain 'betboom.ru' classified as category 'Gambling' with trust level 0
-This site has a locked category[INFO] Packet without dns request
-```
-```
+python admin.py toogle --id 1 --on  #id - worker id
+python admin.py toogle --id 1 --off #id - worker id
 ```
 
 
 ## 5. Monitoring
-```sh
-sudo tcpdump -i tap-f1-out port 53 # output packets
-sudo tcpdump -i tap-f1-in port 53 # input packets
+
+### Conroller
+
+Log monitoring
+```bash
+cd test/virtual_load_network/shared/logs
+sudo tail -f controller.log
 ```
+
+### Worker 1
+
+Log monitoring
+```bash
+cd test/virtual_load_network/shared/logs
+sudo tail -f worker1.log
+```
+
+Monitoring the port on which packets are received
+```bash
+sudo tcpdump -i tap-f1-in port 53
+```
+
+Monitoring the port from which packets are emitted
+```bash
+sudo tcpdump -i tap-f1-out port 53
+```
+
+### Worker 2
+
+Log monitoring
+```bash
+cd test/virtual_load_network/shared/logs
+sudo tail -f worker2.log
+```
+
+Monitoring the port on which packets are received
+```bash
+sudo tcpdump -i tap-f2-in port 53
+```
+
+Monitoring the port from which packets are emitted
+```bash
+sudo tcpdump -i tap-f2-out port 53
+```
+
 
 ## 4. Stop Test Stand
 
 ```bash
-cd test/virtual_load_network
-make stop
+cd test/virtual_load_network/scripts
+sudo ./stop.sh
 ```
 
