@@ -62,12 +62,17 @@ class Worker {
 
   std::unique_ptr<MetricsCollector> metrics_collector_;
 
-  std::atomic<uint64_t> packets_received_count{0};
-  std::atomic<uint64_t> packets_passed_count{0};
-  std::atomic<uint64_t> packets_dropped_count{0};
+  std::atomic<uint64_t> local_packets_received{0};
+  std::atomic<uint64_t> local_packets_passed{0};
+  std::atomic<uint64_t> local_packets_dropped{0};
+
+  std::chrono::steady_clock::time_point last_metrics_push_time;
+  const int METRICS_PUSH_INTERVAL_SEC = 5; 
+
+  void pushMetricsToPrometheus();
 
 public:
-  Worker(uint64_t id);
+  Worker(uint64_t id, const char *gateway_address, const char *gateway_port);
   ~Worker();
 
   void initDPDK(int argc, char **argv);
@@ -84,8 +89,7 @@ public:
   void statsReport();
   void RecordPacketReceived();
   void RecordPacketPassed();
-  void RecordPacketDropped(const std::string &reason);
-  void RecordDomainBlocked(const std::string &domain_or_ip);
+  void RecordPacketDropped();
   void RecordTaskStart();
   void RecordTaskEnd();
 };

@@ -3,23 +3,6 @@
 
 #include <spdlog/spdlog.h>
 
-class FiltrWorker : public Worker {
-  MetricsCollector metrics_collector;
-
-protected:
-  void ProcessTask(const std::vector<char> &data) {
-    metrics_collector.StartTask();
-    metrics_collector.StopTask();
-  }
-
-public:
-  FiltrWorker(const char *gateway_address, const char *gateway_port,
-              uint64_t id)
-      : Worker(id),
-        metrics_collector(gateway_address, gateway_port,
-                          ("worker-" + std::to_string(id)).c_str()) {}
-};
-
 int main(int argc, char **argv) {
   const char *worker_id_str = getenv("WORKER_ID");
   if (worker_id_str == nullptr) {
@@ -41,7 +24,7 @@ int main(int argc, char **argv) {
                gateway_port);
 
   try {
-    Worker worker(worker_id);
+    Worker worker(worker_id, gateway_address, gateway_port);
     bool test_mode = false;
     if (getenv("TEST_REQUEST_POLICY") != nullptr) {
       test_mode = true;

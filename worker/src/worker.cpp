@@ -46,10 +46,7 @@ void Worker::SetState(WorkerState new_state) {
 }
 
 void Worker::RecordPacketReceived() {
-  packets_received_count++;
-  if (metrics_collector_) {
-    metrics_collector_->IncrementPacketsReceived(1);
-  }
+  local_packets_received++;
 }
 
 extern "C" void record_packet_received() {
@@ -62,10 +59,7 @@ extern "C" void record_packet_received() {
 }
 
 void Worker::RecordPacketPassed() {
-  packets_passed_count++;
-  if (metrics_collector_) {
-    metrics_collector_->IncrementPacketsPassed(1);
-  }
+  local_packets_passed++;
 }
 
 extern "C" void record_packet_passed() {
@@ -77,35 +71,17 @@ extern "C" void record_packet_passed() {
   worker->RecordPacketPassed();
 }
 
-void Worker::RecordPacketDropped(const std::string &reason) {
-  packets_dropped_count++;
-  if (metrics_collector_) {
-    metrics_collector_->IncrementPacketsDropped(reason, 1);
-  }
+void Worker::RecordPacketDropped() {
+  local_packets_dropped++;
 }
 
-extern "C" void record_packet_droped(char *reson) {
+extern "C" void record_packet_droped() {
   Worker *worker = Worker::getInstance();
   if (!worker) {
     fprintf(stderr, "worker_classify: worker is null\n");
     return;
   }
-  worker->RecordPacketDropped(reson);
-}
-
-void Worker::RecordDomainBlocked(const std::string &domain_or_ip) {
-  if (metrics_collector_) {
-    metrics_collector_->IncrementBlockedDomain(domain_or_ip);
-  }
-}
-
-extern "C" void record_domain_blocked(char *endpoint) {
-  Worker *worker = Worker::getInstance();
-  if (!worker) {
-    fprintf(stderr, "worker_classify: worker is null\n");
-    return;
-  }
-  worker->RecordDomainBlocked(endpoint);
+  worker->RecordPacketDropped();
 }
 
 void Worker::RecordTaskStart() {
@@ -118,6 +94,19 @@ void Worker::RecordTaskEnd() {
   if (metrics_collector_) {
     metrics_collector_->StopTask();
   }
+}
+
+void Worker::pushMetricsToPrometheus() {
+  if (!metrics_collector_) return;
+  
+  uint64_t received = local_packets_received.exchange(0);
+  uint64_t passed = local_packets_passed.exchange(0);
+  uint64_t dropped = local_packets_dropped.exchange(0);
+  
+  if (received > 0) metrics_collector_->IncrementPacketsReceived(received);
+  if (passed > 0) metrics_collector_->IncrementPacketsPassed(passed);
+  if (dropped > 0) metrics_collector_->IncrementPacketsDropped("total", dropped);
+
 }
 
 void Worker::initDPDK(int argc, char **argv) {
@@ -421,12 +410,18 @@ void Worker::statsReport() {
   RecordTaskEnd();
 }
 
-Worker::Worker(uint64_t id) : worker_id(id), state(WorkerState::FREE) {
+Worker::Worker(uint64_t id, const char *gateway_address, const char *gateway_port) : worker_id(id), state(WorkerState::FREE) {
   instance = this;
   std::string controller_addr = "localhost:50051";
   if (const char *env_addr = getenv("CONTROLLER_GRPC_ADDR")) {
     controller_addr = env_addr;
   }
+
+  metrics_collector_ = std::make_unique<MetricsCollector>(
+    gateway_address, 
+    gateway_port, 
+    ("worker-" + std::to_string(id)).c_str());
+
   auto channel =
       grpc::CreateChannel(controller_addr, grpc::InsecureChannelCredentials());
   stub_ = DataService::NewStub(channel);
@@ -466,6 +461,7 @@ void Worker::MainLoop() {
 
   last_policy_time = steady_clock::now();
   last_stats_time = steady_clock::now();
+  last_metrics_push_time = steady_clock::now();
 
   struct rte_mbuf *pkts[32];
   uint16_t nb_pkts = 32;
@@ -503,11 +499,14 @@ void Worker::MainLoop() {
       policy_interval =
           MIN_POLICY_TIME + (rand() % (MAX_POLICY_TIME - MIN_POLICY_TIME + 1));
     }
+    int64_t seconds_since_metrics = (now - last_metrics_push_time) / 1s;
+    if (seconds_since_metrics >= METRICS_PUSH_INTERVAL_SEC) {
+      pushMetricsToPrometheus();
+      last_metrics_push_time = now;
+    }
   }
 
-  if (stop_flag) {
-    SetState(WorkerState::SHUTTING_DOWN);
-  }
+  pushMetricsToPrometheus();
 
   if (stop_flag) {
     SetState(WorkerState::SHUTTING_DOWN);

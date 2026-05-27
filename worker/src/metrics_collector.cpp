@@ -9,14 +9,13 @@
 namespace {
 double GetMemoryUsed() {
   std::ifstream file("/proc/self/statm");
-  if (!file.is_open()) {
-    return 0;
-  }
+  if (!file.is_open()) return 0;
 
-  long mem_pages = 0;
-  file >> mem_pages;
-  file.close();
-  return mem_pages * (double)getpagesize();
+  long total_pages = 0;   
+  long rss_pages = 0;     
+  file >> total_pages >> rss_pages;  
+  
+  return rss_pages * (double)getpagesize();
 }
 } // namespace
 
@@ -61,18 +60,8 @@ MetricsCollector::MetricsCollector(const char *gateway_address,
                                      .Name("packets_dropped_total")
                                      .Help("Total number of packets dropped")
                                      .Register(*registry);
+
   packets_dropped_counter = &packets_dropped_family.Add({});
-
-  packets_dropped_by_reason_family =
-      &prometheus::BuildCounter()
-           .Name("packets_dropped_by_reason_total")
-           .Help("Packets dropped by reason")
-           .Register(*registry);
-
-  blocked_domains_family = &prometheus::BuildCounter()
-                                .Name("blocked_domains_total")
-                                .Help("Number of blocked requests by domain/IP")
-                                .Register(*registry);
 
   auto &tasks_completed_family = prometheus::BuildCounter()
                                      .Name("tasks_completed_total")
@@ -159,39 +148,40 @@ MetricsCollector::~MetricsCollector() {
 
 void MetricsCollector::GetCPUUsage() {
   std::ifstream file("/proc/stat");
-  CPUInfo::Time cur_time;
-  double percent;
+  if (!file.is_open()) return;
 
-  std::string cpu_name;
-  int ign;
-
-  while (true) {
-    file >> cpu_name >> cur_time.user >> cur_time.user_low >> cur_time.sys >>
-        cur_time.idle >> ign >> ign >> ign >> ign >> ign >> ign;
-
-    if (cpu_name.find("cpu") != 0)
-      break;
-
-    CPUInfo &cpu = cpu_usage[cpu_name];
-    if (cur_time.user < cpu.time.user ||
-        cur_time.user_low < cpu.time.user_low || cur_time.sys < cpu.time.sys ||
-        cur_time.idle < cpu.time.idle) {
-      // overflow detection
-      percent = -1.0;
-    } else {
-      uint64_t total = (cur_time.user - cpu.time.user) +
-                       (cur_time.user_low - cpu.time.user_low) +
-                       (cur_time.sys - cpu.time.sys);
-
-      percent = total;
-      total += (cur_time.idle - cpu.time.idle);
-      percent = (total == 0) ? -1.0 : (percent / total) * 100.0;
+  std::string line;
+  while (std::getline(file, line)) {
+    if (line.find("cpu") != 0) break;
+    
+    std::istringstream iss(line);
+    std::string cpu_name;
+    long user, nice, sys, idle, iowait, irq, softirq, steal, guest, guest_nice;
+    
+    iss >> cpu_name >> user >> nice >> sys >> idle >> iowait >> irq >> softirq >> steal >> guest >> guest_nice;
+    
+    if (cpu_name.empty()) continue;
+    
+    uint64_t non_idle = user + nice + sys + irq + softirq + steal;
+    uint64_t total = non_idle + idle + iowait;
+    
+    auto it = cpu_usage.find(cpu_name);
+    if (it != cpu_usage.end()) {
+      CPUInfo &cpu = it->second;
+      
+      if (cpu.last_total > 0) {
+        uint64_t total_diff = total - cpu.last_total;
+        uint64_t non_idle_diff = non_idle - cpu.last_non_idle;
+        
+        double percent = (total_diff == 0) ? 0.0 : (double)non_idle_diff / total_diff * 100.0;
+        cpu.gauge->Set(percent);
+      }
+      
+      cpu.last_total = total;
+      cpu.last_non_idle = non_idle;
     }
-
-    cpu.time = cur_time;
-    cpu.gauge->Set(percent);
   }
-
+  
   file.close();
 }
 
@@ -211,16 +201,6 @@ void MetricsCollector::IncrementPacketsDropped(const std::string &reason,
                                                int count) {
   if (packets_dropped_counter) {
     packets_dropped_counter->Increment(count);
-  }
-  if (packets_dropped_by_reason_family) {
-    packets_dropped_by_reason_family->Add({{"reason", reason}})
-        .Increment(count);
-  }
-}
-
-void MetricsCollector::IncrementBlockedDomain(const std::string &domain_or_ip) {
-  if (blocked_domains_family) {
-    blocked_domains_family->Add({{"domain", domain_or_ip}}).Increment();
   }
 }
 

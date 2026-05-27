@@ -11,6 +11,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <sstream>
 
 class MetricsCollector {
 public:
@@ -39,6 +40,9 @@ private:
     };
 
     Time time;
+    
+    uint64_t last_total{0};
+    uint64_t last_non_idle{0};
   };
 
   void GetCPUUsage();
@@ -55,8 +59,6 @@ private:
   prometheus::Counter *packets_received_counter;
   prometheus::Counter *packets_passed_counter;
   prometheus::Counter *packets_dropped_counter;
-  prometheus::Family<prometheus::Counter> *packets_dropped_by_reason_family;
-  prometheus::Family<prometheus::Counter> *blocked_domains_family;
 
   prometheus::Counter *tasks_completed_counter;
   prometheus::Histogram *task_duration_histogram;

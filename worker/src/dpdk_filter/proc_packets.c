@@ -4,8 +4,7 @@
 
 extern void record_packet_received();
 extern void record_packet_passed();
-extern void record_packet_droped(char *reason);
-extern void record_domain_blocked(char *domain);
+extern void record_packet_droped();
 
 extern bool worker_classify(const char *type, const char *target,
                             struct requested_classification *out_req);
@@ -28,7 +27,7 @@ void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
     return;
   }
 
-  record_packet_droped("blocked");
+  record_packet_droped();
   rte_pktmbuf_free(pkt);
 }
 
@@ -109,10 +108,6 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
           LOG_WARNING("Classification failed for IP %s", ip_str);
         }
 
-        if (!solution_is_send) {
-          record_domain_blocked(ip_str);
-        }
-
         package_sending_decision(solution_is_send, pkts[i], port_out,
                                  queue_number);
 
@@ -155,10 +150,6 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       if (ret >= 0 && cached_node_domain) {
         package_sending_decision(cached_node_domain->solution_is_send, pkts[i],
                                  port_out, queue_number);
-
-        if (!cached_node_domain->solution_is_send) {
-          record_domain_blocked(info_pac.domain);
-        }
       } else if (ret == -ENOENT) {
 
         struct requested_classification req_clas;
@@ -175,9 +166,6 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
           LOG_WARNING("Classification failed for %s", info_pac.domain);
         }
 
-        if (!solution_is_send) {
-          record_domain_blocked(info_pac.domain);
-        }
 
         package_sending_decision(solution_is_send, pkts[i], port_out,
                                  queue_number);
