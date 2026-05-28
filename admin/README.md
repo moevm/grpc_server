@@ -75,14 +75,14 @@ python admin.py load --file <your_policy>.toml
 ### Получить текущую политику с контроллера
 
 ```bash
-python admin.py get --file <your_policy>.toml
+python admin.py get --save <your_policy>.toml
 ```
 
 ### Включить/отключить фильтрацию на воркере
 
 ```bash
-python admin.py toogle --id 1 --on  #id - worker id
-python admin.py toogle --id 1 --off #id - worker id
+python admin.py toggle --id 1 --on  #id - worker id
+python admin.py toggle --id 1 --off #id - worker id
 ```
 
 
