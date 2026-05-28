@@ -29,9 +29,12 @@ func (c *HTTPClient) Request(providerName string, provider models.Provider,
 			providerName, endpointName)
 	}
 
+	urlSafe := checkValue
+	querySafe := checkValue
+
 	url := provider.BaseURL + endpoint.Path
 	placeholder := fmt.Sprintf("{%s}", endpointName)
-	url = strings.ReplaceAll(url, placeholder, checkValue)
+	url = strings.ReplaceAll(url, placeholder, urlSafe)
 
 	var req *http.Request
 	var err error
@@ -39,7 +42,7 @@ func (c *HTTPClient) Request(providerName string, provider models.Provider,
 	if len(endpoint.Body) > 0 {
 		bodyData := make(map[string]string)
 		for key, value := range endpoint.Body {
-			bodyData[key] = strings.ReplaceAll(value, placeholder, checkValue)
+			bodyData[key] = strings.ReplaceAll(value, placeholder, querySafe)
 		}
 		jsonBody, _ := json.Marshal(bodyData)
 		req, err = http.NewRequest(endpoint.Method, url, bytes.NewBuffer(jsonBody))
@@ -53,17 +56,17 @@ func (c *HTTPClient) Request(providerName string, provider models.Provider,
 	}
 
 	for key, value := range provider.Headers {
-		value = strings.ReplaceAll(value, placeholder, checkValue)
+		value = strings.ReplaceAll(value, placeholder, querySafe)
 		req.Header.Add(key, value)
 	}
 
 	if len(endpoint.Query) > 0 {
-		q := req.URL.Query()
+		var queryParts []string
 		for key, value := range endpoint.Query {
-			value = strings.ReplaceAll(value, placeholder, checkValue)
-			q.Add(key, value)
+			value = strings.ReplaceAll(value, placeholder, querySafe)
+			queryParts = append(queryParts, key + "=" + value)
 		}
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = strings.Join(queryParts, "&")
 	}
 
 	return c.client.Do(req)
