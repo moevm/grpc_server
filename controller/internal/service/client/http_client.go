@@ -64,7 +64,7 @@ func (c *HTTPClient) Request(providerName string, provider models.Provider,
 		var queryParts []string
 		for key, value := range endpoint.Query {
 			value = strings.ReplaceAll(value, placeholder, querySafe)
-			queryParts = append(queryParts, key + "=" + value)
+			queryParts = append(queryParts, key+"="+value)
 		}
 		req.URL.RawQuery = strings.Join(queryParts, "&")
 	}
