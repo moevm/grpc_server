@@ -1,4 +1,4 @@
-#include "worker.hpp"
+#include "../include/worker.hpp"
 #include "communication.grpc.pb.h"
 #include "proc_packets.h"
 #include <cstdlib>

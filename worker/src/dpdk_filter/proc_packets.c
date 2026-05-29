@@ -55,6 +55,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
   }
   if (atomic_load(&filtring_is_turned_off)) {
     for (int i = 0; i < nb_rx; i++) {
+      record_packet_received(); 
       package_sending_decision(true, pkts[i], port_out, queue_number);
     }
     return;
