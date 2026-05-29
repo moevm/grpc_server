@@ -9,12 +9,13 @@
 namespace {
 double GetMemoryUsed() {
   std::ifstream file("/proc/self/statm");
-  if (!file.is_open()) return 0;
+  if (!file.is_open())
+    return 0;
 
-  long total_pages = 0;   
-  long rss_pages = 0;     
-  file >> total_pages >> rss_pages;  
-  
+  long total_pages = 0;
+  long rss_pages = 0;
+  file >> total_pages >> rss_pages;
+
   return rss_pages * (double)getpagesize();
 }
 } // namespace
@@ -148,40 +149,46 @@ MetricsCollector::~MetricsCollector() {
 
 void MetricsCollector::GetCPUUsage() {
   std::ifstream file("/proc/stat");
-  if (!file.is_open()) return;
+  if (!file.is_open())
+    return;
 
   std::string line;
   while (std::getline(file, line)) {
-    if (line.find("cpu") != 0) break;
-    
+    if (line.find("cpu") != 0)
+      break;
+
     std::istringstream iss(line);
     std::string cpu_name;
     long user, nice, sys, idle, iowait, irq, softirq, steal, guest, guest_nice;
-    
-    iss >> cpu_name >> user >> nice >> sys >> idle >> iowait >> irq >> softirq >> steal >> guest >> guest_nice;
-    
-    if (cpu_name.empty()) continue;
-    
+
+    iss >> cpu_name >> user >> nice >> sys >> idle >> iowait >> irq >>
+        softirq >> steal >> guest >> guest_nice;
+
+    if (cpu_name.empty())
+      continue;
+
     uint64_t non_idle = user + nice + sys + irq + softirq + steal;
     uint64_t total = non_idle + idle + iowait;
-    
+
     auto it = cpu_usage.find(cpu_name);
     if (it != cpu_usage.end()) {
       CPUInfo &cpu = it->second;
-      
+
       if (cpu.last_total > 0) {
         uint64_t total_diff = total - cpu.last_total;
         uint64_t non_idle_diff = non_idle - cpu.last_non_idle;
-        
-        double percent = (total_diff == 0) ? 0.0 : (double)non_idle_diff / total_diff * 100.0;
+
+        double percent = (total_diff == 0)
+                             ? 0.0
+                             : (double)non_idle_diff / total_diff * 100.0;
         cpu.gauge->Set(percent);
       }
-      
+
       cpu.last_total = total;
       cpu.last_non_idle = non_idle;
     }
   }
-  
+
   file.close();
 }
 

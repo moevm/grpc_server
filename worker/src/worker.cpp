@@ -45,9 +45,7 @@ void Worker::SetState(WorkerState new_state) {
   }
 }
 
-void Worker::RecordPacketReceived() {
-  local_packets_received++;
-}
+void Worker::RecordPacketReceived() { local_packets_received++; }
 
 extern "C" void record_packet_received() {
   Worker *worker = Worker::getInstance();
@@ -58,9 +56,7 @@ extern "C" void record_packet_received() {
   worker->RecordPacketReceived();
 }
 
-void Worker::RecordPacketPassed() {
-  local_packets_passed++;
-}
+void Worker::RecordPacketPassed() { local_packets_passed++; }
 
 extern "C" void record_packet_passed() {
   Worker *worker = Worker::getInstance();
@@ -71,9 +67,7 @@ extern "C" void record_packet_passed() {
   worker->RecordPacketPassed();
 }
 
-void Worker::RecordPacketDropped() {
-  local_packets_dropped++;
-}
+void Worker::RecordPacketDropped() { local_packets_dropped++; }
 
 extern "C" void record_packet_droped() {
   Worker *worker = Worker::getInstance();
@@ -97,16 +91,19 @@ void Worker::RecordTaskEnd() {
 }
 
 void Worker::pushMetricsToPrometheus() {
-  if (!metrics_collector_) return;
-  
+  if (!metrics_collector_)
+    return;
+
   uint64_t received = local_packets_received.exchange(0);
   uint64_t passed = local_packets_passed.exchange(0);
   uint64_t dropped = local_packets_dropped.exchange(0);
-  
-  if (received > 0) metrics_collector_->IncrementPacketsReceived(received);
-  if (passed > 0) metrics_collector_->IncrementPacketsPassed(passed);
-  if (dropped > 0) metrics_collector_->IncrementPacketsDropped("total", dropped);
 
+  if (received > 0)
+    metrics_collector_->IncrementPacketsReceived(received);
+  if (passed > 0)
+    metrics_collector_->IncrementPacketsPassed(passed);
+  if (dropped > 0)
+    metrics_collector_->IncrementPacketsDropped("total", dropped);
 }
 
 void Worker::initDPDK(int argc, char **argv) {
@@ -415,7 +412,9 @@ void Worker::statsReport() {
   RecordTaskEnd();
 }
 
-Worker::Worker(uint64_t id, const char *gateway_address, const char *gateway_port) : worker_id(id), state(WorkerState::FREE) {
+Worker::Worker(uint64_t id, const char *gateway_address,
+               const char *gateway_port)
+    : worker_id(id), state(WorkerState::FREE) {
   instance = this;
   std::string controller_addr = "localhost:50051";
   if (const char *env_addr = getenv("CONTROLLER_GRPC_ADDR")) {
@@ -423,9 +422,7 @@ Worker::Worker(uint64_t id, const char *gateway_address, const char *gateway_por
   }
 
   metrics_collector_ = std::make_unique<MetricsCollector>(
-    gateway_address, 
-    gateway_port, 
-    ("worker-" + std::to_string(id)).c_str());
+      gateway_address, gateway_port, ("worker-" + std::to_string(id)).c_str());
 
   auto channel =
       grpc::CreateChannel(controller_addr, grpc::InsecureChannelCredentials());

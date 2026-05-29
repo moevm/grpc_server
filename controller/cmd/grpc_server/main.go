@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log"
-	"net"
 	"github.com/moevm/grpc_server/internal/config"
 	"github.com/moevm/grpc_server/internal/grpcserver"
 	"github.com/moevm/grpc_server/internal/manager"
@@ -10,6 +8,8 @@ import (
 	commPb "github.com/moevm/grpc_server/pkg/proto/communication"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	"log"
+	"net"
 )
 
 func main() {

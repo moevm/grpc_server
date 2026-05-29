@@ -8,10 +8,10 @@
 #include <prometheus/gauge.h>
 #include <prometheus/histogram.h>
 #include <prometheus/registry.h>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <unordered_map>
-#include <sstream>
 
 class MetricsCollector {
 public:
@@ -40,7 +40,7 @@ private:
     };
 
     Time time;
-    
+
     uint64_t last_total{0};
     uint64_t last_non_idle{0};
   };

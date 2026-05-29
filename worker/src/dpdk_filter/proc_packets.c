@@ -55,7 +55,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
   }
   if (atomic_load(&filtring_is_turned_off)) {
     for (int i = 0; i < nb_rx; i++) {
-      record_packet_received(); 
+      record_packet_received();
       package_sending_decision(true, pkts[i], port_out, queue_number);
     }
     return;
@@ -189,7 +189,6 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
           solution_is_send = true;
           LOG_WARNING("Classification failed for %s", info_pac.domain);
         }
-
 
         package_sending_decision(solution_is_send, pkts[i], port_out,
                                  queue_number);
