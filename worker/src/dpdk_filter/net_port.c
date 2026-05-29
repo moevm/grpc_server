@@ -11,7 +11,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "../../include/dpdk_filter/af_xdp_port.h"
+#include "net_port.h"
 
 #define RX_RING_SIZE 1024
 #define TX_RING_SIZE 1024
@@ -25,9 +25,9 @@ int find_port_by_dev_name(const char *dev_name, uint16_t *port_id_dev) {
     int ret = rte_eth_dev_info_get(port_id, &dev_info);
 
     if (ret) {
-      printf("[ERROR] Failed to retrieve the contextual information of an "
-             "Ethernet device: %s\n",
-             strerror(-ret));
+      LOG_ERROR("Failed to retrieve the contextual information of an "
+                "Ethernet device: %s",
+                strerror(-ret));
       return ret;
     }
 
@@ -40,11 +40,32 @@ int find_port_by_dev_name(const char *dev_name, uint16_t *port_id_dev) {
   return -1;
 }
 
-struct af_xdp_port *init_struct_af_xdp_port(const char *iface_name,
-                                            struct rte_mempool *mbuf_pool) {
-  struct af_xdp_port *port = calloc(1, sizeof(struct af_xdp_port));
+struct net_port *init_struct_tap_port(const char *tap_iface_name,
+                                      struct rte_mempool *mbuf_pool) {
+
+  struct net_port *port = calloc(1, sizeof(struct net_port));
   if (!port) {
-    printf("[ERROR] Failed to allocate memory for struct af_xdp_port\n");
+    LOG_ERROR("Failed to allocate memory for struct net_port");
+    return NULL;
+  }
+
+  snprintf(port->dev_args, sizeof(port->dev_args), "iface=%s, remote=%s",
+           tap_iface_name, tap_iface_name);
+  snprintf(port->dev_name, sizeof(port->dev_name), "net_tap_%s",
+           tap_iface_name);
+  strncpy(port->iface_name, tap_iface_name, sizeof(port->iface_name) - 1);
+  port->iface_name[sizeof(port->iface_name) - 1] = '\0';
+  port->mbuf_pool = mbuf_pool;
+  port->port_id = -1;
+
+  return port;
+}
+
+struct net_port *init_struct_af_xdp_port(const char *iface_name,
+                                         struct rte_mempool *mbuf_pool) {
+  struct net_port *port = calloc(1, sizeof(struct net_port));
+  if (!port) {
+    LOG_ERROR("Failed to allocate memory for struct net_port");
     return NULL;
   }
 
@@ -59,7 +80,7 @@ struct af_xdp_port *init_struct_af_xdp_port(const char *iface_name,
   return port;
 }
 
-int af_xdp_port_init(struct af_xdp_port *port) {
+int net_port_init(struct net_port *port) {
   int ret;
   struct rte_eth_conf port_conf = {0};
   const char *dev_name = port->dev_name;
@@ -68,14 +89,14 @@ int af_xdp_port_init(struct af_xdp_port *port) {
   ret = rte_vdev_init(dev_name, port->dev_args);
 
   if (ret < 0) {
-    printf("[ERROR] Failed to create vdev: %s\n", strerror(-ret));
+    LOG_ERROR("Failed to create vdev: %s", strerror(-ret));
     return ret;
   }
 
   ret = find_port_by_dev_name(port->dev_name, &port_id);
   if (ret) {
-    printf("no port was found that has the same vdev name. vdev = %s",
-           port->dev_name);
+    LOG_INFO("no port was found that has the same vdev name. vdev = %s",
+             port->dev_name);
     rte_vdev_uninit(dev_name);
     return -1;
   }
@@ -83,14 +104,14 @@ int af_xdp_port_init(struct af_xdp_port *port) {
   port->port_id = port_id;
 
   if (!rte_eth_dev_is_valid_port(port_id)) {
-    printf("[ERROR] Port %u is not valid\n", port_id);
+    LOG_ERROR("Port %u is not valid", port_id);
     rte_vdev_uninit(dev_name);
     return -EINVAL;
   }
 
   ret = rte_eth_dev_configure(port_id, 1, 1, &port_conf);
   if (ret < 0) {
-    printf("[ERROR] Failed to configure port: %s\n", strerror(-ret));
+    LOG_ERROR("Failed to configure port: %s", strerror(-ret));
     rte_vdev_uninit(dev_name);
     return ret;
   }
@@ -99,7 +120,7 @@ int af_xdp_port_init(struct af_xdp_port *port) {
                                rte_eth_dev_socket_id(port_id), NULL,
                                port->mbuf_pool);
   if (ret < 0) {
-    printf("[ERROR] Failed to setup RX queue: %s\n", strerror(-ret));
+    LOG_ERROR("Failed to setup RX queue: %s", strerror(-ret));
     rte_vdev_uninit(dev_name);
     return ret;
   }
@@ -108,43 +129,43 @@ int af_xdp_port_init(struct af_xdp_port *port) {
                                rte_eth_dev_socket_id(port_id), NULL);
 
   if (ret < 0) {
-    printf("[ERROR] Failed to setup TX queue: %s\n", strerror(-ret));
+    LOG_ERROR("Failed to setup TX queue: %s", strerror(-ret));
     rte_vdev_uninit(dev_name);
     return ret;
   }
 
-  printf("Port %u initialized\n", port_id);
+  LOG_INFO("Port %u initialized", port_id);
   return 0;
 }
 
-int af_xdp_port_start(uint16_t port_id) {
+int net_port_start(uint16_t port_id) {
   int ret;
 
   ret = rte_eth_dev_start(port_id);
   if (ret < 0) {
-    printf("[ERROR] Failed to start: %s\n", strerror(-ret));
+    LOG_ERROR("Failed to start: %s", strerror(-ret));
     return ret;
   }
 
   ret = rte_eth_promiscuous_enable(port_id);
   if (ret) {
-    printf("[ERROR] Failed to enable receipt in promiscuous mode for an "
-           "Ethernet device: %s\n",
-           strerror(-ret));
+    LOG_ERROR("Failed to enable receipt in promiscuous mode for an "
+              "Ethernet device: %s",
+              strerror(-ret));
     return ret;
   }
 
-  printf("Port %u started\n", port_id);
+  LOG_INFO("Port %u started", port_id);
   return 0;
 }
 
-void af_xdp_port_destroy(struct af_xdp_port *port) {
+void net_port_destroy(struct net_port *port) {
   if (!port)
     return;
   free(port);
 }
 
-void af_xdp_port_close(struct af_xdp_port *port) {
+void net_port_close(struct net_port *port) {
 
   if (!port)
     return;
@@ -154,23 +175,22 @@ void af_xdp_port_close(struct af_xdp_port *port) {
 
   ret = rte_eth_dev_stop(port_id);
   if (ret) {
-    printf("[ERROR] Failed to stop an Ethernet device: %s\n", strerror(-ret));
+    LOG_ERROR("Failed to stop an Ethernet device: %s", strerror(-ret));
     return;
   }
 
   ret = rte_eth_dev_close(port_id);
   if (ret) {
-    printf("[ERROR] Failed to close a stopped Ethernet device: %s\n",
-           strerror(-ret));
+    LOG_ERROR("Failed to close a stopped Ethernet device: %s", strerror(-ret));
     return;
   }
 
   ret = rte_vdev_uninit(port->dev_name);
   if (ret) {
-    printf("[ERROR] Failed to uninitialize a driver: %s\n", strerror(-ret));
+    LOG_ERROR("Failed to uninitialize a driver: %s", strerror(-ret));
     return;
   }
 
   port->port_id = -1;
-  printf("Port %u closed\n", port_id);
+  LOG_INFO("Port %u closed", port_id);
 }

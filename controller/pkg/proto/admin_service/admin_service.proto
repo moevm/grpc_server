@@ -6,6 +6,8 @@ option go_package = "github.com/moevm/grpc_server/pkg/proto/admin_service";
 
 service AdminService {
     rpc LoadConfig(LoadConfigRequest) returns (LoadConfigResponse) {}
+    rpc GetConfigAdmin(GetConfigRequest) returns (GetConfigResponse) {}
+    rpc ToggleFiltering(ToggleFilteringRequest) returns (ToggleFilteringResponse) {}
 }
 
 message LoadConfigRequest {
@@ -15,4 +17,20 @@ message LoadConfigRequest {
 message LoadConfigResponse {
     bool success = 1;
     string error_message = 2;
+}
+
+message GetConfigRequest {}
+
+message GetConfigResponse {
+    bytes config_data = 1;
+}
+
+message ToggleFilteringRequest {
+    uint64 worker_id = 1;
+    bool enabled = 2;
+}
+
+message ToggleFilteringResponse {
+    bool success = 1;
+    string message = 2;
 }

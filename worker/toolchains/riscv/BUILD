@@ -7,7 +7,7 @@ filegroup(name = "empty")
 
 cc_toolchain(
     name = "linux_riscv64_toolchain",
-    toolchain_identifier = "linux_riscv64-toolchain",
+    toolchain_identifier = "riscv-yocto-toolchain",
     toolchain_config = ":linux_riscv64_toolchain_config",
     all_files = ":empty",
     compiler_files = ":empty",

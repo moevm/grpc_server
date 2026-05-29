@@ -1,0 +1,25 @@
+services:
+  traffic-gen:
+    build:
+      context: .
+      dockerfile: Dockerfile.traffic-gen
+    networks:
+      - testnet
+    cap_add:
+      - NET_ADMIN
+    dns:
+      - ${DNS:-8.8.8.8}
+    deploy:
+      replicas: ${NUM_HOSTS:-3}
+    restart: unless-stopped
+
+networks:
+  testnet:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: "br-testnet"
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+    ipam:
+      config:
+        - subnet: ${SUBNET:-10.0.0}.0/24
+          gateway: ${GATEWAY:-10.0.0.254}

@@ -1,8 +1,13 @@
 CC = gcc
-CFLAGS_BASE = -Iinclude -O2 -msse4.2 -mpclmul -maes
-LDFLAGS = -lrte_eal -lrte_ethdev -lrte_mempool -lrte_mbuf -lrte_bus_vdev -lpthread -lnuma -ldl -lrte_net
+CFLAGS_BASE = -Iinclude/dpdk_filter -O2 -msse4.2 -mpclmul -maes
+LDFLAGS = -lrte_eal -lrte_ethdev -lrte_mempool -lrte_mbuf -lrte_bus_vdev -lpthread -lnuma -ldl -lrte_net -lrte_hash -lsqlite3 -lrte_timer
 
-SRCS = src/dpdk_filter/main.c src/dpdk_filter/af_xdp_port.c src/dpdk_filter/filtr_packets.c src/dpdk_filter/pars_packets.c src/dpdk_filter/proc_packets.c
+DEBUG ?= 0
+ifeq ($(DEBUG),1)
+    CFLAGS_BASE += -DDEBUG
+endif
+
+SRCS = src/dpdk_filter/main.c src/dpdk_filter/net_port.c src/dpdk_filter/filtr_packets.c src/dpdk_filter/pars_packets.c src/dpdk_filter/proc_packets.c src/dpdk_filter/domain_cache.c src/dpdk_filter/ip_cache.c
 
 TARGET_REAL = main-x86
 TARGET_VIRT = main-x86-virt

@@ -64,7 +64,8 @@ func (s *DataServer) GetPolicy(ctx context.Context, req *pb.GetPolicyRequest) (*
 	if !changed {
 		log.Printf("Policy unchanged for worker %d", req.WorkerId)
 		return &pb.GetPolicyResponse{
-			Result: pb.GetPolicyResponse_POLICY_UNCHANGED,
+			Result:           pb.GetPolicyResponse_POLICY_UNCHANGED,
+			FilteringEnabled: s.manager.IsFilteringEnabled(req.WorkerId),
 		}, nil
 	}
 
@@ -76,13 +77,15 @@ func (s *DataServer) GetPolicy(ctx context.Context, req *pb.GetPolicyRequest) (*
 	}
 
 	return &pb.GetPolicyResponse{
-		Result: pb.GetPolicyResponse_POLICY_PROVIDED,
-		Policy: &fullPolicy,
+		Result:           pb.GetPolicyResponse_POLICY_PROVIDED,
+		Policy:           &fullPolicy,
+		FilteringEnabled: s.manager.IsFilteringEnabled(req.WorkerId),
 	}, nil
 }
 
 func (s *DataServer) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb.ClassifyResponse, error) {
-	log.Printf("gRPC Classify from worker %d for domain: %s", req.WorkerId, req.Domain)
+	log.Printf("gRPC Classify from worker %d: type=%s, target=%s",
+		req.WorkerId, req.Type, req.Target)
 
 	cashRequest, err := s.storage.GetRequestHash(ctx, req.Domain)
 

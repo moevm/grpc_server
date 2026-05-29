@@ -18,19 +18,24 @@ all_compile_actions = [
     ACTION_NAMES.c_compile,
 ]
 
+_SDK_BASE = "/opt/riscv-sdk"
+_SDK_HOST = _SDK_BASE + "/sysroots/x86_64-pokysdk-linux"
+_SDK_TARGET = _SDK_BASE + "/sysroots/riscv64-poky-linux"
+_TOOLCHAIN_BIN = _SDK_HOST + "/usr/bin/riscv64-poky-linux"
+
 def _impl(ctx):
     tool_paths = [
         tool_path(
             name = "gcc",
-            path = "/usr/bin/riscv64-linux-gnu-g++",
+            path = _TOOLCHAIN_BIN + "/riscv64-poky-linux-gcc",
         ),
         tool_path(
             name = "ld",
-            path = "/usr/bin/riscv64-linux-gnu-ld",
+            path = _TOOLCHAIN_BIN + "/riscv64-poky-linux-ld",
         ),
         tool_path(
             name = "ar",
-            path = "/usr/bin/riscv64-linux-gnu-ar",
+            path = _TOOLCHAIN_BIN + "/riscv64-poky-linux-ar",
         ),
         tool_path(
             name = "cpp",
@@ -42,19 +47,37 @@ def _impl(ctx):
         ),
         tool_path(
             name = "nm",
-            path = "/usr/bin/riscv64-linux-gnu-nm",
+            path = _TOOLCHAIN_BIN + "/riscv64-poky-linux-nm",
         ),
         tool_path(
             name = "objdump",
-            path = "/usr/bin/riscv64-linux-gnu-objdump",
+            path = _TOOLCHAIN_BIN + "/riscv64-poky-linux-objdump",
         ),
         tool_path(
             name = "strip",
-            path = "/usr/bin/riscv64-linux-gnu-strip",
+            path = _TOOLCHAIN_BIN + "/riscv64-poky-linux-strip",
         ),
     ]
 
     features = [
+        feature(
+            name = "default_compile_flags",
+            enabled = True,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                "--sysroot=" + _SDK_TARGET,
+                                "-O2",
+                                "-pipe",
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        ),
         feature(
             name = "default_linker_flags",
             enabled = True,
@@ -64,16 +87,10 @@ def _impl(ctx):
                     flag_groups = [
                         flag_group(
                             flags = [
-                                "-L/usr/riscv64-linux-gnu/lib",
-                                "-Wl,-rpath=/usr/riscv64-linux-gnu/lib",
-                                "-Wl,--start-group",
-                                "-lprometheus-cpp-push",
-                                "-lprometheus-cpp-core",
-                                "-lcurl",
-                                "-lssl",
-                                "-lcrypto",
-                                "-lz",
-                                "-Wl,--end-group",
+                                "--sysroot=" + _SDK_TARGET,
+                                "-L" + _SDK_TARGET + "/usr/lib",
+                                "-Wl,-rpath=" + _SDK_TARGET + "/usr/lib",
+                                "-lstdc++",
                             ],
                         ),
                     ],
@@ -90,9 +107,6 @@ def _impl(ctx):
                         flag_group(
                             flags = [
                                 "-std=c++17",
-                                "-isystem/usr/riscv64-linux-gnu/include/c++/11",
-                                "-isystem/usr/riscv64-linux-gnu/include/c++/11/riscv64-linux-gnu",
-                                "-isystem/usr/lib/gcc-cross/riscv64-linux-gnu/11/include",
                             ],
                         ),
                     ],
@@ -105,22 +119,19 @@ def _impl(ctx):
         ctx = ctx,
         features = features,
         cxx_builtin_include_directories = [
-            "/usr/riscv64-linux-gnu/include/c++/11",
-            "/usr/riscv64-linux-gnu/include/c++/11/riscv64-linux-gnu",
-            "/usr/lib/gcc-cross/riscv64-linux-gnu/11/include",
-            "/usr/lib/gcc-cross/riscv64-linux-gnu/11/include-fixed",
-            "/usr/riscv64-linux-gnu/include",
-            "/usr/include",
-            "/usr/local/include",
+            _SDK_HOST + "/usr/lib/riscv64-poky-linux/gcc/riscv64-poky-linux/13.4.0/include",
+            _SDK_TARGET + "/usr/include/c++/13.4.0",
+            _SDK_TARGET + "/usr/include/c++/13.4.0/riscv64-poky-linux",
+            _SDK_TARGET + "/usr/include",
         ],
-        toolchain_identifier = "riscv-toolchain",
+        toolchain_identifier = "riscv-yocto-toolchain",
         host_system_name = "local",
-        target_system_name = "riscv64-linux-gnu",
+        target_system_name = "riscv64-poky-linux",
         target_cpu = "riscv64",
         target_libc = "glibc",
         compiler = "gcc",
         abi_version = "lp64d",
-        abi_libc_version = "glibc_2.36",
+        abi_libc_version = "glibc_2.39",
         tool_paths = tool_paths,
     )
 
