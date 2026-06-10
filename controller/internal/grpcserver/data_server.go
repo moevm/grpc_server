@@ -87,12 +87,12 @@ func (s *DataServer) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb
 	log.Printf("gRPC Classify from worker %d: type=%s, target=%s",
 		req.WorkerId, req.Type, req.Target)
 
-	cashRequest, err := s.storage.GetRequestHash(ctx, req.Domain)
+	cashRequest, err := s.storage.GetRequestHash(ctx, req.Target)
 
 	var categoryIDs []int
 
 	if err != nil {
-		categoryIDs, err = s.classifier.Check(req.Domain, "domain")
+		categoryIDs, err = s.classifier.Check(req.Target, req.Type)
 		if err != nil {
 			log.Printf("Classification error: %v", err)
 			return &pb.ClassifyResponse{
@@ -102,7 +102,7 @@ func (s *DataServer) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb
 		}
 
 		err = s.storage.SaveRequestHash(ctx, storage.RequestCash{
-			Endpoint:      req.Domain,
+			Endpoint:      req.Target,
 			CategoriesIds: categoryIDs,
 		})
 
