@@ -5,6 +5,11 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile.cc_x86_to_x86
+    environment:
+      - WORKER_ID=1
+      - CONTROLLER_GRPC_ADDR=controller:50051
+      - PUSH_GATEWAY_ADDR=pushgateway
+      - PUSH_GATEWAY_PORT=9091
     volumes:
       - ./data:/data 
     working_dir: /data

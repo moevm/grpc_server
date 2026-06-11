@@ -1,7 +1,7 @@
 #ifndef WORKER_HPP
 #define WORKER_HPP
 
-#include "../include/metrics_collector.hpp"
+#include "metrics_collector.hpp"
 #include "communication.grpc.pb.h"
 #include "communication.pb.h"
 extern "C" {

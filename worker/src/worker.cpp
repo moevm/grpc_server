@@ -1,4 +1,4 @@
-#include "../include/worker.hpp"
+#include "worker.hpp"
 #include "communication.grpc.pb.h"
 #include "proc_packets.h"
 #include <cstdlib>
@@ -13,7 +13,7 @@ extern "C" bool worker_classify(const char *type, const char *target,
                                 struct requested_classification *out_req) {
   Worker *worker = Worker::getInstance();
   if (!worker) {
-    fprintf(stderr, "worker_classify: worker is null\n");
+    spdlog::error("worker_classify: worker is null");
     return false;
   }
   return worker->classify(std::string(type), std::string(target), out_req);
@@ -50,7 +50,7 @@ void Worker::RecordPacketReceived() { local_packets_received++; }
 extern "C" void record_packet_received() {
   Worker *worker = Worker::getInstance();
   if (!worker) {
-    fprintf(stderr, "worker_classify: worker is null\n");
+    spdlog::error("record_packet_received: worker is null");
     return;
   }
   worker->RecordPacketReceived();
@@ -61,7 +61,7 @@ void Worker::RecordPacketPassed() { local_packets_passed++; }
 extern "C" void record_packet_passed() {
   Worker *worker = Worker::getInstance();
   if (!worker) {
-    fprintf(stderr, "worker_classify: worker is null\n");
+    spdlog::error("record_packet_passed: worker is null");
     return;
   }
   worker->RecordPacketPassed();
@@ -72,7 +72,7 @@ void Worker::RecordPacketDropped() { local_packets_dropped++; }
 extern "C" void record_packet_droped() {
   Worker *worker = Worker::getInstance();
   if (!worker) {
-    fprintf(stderr, "worker_classify: worker is null\n");
+    spdlog::error("record_packet_dropped: worker is null");
     return;
   }
   worker->RecordPacketDropped();
