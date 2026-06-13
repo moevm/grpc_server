@@ -131,7 +131,7 @@ start_controller() {
         -pidfile "/tmp/qemu-controller.pid" \
         -bios "$QEMU_BIOS" \
         -kernel "$QEMU_KERNEL" \
-        -append "root=/dev/vda rw earlycon=sbi console=ttyS0 hugepages=${VM_HUGEPAGES} role=controller ip=${MGMT_SUBNET}.3::${MGMT_SUBNET}.254:255.255.255.0::eth0:off" \
+        -append "root=/dev/vda rw earlycon=sbi console=ttyS0 hugepages=${VM_HUGEPAGES} role=controller mgmt_if=eth0" \
         -netdev tap,id=net0,ifname="tap-ctrl",script=no,downscript=no \
         -device virtio-net-device,netdev=net0 \
         -netdev tap,id=net1,ifname="tap-ctrl-inet",script=no,downscript=no \
@@ -152,11 +152,10 @@ start_filter_vm() {
     local TAP_OUT="$3"
     local TAP_MGMT="$4"
     local BRIDGE_IN="$5"
-    local MGMT_IP="$6"
-    local MAC_IN="$7"
-    local MAC_OUT="$8"
-    local MAC_MGMT="$9"
-    local WORKER_ID="${10}"
+    local MAC_IN="$6"
+    local MAC_OUT="$7"
+    local MAC_MGMT="$8"
+    local WORKER_ID="$9"
 
     local OVERLAY="$PROJECT_DIR/${VM_NAME}.qcow2"
     if [ ! -f "$OVERLAY" ]; then
@@ -182,7 +181,7 @@ start_filter_vm() {
         -pidfile "/tmp/qemu-${VM_NAME}.pid" \
         -bios "$QEMU_BIOS" \
         -kernel "$QEMU_KERNEL" \
-        -append "root=/dev/vda rw earlycon=sbi console=ttyS0 hugepages=${VM_HUGEPAGES} role=worker worker_id=${WORKER_ID} ip=${MGMT_IP}::${MGMT_SUBNET}.254:255.255.255.0::eth2:off" \
+        -append "root=/dev/vda rw earlycon=sbi console=ttyS0 hugepages=${VM_HUGEPAGES} role=worker worker_id=${WORKER_ID} mgmt_if=eth2" \
         -netdev tap,id=net0,ifname="$TAP_IN",script=no,downscript=no \
         -device virtio-net-device,netdev=net0,mac="$MAC_IN" \
         -netdev tap,id=net1,ifname="$TAP_OUT",script=no,downscript=no \
@@ -199,8 +198,20 @@ start_filter_vm() {
         }
 }
 
-start_filter_vm "filter1" "tap-f1-in" "tap-f1-out" "tap-f1-mgmt" "$BRIDGE1" "${MGMT_SUBNET}.1" "$FILTER1_MAC_IN" "$FILTER1_MAC_OUT" "$FILTER1_MAC_MGMT" 1
-start_filter_vm "filter2" "tap-f2-in" "tap-f2-out" "tap-f2-mgmt" "$BRIDGE2" "${MGMT_SUBNET}.2" "$FILTER2_MAC_IN" "$FILTER2_MAC_OUT" "$FILTER2_MAC_MGMT" 2
+ip tuntap add dev "tap-ctrl" mode tap 2>/dev/null || true
+ip link set "tap-ctrl" master "$MGMT_BRIDGE"
+ip link set "tap-ctrl" up
+
+ip tuntap add dev "tap-ctrl-inet" mode tap 2>/dev/null || true
+ip link set "tap-ctrl-inet" master "$INET_BRIDGE"
+ip link set "tap-ctrl-inet" up
+
+start_controller
+
+sleep 3
+
+start_filter_vm "filter1" "tap-f1-in" "tap-f1-out" "tap-f1-mgmt" "$BRIDGE1" "$FILTER1_MAC_IN" "$FILTER1_MAC_OUT" "$FILTER1_MAC_MGMT" 1
+start_filter_vm "filter2" "tap-f2-in" "tap-f2-out" "tap-f2-mgmt" "$BRIDGE2" "$FILTER2_MAC_IN" "$FILTER2_MAC_OUT" "$FILTER2_MAC_MGMT" 2
 
 for SVC in $(docker compose ps -q 2>/dev/null); do
     docker exec "$SVC" ip neigh flush all 2>/dev/null || true
@@ -218,16 +229,6 @@ for SVC in $(docker compose -p "$(basename "$PROJECT_DIR")" ps --format '{{.Name
     docker exec "$SVC" ip -6 neigh add "${SUBNET2_V6}fe" lladdr "$FILTER2_MAC_IN" nud permanent dev eth0 2>/dev/null || true
     docker exec "$SVC" ip -6 route replace default via "${SUBNET2_V6}fe" dev eth0 2>/dev/null || true
 done
-
-ip tuntap add dev "tap-ctrl" mode tap 2>/dev/null || true
-ip link set "tap-ctrl" master "$MGMT_BRIDGE"
-ip link set "tap-ctrl" up
-
-ip tuntap add dev "tap-ctrl-inet" mode tap 2>/dev/null || true
-ip link set "tap-ctrl-inet" master "$INET_BRIDGE"
-ip link set "tap-ctrl-inet" up
-
-start_controller
 
 echo "Test stand is running"
 echo "  Filter VMs: filter1 (pid $(cat /tmp/qemu-filter1.pid 2>/dev/null)), filter2 (pid $(cat /tmp/qemu-filter2.pid 2>/dev/null))"
