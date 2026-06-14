@@ -116,6 +116,7 @@ cp ../../controller/internal/service/config/categories.json "$SHARED_DIR/interna
 cp ../../controller/internal/service/config/providers.json "$SHARED_DIR/internal/service/config/"
 if [ -d "$PROJECT_DIR/configs" ]; then
     cp -r "$PROJECT_DIR/configs" "$SHARED_DIR/"
+    cp -r "$PROJECT_DIR/configs/controller.env" "$SHARED_DIR/.env"
 fi
 
 start_controller() {
