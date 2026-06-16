@@ -487,7 +487,11 @@ void add_to_ip_cache(const struct ip_key *key, struct node_cache_ip *node,
 
   memcpy(key_copy, key, IP_MAX_LEN);
   node->timestamp = rte_get_timer_cycles();
-  node->ttl_seconds = ttl_ip;
+  if (ttl_ip <= 0) {
+    node->ttl_seconds = IP_CACHE_DEFAULT_TTL;
+  } else {
+    node->ttl_seconds = ttl_ip;
+  }
   node->key = key_copy;
 
   rte_spinlock_lock(&cache_spinlock_ip);
