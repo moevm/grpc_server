@@ -443,11 +443,7 @@ void add_to_dns_cache(const char *domain, struct node_cache_domain *node,
   strncpy(key_copy, domain, DOMAIN_MAX_LEN);
   key_copy[DOMAIN_MAX_LEN - 1] = '\0';
   node->timestamp = rte_get_timer_cycles();
-  if (ttl_dns <= 0) {
-    node->ttl_seconds = DNS_CACHE_DEFAULT_TTL;
-  } else {
-    node->ttl_seconds = ttl_dns;
-  }
+  node->ttl_seconds = ttl_dns;
   node->key_domain = key_copy;
 
   rte_spinlock_lock(&cache_spinlock_domain);

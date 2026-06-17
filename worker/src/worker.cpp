@@ -392,6 +392,12 @@ void Worker::MainLoop() {
     {
       std::lock_guard<std::mutex> lock(policy_mutex);
       local_policy = current_policy;
+      if (local_policy.ttl_domain <= 0) {
+        local_policy.ttl_domain = DNS_CACHE_DEFAULT_TTL;
+      }
+      if (local_policy.ttl_ip <= 0) {
+        local_policy.ttl_ip = IP_CACHE_DEFAULT_TTL;
+      }
     }
     forward_to_out(port_exception, port_in, queue_number);
     pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts,
