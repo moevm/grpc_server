@@ -204,39 +204,8 @@ void MetricsCollector::IncrementPacketsPassed(int count) {
   }
 }
 
-void MetricsCollector::IncrementPacketsDropped(const std::string &reason,
-                                               int count) {
+void MetricsCollector::IncrementPacketsDropped(int count) {
   if (packets_dropped_counter) {
     packets_dropped_counter->Increment(count);
   }
-}
-
-void MetricsCollector::StartTask() {
-  is_task_running = true;
-  task_start = std::chrono::high_resolution_clock::now();
-  task_processing_time_gauge->Set(0);
-  PushMetrics();
-}
-
-void MetricsCollector::StopTask() {
-  auto duration = std::chrono::duration<double>(
-                      std::chrono::high_resolution_clock::now() - task_start)
-                      .count();
-
-  if (task_duration_histogram) {
-    task_duration_histogram->Observe(duration);
-  }
-
-  if (tasks_completed_counter) {
-    tasks_completed_counter->Increment();
-  }
-
-  is_task_running = false;
-  task_processing_time_gauge->Set(0);
-  PushMetrics();
-}
-
-void MetricsCollector::ObserveCollectionDuration(double seconds) {
-  // Метод оставлен для совместимости
-  (void)seconds;
 }

@@ -2,6 +2,8 @@
 #include "domain_cache.h"
 #include "ip_cache.h"
 #include <stdatomic.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 extern void record_packet_received();
 extern void record_packet_passed();
@@ -16,15 +18,18 @@ void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
                               struct net_port *port_out,
                               uint16_t queue_number) {
   if (solution_is_send) {
-    record_packet_passed();
-
     struct rte_mbuf *tx_pkt[1] = {pkt};
     uint16_t ret = rte_eth_tx_burst(port_out->port_id, queue_number, tx_pkt, 1);
 
     if (ret < 1) {
       LOG_ERROR("Failed to send packet");
+      record_packet_droped();
       rte_pktmbuf_free(pkt);
+      return;
     }
+
+    record_packet_passed();
+
     return;
   }
 
@@ -207,6 +212,8 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       } else {
         LOG_ERROR("Failed to search a key-value pair in the hash table: %s",
                   strerror(-ret));
+        record_packet_droped();
+        rte_pktmbuf_free(pkts[i]);
       }
     }
   }

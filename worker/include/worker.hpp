@@ -1,9 +1,9 @@
 #ifndef WORKER_HPP
 #define WORKER_HPP
 
-#include "metrics_collector.hpp"
 #include "communication.grpc.pb.h"
 #include "communication.pb.h"
+#include "metrics_collector.hpp"
 extern "C" {
 #include "dpdk_filter/domain_cache.h"
 #include "dpdk_filter/filtr_packets.h"
@@ -71,7 +71,7 @@ class Worker {
   std::chrono::steady_clock::time_point last_metrics_push_time;
   const int METRICS_PUSH_INTERVAL_SEC = 5;
 
-  void pushMetricsToPrometheus();
+  void flushLocalCounters();
 
 public:
   Worker(uint64_t id, const char *gateway_address, const char *gateway_port);
@@ -88,12 +88,9 @@ public:
   static Worker *getInstance();
   void MainLoop();
 
-  void statsReport();
   void RecordPacketReceived();
   void RecordPacketPassed();
   void RecordPacketDropped();
-  void RecordTaskStart();
-  void RecordTaskEnd();
 };
 
 #endif

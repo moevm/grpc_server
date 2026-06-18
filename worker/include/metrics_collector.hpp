@@ -21,12 +21,8 @@ public:
 
   void IncrementPacketsReceived(int count = 1);
   void IncrementPacketsPassed(int count = 1);
-  void IncrementPacketsDropped(const std::string &reason, int count = 1);
-  void IncrementBlockedDomain(const std::string &domain_or_ip);
+  void IncrementPacketsDropped(int count = 1);
 
-  void StartTask();
-  void StopTask();
-  void ObserveCollectionDuration(double seconds);
 
 private:
   struct CPUInfo {
@@ -61,9 +57,7 @@ private:
   prometheus::Counter *packets_dropped_counter;
 
   prometheus::Counter *tasks_completed_counter;
-  prometheus::Histogram *task_duration_histogram;
 
-  prometheus::Histogram *metrics_collection_duration;
   prometheus::Counter *push_errors_total;
 
   std::atomic<bool> is_running{true};

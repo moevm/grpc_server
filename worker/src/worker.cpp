@@ -78,19 +78,7 @@ extern "C" void record_packet_droped() {
   worker->RecordPacketDropped();
 }
 
-void Worker::RecordTaskStart() {
-  if (metrics_collector_) {
-    metrics_collector_->StartTask();
-  }
-}
-
-void Worker::RecordTaskEnd() {
-  if (metrics_collector_) {
-    metrics_collector_->StopTask();
-  }
-}
-
-void Worker::pushMetricsToPrometheus() {
+void Worker::flushLocalCounters() {
   if (!metrics_collector_)
     return;
 
@@ -103,7 +91,7 @@ void Worker::pushMetricsToPrometheus() {
   if (passed > 0)
     metrics_collector_->IncrementPacketsPassed(passed);
   if (dropped > 0)
-    metrics_collector_->IncrementPacketsDropped("total", dropped);
+    metrics_collector_->IncrementPacketsDropped(dropped);
 }
 
 void Worker::initDPDK(int argc, char **argv) {
@@ -167,7 +155,6 @@ void Worker::forward_to_out(struct net_port *incoming_port,
 }
 
 void Worker::requestPolicyFromController() {
-  RecordTaskStart();
 
   try {
     spdlog::info("Worker {} requests policy", worker_id);
@@ -182,7 +169,6 @@ void Worker::requestPolicyFromController() {
 
     if (!status.ok()) {
       spdlog::error("GetPolicy failed: " + status.error_message());
-      RecordTaskEnd();
       return;
     }
 
@@ -332,12 +318,10 @@ void Worker::requestPolicyFromController() {
     spdlog::error("requestPolicyFromController exception: {}", e.what());
   }
 
-  RecordTaskEnd();
 }
 
 bool Worker::classify(const std::string &type, const std::string &target,
                       struct requested_classification *out_req) {
-  RecordTaskStart();
 
   try {
     spdlog::info("Worker {} classifying '{}' as {}", worker_id, target, type);
@@ -353,7 +337,6 @@ bool Worker::classify(const std::string &type, const std::string &target,
     auto status = stub_->Classify(&context, req, &resp);
     if (!status.ok()) {
       spdlog::error("Classify failed: " + status.error_message());
-      RecordTaskEnd();
       return false;
     }
 
@@ -374,42 +357,11 @@ bool Worker::classify(const std::string &type, const std::string &target,
               CATEGORY_MAX_LEN - 1);
     }
 
-    RecordTaskEnd();
     return true;
   } catch (const std::exception &e) {
     spdlog::error(std::string("classifyDomain: ") + e.what());
-    RecordTaskEnd();
     return false;
   }
-}
-
-void Worker::statsReport() {
-  RecordTaskStart();
-
-  try {
-    spdlog::info("Worker {} send stats", worker_id);
-
-    StatsReport report;
-    report.set_worker_id(worker_id);
-    report.set_time(time(nullptr));
-
-    grpc::ClientContext context;
-    google::protobuf::Empty response;
-
-    auto status = stub_->SendStats(&context, report, &response);
-    if (!status.ok()) {
-      spdlog::error("SendStats failed: " + status.error_message());
-      RecordTaskEnd();
-      return;
-    }
-
-    spdlog::info("Stats sent successfully");
-
-  } catch (const std::exception &e) {
-    spdlog::error("statsReport failed: {}", e.what());
-  }
-
-  RecordTaskEnd();
 }
 
 Worker::Worker(uint64_t id, const char *gateway_address,
@@ -487,14 +439,6 @@ void Worker::MainLoop() {
 
     auto now = steady_clock::now();
 
-    int64_t seconds_since_stats = (now - last_stats_time) / 1s;
-    if (seconds_since_stats >= stats_interval) {
-      std::thread([this]() { statsReport(); }).detach();
-      last_stats_time = now;
-      stats_interval =
-          MIN_STATS_TIME + (rand() % (MAX_STATS_TIME - MIN_STATS_TIME + 1));
-      spdlog::info("Next stats report in {}s", stats_interval);
-    }
 
     int64_t seconds_since_policy = (now - last_policy_time) / 1s;
     if (seconds_since_policy >= policy_interval) {
@@ -506,12 +450,12 @@ void Worker::MainLoop() {
     }
     int64_t seconds_since_metrics = (now - last_metrics_push_time) / 1s;
     if (seconds_since_metrics >= METRICS_PUSH_INTERVAL_SEC) {
-      pushMetricsToPrometheus();
+      flushLocalCounters();
       last_metrics_push_time = now;
     }
   }
 
-  pushMetricsToPrometheus();
+  flushLocalCounters();
 
   if (stop_flag) {
     SetState(WorkerState::SHUTTING_DOWN);
