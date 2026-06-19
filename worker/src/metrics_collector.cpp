@@ -70,17 +70,6 @@ MetricsCollector::MetricsCollector(const char *gateway_address,
                                      .Register(*registry);
   tasks_completed_counter = &tasks_completed_family.Add({});
 
-  auto &task_duration_family = prometheus::BuildHistogram()
-                                   .Name("task_duration_seconds")
-                                   .Help("Task execution duration in seconds")
-                                   .Register(*registry);
-
-  prometheus::Histogram::BucketBoundaries task_buckets = {
-      0.001, 0.005, 0.01, 0.025, 0.05, 0.1,  0.25,
-      0.5,   1.0,   2.5,  5.0,   10.0, 30.0, 60.0};
-  task_duration_histogram =
-      &task_duration_family.Add({}, std::move(task_buckets));
-
   auto &push_errors_family = prometheus::BuildCounter()
                                  .Name("push_errors_total")
                                  .Help("Total number of push gateway errors")
