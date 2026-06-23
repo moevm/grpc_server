@@ -11,19 +11,31 @@ const uint16_t LIST_EXCEPTION_PORTS[LEN_LIST_EXCEPTION_PORTS] = {22};
 void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
                               struct net_port *port_out,
                               uint16_t queue_number) {
-  if (solution_is_send) {
-    struct rte_mbuf *tx_pkt[1] = {pkt};
-    uint16_t ret = rte_eth_tx_burst(port_out->port_id, queue_number, tx_pkt, 1);
-
-    if (ret < 1) {
-      LOG_ERROR("Failed to send packet");
-      // PLUG (to be added later) - need to add processing for this case
-      rte_pktmbuf_free(pkt);
+    if (solution_is_send) {
+        struct rte_ipv4_hdr *ipv4_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_ipv4_hdr *, sizeof(struct rte_ether_hdr));
+        
+        pkt->l2_len = RTE_ETHER_HDR_LEN;
+        pkt->l3_len = (ipv4_hdr->version_ihl & 0x0F) * 4;
+        
+        pkt->ol_flags |= RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM;
+        
+        if (pkt->packet_type & RTE_PTYPE_L4_TCP) {
+            pkt->ol_flags |= RTE_MBUF_F_TX_TCP_CKSUM;
+        } else if (pkt->packet_type & RTE_PTYPE_L4_UDP) {
+            pkt->ol_flags |= RTE_MBUF_F_TX_UDP_CKSUM;
+        }
+        
+        struct rte_mbuf *tx_pkt[1] = {pkt};
+        uint16_t ret = rte_eth_tx_burst(port_out->port_id, queue_number, tx_pkt, 1);
+        if (ret < 1) {
+            LOG_ERROR("Failed to send packet");
+            rte_pktmbuf_free(pkt);
+        }
+        return;
     }
-    return;
-  }
-  rte_pktmbuf_free(pkt);
+    rte_pktmbuf_free(pkt);
 }
+
 
 bool check_is_exception(uint16_t *port) {
   for (int i = 0; i < LEN_LIST_EXCEPTION_PORTS; i++) {

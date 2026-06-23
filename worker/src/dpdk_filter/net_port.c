@@ -83,6 +83,9 @@ struct net_port *init_struct_af_xdp_port(const char *iface_name,
 int net_port_init(struct net_port *port) {
   int ret;
   struct rte_eth_conf port_conf = {0};
+  port_conf.txmode.offloads = RTE_ETH_TX_OFFLOAD_IPV4_CKSUM |
+                            RTE_ETH_TX_OFFLOAD_TCP_CKSUM |
+                            RTE_ETH_TX_OFFLOAD_UDP_CKSUM;
   const char *dev_name = port->dev_name;
   uint16_t port_id;
 
