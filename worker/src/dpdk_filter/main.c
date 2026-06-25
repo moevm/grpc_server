@@ -112,7 +112,7 @@ int main(int argc, char **argv) {
     forward_to_out(port_exception, port_in, queue_number);
     pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts,
                       pkts, &policy, false);
-    forward_to_out(port_out, port_exception, queue_number);
+    forward_to_out(port_out, port_in, queue_number);
 
     if (++timer_check_counter >= timer_check_interval) {
       rte_timer_manage();

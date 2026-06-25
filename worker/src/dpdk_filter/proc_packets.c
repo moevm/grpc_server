@@ -2,38 +2,81 @@
 #include "domain_cache.h"
 #include "ip_cache.h"
 #include <stdatomic.h>
+#include <rte_ip.h>
+#include <rte_tcp.h>
+#include <rte_udp.h>
+#include <rte_ether.h>
+#include <rte_icmp.h>
+#include <netinet/in.h>
+
 
 extern bool worker_classify(const char *type, const char *target,
                             struct requested_classification *out_req);
 
 const uint16_t LIST_EXCEPTION_PORTS[LEN_LIST_EXCEPTION_PORTS] = {22};
 
+static inline uint16_t checksum(void *data, uint16_t len) {
+    uint32_t sum = 0;
+    uint16_t *ptr = data;
+
+    while (len > 1) {
+        sum += *ptr++;
+        len -= 2;
+    }
+
+    if (len) {
+        sum += *((uint8_t *)ptr);
+    }
+
+    while (sum >> 16) {
+        sum = (sum & 0xffff) + (sum >> 16);
+    }
+
+    return (uint16_t)(~sum);
+}
+
 void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
                               struct net_port *port_out,
                               uint16_t queue_number) {
-    if (solution_is_send) {
-        struct rte_ipv4_hdr *ipv4_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_ipv4_hdr *, sizeof(struct rte_ether_hdr));
-        
-        pkt->l2_len = RTE_ETHER_HDR_LEN;
-        pkt->l3_len = (ipv4_hdr->version_ihl & 0x0F) * 4;
-        
-        pkt->ol_flags |= RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM;
-        
-        if (pkt->packet_type & RTE_PTYPE_L4_TCP) {
-            pkt->ol_flags |= RTE_MBUF_F_TX_TCP_CKSUM;
-        } else if (pkt->packet_type & RTE_PTYPE_L4_UDP) {
-            pkt->ol_flags |= RTE_MBUF_F_TX_UDP_CKSUM;
-        }
-        
-        struct rte_mbuf *tx_pkt[1] = {pkt};
-        uint16_t ret = rte_eth_tx_burst(port_out->port_id, queue_number, tx_pkt, 1);
-        if (ret < 1) {
-            LOG_ERROR("Failed to send packet");
-            rte_pktmbuf_free(pkt);
-        }
-        return;
+  if (solution_is_send) {
+    struct rte_ether_hdr *eth = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
+
+    if (eth->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) {
+      struct rte_ipv4_hdr *ip = (struct rte_ipv4_hdr *)(eth + 1);
+      uint16_t ip_hdr_len = (ip->version_ihl & 0x0F) * 4;
+      uint16_t ip_len = rte_be_to_cpu_16(ip->total_length);
+      uint16_t l4_len = ip_len - ip_hdr_len;
+
+      if (ip->next_proto_id == IPPROTO_ICMP) {
+          struct rte_icmp_hdr *icmp = (struct rte_icmp_hdr *)((char *)ip + ip_hdr_len);
+          icmp->icmp_cksum = 0;
+          icmp->icmp_cksum = checksum(icmp, l4_len);
+      }
+
+      else if (ip->next_proto_id == IPPROTO_TCP) {
+          struct rte_tcp_hdr *tcp = (struct rte_tcp_hdr *)((char *)ip + ip_hdr_len);
+          tcp->cksum = 0;
+          tcp->cksum = rte_ipv4_udptcp_cksum(ip, tcp);
+      }
+
+      else if (ip->next_proto_id == IPPROTO_UDP) {
+          struct rte_udp_hdr *udp = (struct rte_udp_hdr *)((char *)ip + ip_hdr_len);
+          udp->dgram_cksum = 0;
+          udp->dgram_cksum = rte_ipv4_udptcp_cksum(ip, udp);
+      }
     }
-    rte_pktmbuf_free(pkt);
+
+    struct rte_mbuf *tx_pkt[1] = {pkt};
+    uint16_t ret = rte_eth_tx_burst(port_out->port_id, queue_number, tx_pkt, 1);
+
+    if (ret < 1) {
+      LOG_ERROR("Failed to send packet");
+      // PLUG (to be added later) - need to add processing for this case
+      rte_pktmbuf_free(pkt);
+    }
+    return;
+  }
+  rte_pktmbuf_free(pkt);
 }
 
 

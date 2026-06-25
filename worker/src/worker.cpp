@@ -92,17 +92,38 @@ void Worker::initDPDK(int argc, char **argv) {
 void Worker::forward_to_out(struct net_port *incoming_port,
                             struct net_port *outgoing_port,
                             uint16_t queue_number) {
-  struct rte_mbuf *tap_pkts[32];
-  uint16_t nb_tap =
-      rte_eth_rx_burst(incoming_port->port_id, queue_number, tap_pkts, 32);
+  struct rte_mbuf *tap_pkts[FORWARD_TO_OUT_BURST_SIZE];
+  uint16_t nb_tap = rte_eth_rx_burst(incoming_port->port_id, queue_number,
+                                      tap_pkts, FORWARD_TO_OUT_BURST_SIZE);
   for (int i = 0; i < nb_tap; i++) {
-    int ret =
-        rte_eth_tx_burst(outgoing_port->port_id, queue_number, &tap_pkts[i], 1);
-    if (ret < 1) {
-      spdlog::warn("Failed to send packet");
-      // PLUG (to be added later) - need to add processing for this case
-      rte_pktmbuf_free(tap_pkts[i]);
-    }
+      struct rte_ether_hdr *eth = rte_pktmbuf_mtod(tap_pkts[i], struct rte_ether_hdr *);
+
+      if (eth->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) {
+          struct rte_ipv4_hdr *ip = (struct rte_ipv4_hdr *)(eth + 1);
+          uint16_t ip_hdr_len = (ip->version_ihl & 0x0F) * 4;
+          uint16_t ip_len = rte_be_to_cpu_16(ip->total_length);
+          uint16_t l4_len = ip_len - ip_hdr_len;
+
+          if (ip->next_proto_id == IPPROTO_ICMP) {
+              struct rte_icmp_hdr *icmp = (struct rte_icmp_hdr *)((char *)ip + ip_hdr_len);
+              icmp->icmp_cksum = 0;
+              icmp->icmp_cksum = checksum(icmp, l4_len);
+          } else if (ip->next_proto_id == IPPROTO_TCP) {
+              struct rte_tcp_hdr *tcp = (struct rte_tcp_hdr *)((char *)ip + ip_hdr_len);
+              tcp->cksum = 0;
+              tcp->cksum = rte_ipv4_udptcp_cksum(ip, tcp);
+          } else if (ip->next_proto_id == IPPROTO_UDP) {
+              struct rte_udp_hdr *udp = (struct rte_udp_hdr *)((char *)ip + ip_hdr_len);
+              udp->dgram_cksum = 0;
+              udp->dgram_cksum = rte_ipv4_udptcp_cksum(ip, udp);
+          }
+      }
+
+      int ret = rte_eth_tx_burst(outgoing_port->port_id, queue_number, &tap_pkts[i], 1);
+      if (ret < 1) {
+          LOG_ERROR("Failed to send packet");
+          rte_pktmbuf_free(tap_pkts[i]);
+      }
   }
 }
 
