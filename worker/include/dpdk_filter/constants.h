@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define DNS_CACHE_DEFAULT_TTL (7 * 24 * 60 * 60) // 7 дней
+#define IP_CACHE_DEFAULT_TTL (7 * 24 * 60 * 60)  // 7 дней
 #define FORWARD_TO_OUT_BURST_SIZE 32
 #define MAX_CATEGORIES_BY_TRUST_LVL 64
 #define MAX_DOMAINS 64
