@@ -116,7 +116,7 @@ void Worker::requestPolicyFromController() {
     GetPolicyResponse resp;
     grpc::ClientContext context;
 
-    auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(5);
+    auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(1);
     context.set_deadline(deadline);
 
     auto status = stub_->GetPolicy(&context, req, &resp);
@@ -286,7 +286,7 @@ bool Worker::classify(const std::string &type, const std::string &target,
     ClassifyResponse resp;
     grpc::ClientContext context;
 
-    auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(5);
+    auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(1);
     context.set_deadline(deadline);
 
     auto status = stub_->Classify(&context, req, &resp);
