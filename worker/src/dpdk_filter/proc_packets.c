@@ -26,8 +26,9 @@ void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
 }
 
 bool check_is_exception(uint16_t *port) {
+  uint16_t host_port = rte_be_to_cpu_16(*port);
   for (int i = 0; i < LEN_LIST_EXCEPTION_PORTS; i++) {
-    if (*port == LIST_EXCEPTION_PORTS[i]) {
+    if (host_port == LIST_EXCEPTION_PORTS[i]) {
       return true;
     }
   }
