@@ -24,8 +24,13 @@ go_deps.from_file(go_mod = "//:go.mod")
 use_repo(
     go_deps,
     "com_github_joho_godotenv",
+    "com_github_subosito_gotenv",
     "com_github_pelletier_go_toml",
     "com_github_stretchr_testify",
     "org_golang_google_grpc",
     "org_golang_google_protobuf",
+    # Добавляем Redis в use_repo
+    "com_github_redis_go_redis_v9",
+    "com_github_cespare_xxhash_v2",
+    "com_github_dgryski_go_rendezvous",
 )
