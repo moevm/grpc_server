@@ -17,13 +17,17 @@ type Config struct {
 	MaxRetries  int
 	DialTimeout time.Duration
 	Timeout     time.Duration
+	TTLSuccess         time.Duration
+	TTLUnknown         time.Duration
 }
 
 type RedisClient struct {
 	db *redis.Client
+	TTLSuccess         time.Duration
+	TTLUnknown         time.Duration
 }
 
-type RequestCash struct {
+type RequestCache struct {
 	Endpoint      string
 	CategoriesIds []int
 }
@@ -45,25 +49,30 @@ func NewRedisClient(ctx context.Context, cfg Config) (*RedisClient, error) {
 		return nil, err
 	}
 
-	return &RedisClient{db: db}, nil
+	return &RedisClient{db: db, TTLSuccess: cfg.TTLSuccess, TTLUnknown: cfg.TTLUnknown}, nil
 }
 
-func (c *RedisClient) SaveRequestHash(ctx context.Context, hash RequestCash) error {
+func (c *RedisClient) SaveRequestCache(ctx context.Context, cache RequestCache, isUnknown bool) error {
 
-	key := fmt.Sprintf("request:hash:%s", hash.Endpoint)
+	key := fmt.Sprintf("request:cache:%s", cache.Endpoint)
 
-	data, err := json.Marshal(hash.CategoriesIds)
+	data, err := json.Marshal(cache.CategoriesIds)
 
 	if err != nil {
 		return err
 	}
 
-	return c.db.Set(ctx, key, data, 0).Err()
+	ttl := c.TTLSuccess
+	if isUnknown {
+		ttl = c.TTLUnknown
+	}
+
+	return c.db.Set(ctx, key, data, ttl).Err()
 }
 
-func (c *RedisClient) GetRequestHash(ctx context.Context, endpoint string) (*RequestCash, error) {
+func (c *RedisClient) GetRequestCache(ctx context.Context, endpoint string) (*RequestCache, error) {
 
-	key := fmt.Sprintf("request:hash:%s", endpoint)
+	key := fmt.Sprintf("request:cache:%s", endpoint)
 
 	cmd := c.db.Get(ctx, key)
 
@@ -85,5 +94,5 @@ func (c *RedisClient) GetRequestHash(ctx context.Context, endpoint string) (*Req
 		return nil, err
 	}
 
-	return &RequestCash{Endpoint: endpoint, CategoriesIds: categoriesID}, nil
+	return &RequestCache{Endpoint: endpoint, CategoriesIds: categoriesID}, nil
 }
