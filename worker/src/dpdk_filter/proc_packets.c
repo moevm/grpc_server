@@ -1,6 +1,7 @@
 #include "proc_packets.h"
 #include "domain_cache.h"
 #include "ip_cache.h"
+#include <rte_icmp.h>
 #include <stdatomic.h>
 
 extern bool worker_classify(const char *type, const char *target,
@@ -8,10 +9,43 @@ extern bool worker_classify(const char *type, const char *target,
 
 const uint16_t LIST_EXCEPTION_PORTS[LEN_LIST_EXCEPTION_PORTS] = {22};
 
+void dump_checksum_before_tx(struct rte_mbuf *pkt) {
+  struct rte_ether_hdr *eth = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
+  if (eth->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
+    return;
+
+  struct rte_ipv4_hdr *ip =
+      (struct rte_ipv4_hdr *)((uint8_t *)eth + sizeof(struct rte_ether_hdr));
+  void *l4 = (uint8_t *)ip + rte_ipv4_hdr_len(ip);
+  uint16_t cksum = 0;
+  const char *proto_name = "OTHER";
+
+  if (ip->next_proto_id == IPPROTO_ICMP) {
+    struct rte_icmp_hdr *icmp = (struct rte_icmp_hdr *)l4;
+    cksum = icmp->icmp_cksum;
+    proto_name = "ICMP";
+  } else if (ip->next_proto_id == IPPROTO_TCP) {
+    struct rte_tcp_hdr *tcp = (struct rte_tcp_hdr *)l4;
+    cksum = tcp->cksum;
+    proto_name = "TCP";
+  } else if (ip->next_proto_id == IPPROTO_UDP) {
+    struct rte_udp_hdr *udp = (struct rte_udp_hdr *)l4;
+    cksum = udp->dgram_cksum;
+    proto_name = "UDP";
+  }
+
+  LOG_INFO("[DIAG] %s before tx_burst: cksum=0x%04x ip_cksum=0x%04x "
+           "ol_flags=0x%lx",
+           proto_name, rte_be_to_cpu_16(cksum),
+           rte_be_to_cpu_16(ip->hdr_checksum),
+           (unsigned long)pkt->ol_flags);
+}
+
 void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
                               struct net_port *port_out,
                               uint16_t queue_number) {
   if (solution_is_send) {
+    dump_checksum_before_tx(pkt);
     struct rte_mbuf *tx_pkt[1] = {pkt};
     uint16_t ret = rte_eth_tx_burst(port_out->port_id, queue_number, tx_pkt, 1);
 

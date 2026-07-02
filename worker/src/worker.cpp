@@ -96,6 +96,7 @@ void Worker::forward_to_out(struct net_port *incoming_port,
   uint16_t nb_tap =
       rte_eth_rx_burst(incoming_port->port_id, queue_number, tap_pkts, 32);
   for (int i = 0; i < nb_tap; i++) {
+    dump_checksum_before_tx(tap_pkts[i]);
     int ret =
         rte_eth_tx_burst(outgoing_port->port_id, queue_number, &tap_pkts[i], 1);
     if (ret < 1) {
@@ -401,8 +402,13 @@ void Worker::MainLoop() {
     }
     forward_to_out(port_exception, port_in, queue_number);
     pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts,
+<<<<<<< HEAD
                       pkts, &local_policy, !enable);
     forward_to_out(port_out, port_in, queue_number);
+=======
+                      pkts, &local_policy, false);
+    forward_to_out(port_out, port_exception, queue_number);
+>>>>>>> 804caa4 (afa)
     if (++timer_check_counter >= timer_check_interval) {
       rte_timer_manage();
       timer_check_counter = 0;

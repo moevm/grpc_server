@@ -12,6 +12,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+void dump_checksum_before_tx(struct rte_mbuf *pkt);
+
 void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
                               struct net_port *port_out, uint16_t queue_number);
 

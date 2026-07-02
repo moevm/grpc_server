@@ -70,7 +70,8 @@ struct net_port *init_struct_af_xdp_port(const char *iface_name,
   }
 
   snprintf(port->dev_args, sizeof(port->dev_args),
-           "iface=%s,start_queue=0,queue_count=1", iface_name);
+         "iface=%s,start_queue=0,queue_count=1,pmd_zero_copy=1",
+    iface_name);
   snprintf(port->dev_name, sizeof(port->dev_name), "net_af_xdp_%s", iface_name);
   strncpy(port->iface_name, iface_name, sizeof(port->iface_name) - 1);
   port->iface_name[sizeof(port->iface_name) - 1] = '\0';
