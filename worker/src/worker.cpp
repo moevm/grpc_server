@@ -122,7 +122,11 @@ void Worker::requestPolicyFromController() {
     auto status = stub_->GetPolicy(&context, req, &resp);
 
     if (!status.ok()) {
-      spdlog::error("GetPolicy failed: " + status.error_message());
+      if (status.error_code() == grpc::DEADLINE_EXCEEDED) {
+        spdlog::warn("GetPolicy timed out");
+      } else {
+        spdlog::error("GetPolicy failed: {}", status.error_message());
+      }
       return;
     }
 
@@ -291,7 +295,11 @@ bool Worker::classify(const std::string &type, const std::string &target,
 
     auto status = stub_->Classify(&context, req, &resp);
     if (!status.ok()) {
-      spdlog::error("Classify failed: " + status.error_message());
+      if (status.error_code() == grpc::DEADLINE_EXCEEDED) {
+        spdlog::warn("Classify timed out");
+      } else {
+        spdlog::error("Classify failed: " + status.error_message());
+      }
       return false;
     }
 
