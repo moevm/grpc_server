@@ -51,13 +51,6 @@ int main(int argc, char **argv) {
       worker.requestPolicyFromController();
     }
 
-    if (getenv("TEST_STATS") != nullptr) {
-      test_mode = true;
-      spdlog::info("Test mode: send stats");
-      std::this_thread::sleep_for(std::chrono::seconds(2));
-      worker.statsReport();
-    }
-
     if (const char *target = getenv("TEST_CLASSIFY_TARGET")) {
       const char *type = getenv("TEST_CLASSIFY_TYPE");
       if (!type)

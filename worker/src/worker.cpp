@@ -312,30 +312,6 @@ bool Worker::classify(const std::string &type, const std::string &target,
   }
 }
 
-void Worker::statsReport() {
-  try {
-    spdlog::info("Worker {} send stats", worker_id);
-
-    StatsReport report;
-    report.set_worker_id(worker_id);
-    report.set_time(time(nullptr));
-
-    grpc::ClientContext context;
-    google::protobuf::Empty response;
-
-    auto status = stub_->SendStats(&context, report, &response);
-    if (!status.ok()) {
-      spdlog::error("SendStats failed: " + status.error_message());
-      return;
-    }
-
-    spdlog::info("Stats sent successfully");
-
-  } catch (const std::exception &e) {
-    spdlog::error("statsReport failed: {}", e.what());
-  }
-}
-
 Worker::Worker(uint64_t id) : worker_id(id), state(WorkerState::FREE) {
   instance = this;
   std::string controller_addr = "localhost:50051";
@@ -381,7 +357,6 @@ void Worker::MainLoop() {
   using namespace std::chrono;
 
   last_policy_time = steady_clock::now();
-  last_stats_time = steady_clock::now();
 
   struct rte_mbuf *pkts[32];
   uint16_t nb_pkts = 32;
@@ -409,15 +384,6 @@ void Worker::MainLoop() {
     }
 
     auto now = steady_clock::now();
-
-    int64_t seconds_since_stats = (now - last_stats_time) / 1s;
-    if (seconds_since_stats >= stats_interval) {
-      std::thread([this]() { statsReport(); }).detach();
-      last_stats_time = now;
-      stats_interval =
-          MIN_STATS_TIME + (rand() % (MAX_STATS_TIME - MIN_STATS_TIME + 1));
-      spdlog::info("Next stats report in {}s", stats_interval);
-    }
 
     int64_t seconds_since_policy = (now - last_policy_time) / 1s;
     if (seconds_since_policy >= policy_interval) {

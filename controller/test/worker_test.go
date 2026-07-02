@@ -12,7 +12,6 @@ import (
 	pb "github.com/moevm/grpc_server/pkg/proto/communication"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type MockController struct {
@@ -35,11 +34,6 @@ func (m *MockController) Classify(ctx context.Context, req *pb.ClassifyRequest) 
 		Categories: []string{"news", "technology"},
 		TrustLevel: 3,
 	}, nil
-}
-
-func (m *MockController) SendStats(ctx context.Context, req *pb.StatsReport) (*emptypb.Empty, error) {
-	m.t.Logf("SendStats called: worker_id=%d", req.WorkerId)
-	return &emptypb.Empty{}, nil
 }
 
 func StartMockController(t *testing.T, policy *pb.WorkerPolicy) (string, func()) {
@@ -173,36 +167,4 @@ func TestWorkerClassify(t *testing.T) {
 	outputStr := string(output)
 	assert.NoError(t, err, "Worker failed: %s", string(output))
 	assert.Contains(t, outputStr, "Target 'example.com' classified as categories [news, technology] with trust level 3")
-}
-
-func TestWorkerSendStats(t *testing.T) {
-	root := findProjectRoot()
-	workerBin := filepath.Join(root, "worker", "bazel-bin", "worker")
-
-	if _, err := os.Stat(workerBin); err != nil {
-		t.Skipf("Worker binary not found: %v", err)
-	}
-
-	addr, cleanup := StartMockController(t, nil)
-	defer cleanup()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	worker := exec.CommandContext(ctx, workerBin)
-	worker.Env = []string{
-		"WORKER_ID=1",
-		"CONTROLLER_GRPC_ADDR=" + addr,
-		"METRICS_GATEWAY_ADDRESS=localhost",
-		"METRICS_GATEWAY_PORT=9091",
-		"TEST_STATS=true",
-	}
-
-	output, err := worker.CombinedOutput()
-	assert.NoError(t, err, "Worker failed: %s", string(output))
-
-	outputStr := string(output)
-
-	assert.Contains(t, outputStr, "Stats sent successfully")
-
 }

@@ -23,10 +23,6 @@ extern "C" {
 #define MIN_POLICY_TIME 30
 #define MAX_POLICY_TIME 45
 
-#define EXPECTED_STATS_TIME 60
-#define MIN_STATS_TIME 30
-#define MAX_STATS_TIME 45
-
 enum class WorkerState {
   FREE,          // Ожидает задачи
   SHUTTING_DOWN, // Завершение работы
@@ -37,10 +33,8 @@ class Worker {
 
   uint64_t current_config_version = 0;
   std::chrono::time_point<std::chrono::steady_clock> last_policy_time;
-  std::chrono::time_point<std::chrono::steady_clock> last_stats_time;
 
   int64_t policy_interval = MIN_POLICY_TIME;
-  int64_t stats_interval = MIN_STATS_TIME;
 
   std::atomic<bool> enable{true};
   struct net_port *port_in = nullptr;
@@ -69,7 +63,6 @@ public:
                 struct requested_classification *out_req);
   void forward_to_out(struct net_port *incoming_port,
                       struct net_port *outgoing_port, uint16_t queue_number);
-  void statsReport();
   WorkerState GetState() const { return state; }
   static Worker *getInstance();
   void MainLoop();
