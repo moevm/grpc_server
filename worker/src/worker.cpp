@@ -69,7 +69,7 @@ extern "C" void record_packet_passed() {
 
 void Worker::RecordPacketDropped() { local_packets_dropped++; }
 
-extern "C" void record_packet_droped() {
+extern "C" void record_packet_dropped() {
   Worker *worker = Worker::getInstance();
   if (!worker) {
     spdlog::error("record_packet_dropped: worker is null");
