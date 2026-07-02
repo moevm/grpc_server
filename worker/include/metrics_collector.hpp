@@ -19,10 +19,9 @@ public:
                    const char *worker_name);
   ~MetricsCollector();
 
-  void IncrementPacketsReceived(int count = 1);
-  void IncrementPacketsPassed(int count = 1);
-  void IncrementPacketsDropped(int count = 1);
-
+  void IncrementPacketsReceived(uint64_t count = 1);
+  void IncrementPacketsPassed(uint64_t count = 1);
+  void IncrementPacketsDropped(uint64_t count = 1);
 
 private:
   struct CPUInfo {
@@ -50,21 +49,15 @@ private:
 
   std::unordered_map<std::string, CPUInfo> cpu_usage;
   prometheus::Gauge *memory_used_gauge;
-  prometheus::Gauge *task_processing_time_gauge;
 
   prometheus::Counter *packets_received_counter;
   prometheus::Counter *packets_passed_counter;
   prometheus::Counter *packets_dropped_counter;
 
-  prometheus::Counter *tasks_completed_counter;
-
   prometheus::Counter *push_errors_total;
 
   std::atomic<bool> is_running{true};
   std::thread thread;
-
-  std::atomic<bool> is_task_running{false};
-  std::chrono::time_point<std::chrono::high_resolution_clock> task_start;
 };
 
 #endif

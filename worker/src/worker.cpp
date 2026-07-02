@@ -317,7 +317,6 @@ void Worker::requestPolicyFromController() {
   } catch (const std::exception &e) {
     spdlog::error("requestPolicyFromController exception: {}", e.what());
   }
-
 }
 
 bool Worker::classify(const std::string &type, const std::string &target,
@@ -439,7 +438,6 @@ void Worker::MainLoop() {
 
     auto now = steady_clock::now();
 
-
     int64_t seconds_since_policy = (now - last_policy_time) / 1s;
     if (seconds_since_policy >= policy_interval) {
       std::thread([this]() { requestPolicyFromController(); }).detach();
@@ -449,7 +447,7 @@ void Worker::MainLoop() {
       spdlog::info("Next policy request in {}s", policy_interval);
     }
     int64_t seconds_since_metrics = (now - last_metrics_push_time) / 1s;
-    if (seconds_since_metrics >= METRICS_PUSH_INTERVAL_SEC) {
+    if (seconds_since_metrics >= METRICS_FLUSH_INTERVAL_SEC) {
       flushLocalCounters();
       last_metrics_push_time = now;
     }

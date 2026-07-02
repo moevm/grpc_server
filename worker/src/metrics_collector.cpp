@@ -37,13 +37,6 @@ MetricsCollector::MetricsCollector(const char *gateway_address,
                                  .Register(*registry);
   memory_used_gauge = &memory_used_family.Add({});
 
-  auto &task_processing_time_family =
-      prometheus::BuildGauge()
-          .Name("task_processing_time")
-          .Help("Task processing time (in seconds)")
-          .Register(*registry);
-  task_processing_time_gauge = &task_processing_time_family.Add({});
-
   auto &packets_received_family = prometheus::BuildCounter()
                                       .Name("packets_received_total")
                                       .Help("Total number of packets received")
@@ -63,12 +56,6 @@ MetricsCollector::MetricsCollector(const char *gateway_address,
                                      .Register(*registry);
 
   packets_dropped_counter = &packets_dropped_family.Add({});
-
-  auto &tasks_completed_family = prometheus::BuildCounter()
-                                     .Name("tasks_completed_total")
-                                     .Help("Total number of completed tasks")
-                                     .Register(*registry);
-  tasks_completed_counter = &tasks_completed_family.Add({});
 
   auto &push_errors_family = prometheus::BuildCounter()
                                  .Name("push_errors_total")
@@ -97,7 +84,6 @@ MetricsCollector::MetricsCollector(const char *gateway_address,
 
   gateway.RegisterCollectable(registry);
   thread = std::thread(&MetricsCollector::MainLoop, this);
-  is_task_running = false;
 }
 
 void MetricsCollector::MainLoop() {
@@ -106,14 +92,6 @@ void MetricsCollector::MainLoop() {
 
     memory_used_gauge->Set(::GetMemoryUsed());
     GetCPUUsage();
-
-    if (is_task_running) {
-      auto cur_time = std::chrono::high_resolution_clock::now();
-      task_processing_time_gauge->Set(
-          std::chrono::duration<double>(cur_time - task_start).count());
-    } else {
-      task_processing_time_gauge->Set(0);
-    }
 
     PushMetrics();
   }
@@ -181,19 +159,19 @@ void MetricsCollector::GetCPUUsage() {
   file.close();
 }
 
-void MetricsCollector::IncrementPacketsReceived(int count) {
+void MetricsCollector::IncrementPacketsReceived(uint64_t count) {
   if (packets_received_counter) {
     packets_received_counter->Increment(count);
   }
 }
 
-void MetricsCollector::IncrementPacketsPassed(int count) {
+void MetricsCollector::IncrementPacketsPassed(uint64_t count) {
   if (packets_passed_counter) {
     packets_passed_counter->Increment(count);
   }
 }
 
-void MetricsCollector::IncrementPacketsDropped(int count) {
+void MetricsCollector::IncrementPacketsDropped(uint64_t count) {
   if (packets_dropped_counter) {
     packets_dropped_counter->Increment(count);
   }

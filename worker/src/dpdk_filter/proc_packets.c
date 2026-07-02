@@ -7,7 +7,7 @@
 
 extern void record_packet_received();
 extern void record_packet_passed();
-extern void record_packet_droped();
+extern void record_packet_dropped();
 
 extern bool worker_classify(const char *type, const char *target,
                             struct requested_classification *out_req);
@@ -23,7 +23,7 @@ void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
 
     if (ret < 1) {
       LOG_ERROR("Failed to send packet");
-      record_packet_droped();
+      record_packet_dropped();
       rte_pktmbuf_free(pkt);
       return;
     }
@@ -33,7 +33,7 @@ void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
     return;
   }
 
-  record_packet_droped();
+  record_packet_dropped();
   rte_pktmbuf_free(pkt);
 }
 
@@ -158,6 +158,8 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       } else {
         LOG_ERROR("Failed to search a key-value pair in the hash table: %s",
                   strerror(-ret));
+        record_packet_dropped();
+        rte_pktmbuf_free(pkts[i]);
       }
     } else {
       LOG_INFO("[INFO] Packet with dns request");
@@ -212,7 +214,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       } else {
         LOG_ERROR("Failed to search a key-value pair in the hash table: %s",
                   strerror(-ret));
-        record_packet_droped();
+        record_packet_dropped();
         rte_pktmbuf_free(pkts[i]);
       }
     }

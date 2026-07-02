@@ -69,7 +69,7 @@ class Worker {
   std::atomic<uint64_t> local_packets_dropped{0};
 
   std::chrono::steady_clock::time_point last_metrics_push_time;
-  const int METRICS_PUSH_INTERVAL_SEC = 5;
+  const int METRICS_FLUSH_INTERVAL_SEC = 5;
 
   void flushLocalCounters();
 
