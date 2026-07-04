@@ -7,6 +7,7 @@
 #include <grpcpp/grpcpp.h>
 #include <signal.h>
 #include <spdlog/spdlog.h>
+#include <unistd.h>
 #include <thread>
 
 extern "C" bool worker_classify(const char *type, const char *target,
@@ -55,9 +56,15 @@ void Worker::initDPDK(int argc, char **argv) {
     throw std::runtime_error("EAL init failed");
   }
 
+  uint16_t data_room_size = 2048 + RTE_PKTMBUF_HEADROOM;
+  uint32_t frame_size = rte_mempool_calc_obj_size(
+      sizeof(struct rte_mbuf) + priv_size + data_room_size, 0, NULL);
+  spdlog::info("AF_XDP frame_size={}, PAGE_SIZE={}, data_room={}", frame_size,
+               getpagesize(), data_room_size);
+
   mbuf_pool = rte_pktmbuf_pool_create(
       "POOL", mbuf_quantity_in_pool, cache_size_per_kernel, priv_size,
-      RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
+      data_room_size, rte_socket_id());
   if (!mbuf_pool) {
     throw std::runtime_error("Failed to create mbuf pool");
   }
@@ -96,14 +103,8 @@ void Worker::forward_to_out(struct net_port *incoming_port,
   uint16_t nb_tap =
       rte_eth_rx_burst(incoming_port->port_id, queue_number, tap_pkts, 32);
   for (int i = 0; i < nb_tap; i++) {
-    dump_checksum_before_tx(tap_pkts[i]);
-    int ret =
-        rte_eth_tx_burst(outgoing_port->port_id, queue_number, &tap_pkts[i], 1);
-    if (ret < 1) {
-      spdlog::warn("Failed to send packet");
-      // PLUG (to be added later) - need to add processing for this case
-      rte_pktmbuf_free(tap_pkts[i]);
-    }
+    rewrite_l2_and_forward(tap_pkts[i], incoming_port, outgoing_port,
+                           queue_number);
   }
 }
 
@@ -402,13 +403,8 @@ void Worker::MainLoop() {
     }
     forward_to_out(port_exception, port_in, queue_number);
     pakage_processing(port_in, port_out, port_exception, queue_number, nb_pkts,
-<<<<<<< HEAD
-                      pkts, &local_policy, !enable);
-    forward_to_out(port_out, port_in, queue_number);
-=======
                       pkts, &local_policy, false);
-    forward_to_out(port_out, port_exception, queue_number);
->>>>>>> 804caa4 (afa)
+    forward_to_out(port_out, port_in, queue_number);
     if (++timer_check_counter >= timer_check_interval) {
       rte_timer_manage();
       timer_check_counter = 0;

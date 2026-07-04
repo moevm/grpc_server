@@ -19,6 +19,11 @@ void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
 
 bool check_is_exception(uint16_t *port);
 
+void learn_neighbor_mac(struct net_port *port, struct rte_mbuf *pkt);
+
+void rewrite_l2_and_forward(struct rte_mbuf *pkt, struct net_port *in_port,
+                            struct net_port *out_port, uint16_t queue_number);
+
 void pakage_processing(struct net_port *port_in, struct net_port *port_out,
                        struct net_port *port_exception, uint16_t queue_number,
                        uint16_t nb_pkts, struct rte_mbuf **pkts,

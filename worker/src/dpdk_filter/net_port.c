@@ -70,7 +70,7 @@ struct net_port *init_struct_af_xdp_port(const char *iface_name,
   }
 
   snprintf(port->dev_args, sizeof(port->dev_args),
-         "iface=%s,start_queue=0,queue_count=1,pmd_zero_copy=1",
+         "iface=%s,start_queue=0,queue_count=1",
     iface_name);
   snprintf(port->dev_name, sizeof(port->dev_name), "net_af_xdp_%s", iface_name);
   strncpy(port->iface_name, iface_name, sizeof(port->iface_name) - 1);
@@ -135,7 +135,12 @@ int net_port_init(struct net_port *port) {
     return ret;
   }
 
-  LOG_INFO("Port %u initialized", port_id);
+  rte_eth_macaddr_get(port_id, &port->mac_addr);
+  port->neighbor_learned = false;
+  LOG_INFO("Port %u initialized, MAC=%02x:%02x:%02x:%02x:%02x:%02x", port_id,
+           port->mac_addr.addr_bytes[0], port->mac_addr.addr_bytes[1],
+           port->mac_addr.addr_bytes[2], port->mac_addr.addr_bytes[3],
+           port->mac_addr.addr_bytes[4], port->mac_addr.addr_bytes[5]);
   return 0;
 }
 

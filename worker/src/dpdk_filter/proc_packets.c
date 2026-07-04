@@ -9,6 +9,50 @@ extern bool worker_classify(const char *type, const char *target,
 
 const uint16_t LIST_EXCEPTION_PORTS[LEN_LIST_EXCEPTION_PORTS] = {22};
 
+void learn_neighbor_mac(struct net_port *port, struct rte_mbuf *pkt) {
+  struct rte_ether_hdr *eth = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
+  if (!port->neighbor_learned) {
+    rte_ether_addr_copy(&eth->src_addr, &port->neighbor_mac);
+    port->neighbor_learned = true;
+    LOG_INFO("Learned neighbor MAC on %s: %02x:%02x:%02x:%02x:%02x:%02x",
+             port->iface_name, port->neighbor_mac.addr_bytes[0],
+             port->neighbor_mac.addr_bytes[1],
+             port->neighbor_mac.addr_bytes[2],
+             port->neighbor_mac.addr_bytes[3],
+             port->neighbor_mac.addr_bytes[4],
+             port->neighbor_mac.addr_bytes[5]);
+  }
+}
+
+void rewrite_l2_and_forward(struct rte_mbuf *pkt, struct net_port *in_port,
+                            struct net_port *out_port,
+                            uint16_t queue_number) {
+  struct rte_ether_hdr *eth = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
+
+  learn_neighbor_mac(in_port, pkt);
+
+  rte_ether_addr_copy(&out_port->mac_addr, &eth->src_addr);
+  if (out_port->neighbor_learned) {
+    rte_ether_addr_copy(&out_port->neighbor_mac, &eth->dst_addr);
+  }
+
+  if (eth->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) {
+    struct rte_ipv4_hdr *ip =
+        (struct rte_ipv4_hdr *)((uint8_t *)eth + sizeof(struct rte_ether_hdr));
+    if (ip->time_to_live > 1) {
+      ip->time_to_live--;
+      uint32_t cksum = rte_be_to_cpu_16(ip->hdr_checksum) + 0x0100;
+      cksum = (cksum & 0xFFFF) + (cksum >> 16);
+      ip->hdr_checksum = rte_cpu_to_be_16((uint16_t)cksum);
+    } else {
+      rte_pktmbuf_free(pkt);
+      return;
+    }
+  }
+
+  package_sending_decision(true, pkt, out_port, queue_number);
+}
+
 void dump_checksum_before_tx(struct rte_mbuf *pkt) {
   struct rte_ether_hdr *eth = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
   if (eth->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
@@ -83,7 +127,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
   }
   if (atomic_load(&filtring_is_turned_off)) {
     for (int i = 0; i < nb_rx; i++) {
-      package_sending_decision(true, pkts[i], port_out, queue_number);
+      rewrite_l2_and_forward(pkts[i], port_in, port_out, queue_number);
     }
     return;
   }
@@ -94,6 +138,13 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
     memset(&info_pac, 0, sizeof(info_pac));
 
     parsing_pakage(pkts[i], &info_pac);
+
+    if (info_pac.ip_version != IP_4 && info_pac.ip_version != IP_6) {
+      LOG_INFO("Non-IP packet (ARP/other), forwarding without filtering");
+      package_sending_decision(true, pkts[i], port_out, queue_number);
+      continue;
+    }
+
     LOG_INFO("[PKT] port = %hu", ntohs(info_pac.number_port));
     if (info_pac.domain[0] == '\0') {
       LOG_INFO("Packet without dns request");
@@ -121,8 +172,11 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       if (ret >= 0 && cached_node_ip) {
         LOG_INFO("IP cache hit, decision: %s",
                  cached_node_ip->solution_is_send ? "send" : "drop");
-        package_sending_decision(cached_node_ip->solution_is_send, pkts[i],
-                                 port_out, queue_number);
+        if (cached_node_ip->solution_is_send) {
+          rewrite_l2_and_forward(pkts[i], port_in, port_out, queue_number);
+        } else {
+          rte_pktmbuf_free(pkts[i]);
+        }
       } else if (ret == -ENOENT) {
         LOG_INFO("IP cache miss, applying filter");
 
@@ -150,8 +204,11 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
           LOG_WARNING("Classification failed for IP %s", ip_str);
         }
 
-        package_sending_decision(solution_is_send, pkts[i], port_out,
-                                 queue_number);
+        if (solution_is_send) {
+          rewrite_l2_and_forward(pkts[i], port_in, port_out, queue_number);
+        } else {
+          rte_pktmbuf_free(pkts[i]);
+        }
 
         struct node_cache_ip *new_node =
             rte_calloc("struct_node_cache_ip", 1, sizeof(struct node_cache_ip),
@@ -194,8 +251,11 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       if (ret >= 0 && cached_node_domain) {
         LOG_INFO("Domain cache hit for '%s', decision: %s", info_pac.domain,
                  cached_node_domain->solution_is_send ? "send" : "drop");
-        package_sending_decision(cached_node_domain->solution_is_send, pkts[i],
-                                 port_out, queue_number);
+        if (cached_node_domain->solution_is_send) {
+          rewrite_l2_and_forward(pkts[i], port_in, port_out, queue_number);
+        } else {
+          rte_pktmbuf_free(pkts[i]);
+        }
       } else if (ret == -ENOENT) {
         LOG_INFO("Domain cache miss for '%s', applying filter",
                  info_pac.domain);
@@ -212,6 +272,12 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
         } else {
           solution_is_send = true;
           LOG_WARNING("Classification failed for %s", info_pac.domain);
+        }
+
+        if (solution_is_send) {
+          rewrite_l2_and_forward(pkts[i], port_in, port_out, queue_number);
+        } else {
+          rte_pktmbuf_free(pkts[i]);
         }
 
         struct node_cache_domain *new_node =
