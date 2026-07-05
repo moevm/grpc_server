@@ -23,4 +23,4 @@ Detailed instructions on how to administer policies via the CLI, a description o
 
 ## Worker-Controller Communication Protocol
 
-The communication protocol between Worker (C++) and Controller (Go) is based on gRPC with Protocol Buffers for message serialization. The interaction is one-way: Worker always acts as client, Controller as server. [Full protocol description](wiki/worker_controller_communication_protocol.md).
+The communication protocol between Worker and Controller is based on gRPC with Protocol Buffers for message serialization. The interaction is one-way: Worker always acts as client, Controller as server. [Full protocol description](wiki/worker_controller_communication_protocol.md).
