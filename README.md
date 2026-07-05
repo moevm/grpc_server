@@ -1,46 +1,26 @@
-# grpc_server
-GRPC server with workers
+# Network traffic filtering system
+The network traffic filtering system consists of three components:
 
-# Controller
-A controller for distributed task processing via Unix sockets
+- The controller is a management node that stores policies, processes requests for domain and IP address classification, and accesses external categorization providers.
 
-## Requirements
-- Go 1.20+
+- Worker is a filtering node that intercepts and filters traffic through DPDK.
 
-## Build and Launch with Bazel
-### Controller (bazel)
-To build binaries for the x86_64 architecture:
-`bazel build --platforms=@rules_go//go/toolchain:linux_amd64 //cmd/grpc_server:grpc_server`
+- Admin CLI is a console interface for managing policies and enabling/disabling filtering.
 
-To build binary files for the RISC-V architecture:
-`bazel build --platforms=@rules_go//go/toolchain:linux_riscv64 //cmd/grpc_server:grpc_server`
+The Worker is located between the client's subnet and the central router, intercepts all incoming packets and decides whether to skip or block based on the policies received from the controller.
 
-To run locally for x86_64, need to use: 
-`bazel run //cmd/grpc_server:grpc_server`
+## Assembly and launch on a test stand
 
-p.s. before the new build, you should use the commands:
-`rm -rf ~/.cache/bazel` and `bazel clean --expunge`
+To run a full-fledged test stand with RISC-V virtual machines that emulate the operation of filters and a controller, see the instructions:
+[test bench launch](wiki/using_test_stand.md).
 
-### Worker (bazel)
+## Assembly and launch on real boards
 
-To build binaries for the x86_64 architecture (cross compile x86_64 to x86_64):
-`bazel build //:worker --extra_toolchains=//toolchains/x86_64:cc_toolchain_for_linux_x86_64 --platforms=//platforms:x86_64_linux`
 
-To build binary files for the RISC-V architecture (cross compile x86_64 to riscv):
-`bazel build //:worker --extra_toolchains=//toolchains/x86_64:cc_toolchain_for_linux_x86_64 --platforms=//platforms:x86_64_linux`
+## Policy management
 
-Native build:
-`bazel build //:worker`
+Detailed instructions on how to administer policies via the CLI, a description of the TOML configuration, and a list of categories: [policy management](wiki/admin_client.md).
 
-To run locally
-`bazel run //:worker` or `./bazel-bin/worker`
+## Worker-Controller Communication Protocol
 
-### Controller (go build)
-
-To build binaries:
-`make`
-
-To run locally:
-`make run-server`
-
-p.s. Go build instruction is located in controller/Makefile, also generate proto files is needed (this instruction is also in Makefile).
+The communication protocol between Worker (C++) and Controller (Go) is based on gRPC with Protocol Buffers for message serialization. The interaction is one-way: Worker always acts as client, Controller as server. [Full protocol description](wiki/worker_controller_communication_protocol.md).
