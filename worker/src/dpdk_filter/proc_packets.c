@@ -2,6 +2,12 @@
 #include "domain_cache.h"
 #include "ip_cache.h"
 #include <stdatomic.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+extern void record_packet_received();
+extern void record_packet_passed();
+extern void record_packet_dropped();
 
 extern bool worker_classify(const char *type, const char *target,
                             struct requested_classification *out_req);
@@ -17,11 +23,17 @@ void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
 
     if (ret < 1) {
       LOG_ERROR("Failed to send packet");
-      // PLUG (to be added later) - need to add processing for this case
+      record_packet_dropped();
       rte_pktmbuf_free(pkt);
+      return;
     }
+
+    record_packet_passed();
+
     return;
   }
+
+  record_packet_dropped();
   rte_pktmbuf_free(pkt);
 }
 
@@ -49,6 +61,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
   }
   if (atomic_load(&filtring_is_turned_off)) {
     for (int i = 0; i < nb_rx; i++) {
+      record_packet_received();
       package_sending_decision(true, pkts[i], port_out, queue_number);
     }
     return;
@@ -56,11 +69,14 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
 
   for (int i = 0; i < nb_rx; i++) {
 
+    record_packet_received();
+
     struct info_of_pakage info_pac;
     memset(&info_pac, 0, sizeof(info_pac));
 
     parsing_pakage(pkts[i], &info_pac);
     LOG_INFO("[PKT] port = %hu", ntohs(info_pac.number_port));
+
     if (info_pac.domain[0] == '\0') {
       LOG_INFO("Packet without dns request");
       struct node_cache_ip *cached_node_ip = NULL;
@@ -92,7 +108,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       } else if (ret == -ENOENT) {
         LOG_INFO("IP cache miss, applying filter");
 
-        struct requested_classification req_clas; // query to ip controller
+        struct requested_classification req_clas;
 
         bool solution_is_send;
 
@@ -143,6 +159,8 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       } else {
         LOG_ERROR("Failed to search a key-value pair in the hash table: %s",
                   strerror(-ret));
+        record_packet_dropped();
+        rte_pktmbuf_free(pkts[i]);
       }
     } else {
       LOG_INFO("[INFO] Packet with dns request");
@@ -166,7 +184,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
         LOG_INFO("Domain cache miss for '%s', applying filter",
                  info_pac.domain);
 
-        struct requested_classification req_clas; // query to domain controller
+        struct requested_classification req_clas;
 
         bool solution_is_send;
         bool classification_success =
@@ -179,6 +197,9 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
           solution_is_send = true;
           LOG_WARNING("Classification failed for %s", info_pac.domain);
         }
+
+        package_sending_decision(solution_is_send, pkts[i], port_out,
+                                 queue_number);
 
         struct node_cache_domain *new_node =
             rte_calloc("struct_node_cache", 1, sizeof(struct node_cache_domain),
@@ -194,6 +215,8 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       } else {
         LOG_ERROR("Failed to search a key-value pair in the hash table: %s",
                   strerror(-ret));
+        record_packet_dropped();
+        rte_pktmbuf_free(pkts[i]);
       }
     }
   }

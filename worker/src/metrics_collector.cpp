@@ -9,14 +9,14 @@
 namespace {
 double GetMemoryUsed() {
   std::ifstream file("/proc/self/statm");
-  if (!file.is_open()) {
+  if (!file.is_open())
     return 0;
-  }
 
-  long mem_pages = 0;
-  file >> mem_pages;
-  file.close();
-  return mem_pages * (double)getpagesize();
+  long total_pages = 0;
+  long rss_pages = 0;
+  file >> total_pages >> rss_pages;
+
+  return rss_pages * (double)getpagesize();
 }
 } // namespace
 
@@ -25,6 +25,7 @@ MetricsCollector::MetricsCollector(const char *gateway_address,
                                    const char *worker_name)
     : gateway(gateway_address, gateway_port, worker_name),
       registry(std::make_shared<prometheus::Registry>()) {
+
   auto &cpu_usage_family = prometheus::BuildGauge()
                                .Name("cpu_usage")
                                .Help("CPU Usage in percents")
@@ -34,12 +35,33 @@ MetricsCollector::MetricsCollector(const char *gateway_address,
                                  .Name("memory_used")
                                  .Help("Memory used by worker in bytes")
                                  .Register(*registry);
+  memory_used_gauge = &memory_used_family.Add({});
 
-  auto &task_processing_time_family =
-      prometheus::BuildGauge()
-          .Name("task_processing_time")
-          .Help("Task processing time (in seconds)")
+  auto &packets_received_family = prometheus::BuildCounter()
+                                      .Name("packets_received_total")
+                                      .Help("Total number of packets received")
+                                      .Register(*registry);
+  packets_received_counter = &packets_received_family.Add({});
+
+  auto &packets_passed_family =
+      prometheus::BuildCounter()
+          .Name("packets_passed_total")
+          .Help("Total number of packets passed/forwarded")
           .Register(*registry);
+  packets_passed_counter = &packets_passed_family.Add({});
+
+  auto &packets_dropped_family = prometheus::BuildCounter()
+                                     .Name("packets_dropped_total")
+                                     .Help("Total number of packets dropped")
+                                     .Register(*registry);
+
+  packets_dropped_counter = &packets_dropped_family.Add({});
+
+  auto &push_errors_family = prometheus::BuildCounter()
+                                 .Name("push_errors_total")
+                                 .Help("Total number of push gateway errors")
+                                 .Register(*registry);
+  push_errors_total = &push_errors_family.Add({});
 
   std::ifstream file("/proc/stat");
   int ign;
@@ -60,12 +82,8 @@ MetricsCollector::MetricsCollector(const char *gateway_address,
 
   file.close();
 
-  memory_used_gauge = &memory_used_family.Add({});
-  task_processing_time_gauge = &task_processing_time_family.Add({});
-
   gateway.RegisterCollectable(registry);
   thread = std::thread(&MetricsCollector::MainLoop, this);
-  is_task_running = false;
 }
 
 void MetricsCollector::MainLoop() {
@@ -75,73 +93,86 @@ void MetricsCollector::MainLoop() {
     memory_used_gauge->Set(::GetMemoryUsed());
     GetCPUUsage();
 
-    if (is_task_running) {
-      auto cur_time = std::chrono::high_resolution_clock::now();
-      task_processing_time_gauge->Set(
-          std::chrono::duration<double>(cur_time - task_start).count());
-    } else {
-      task_processing_time_gauge->Set(0);
-    }
+    PushMetrics();
+  }
+}
 
-    int status = gateway.PushAdd();
-    if (status != 200) {
-      spdlog::warn("Failed to push metrics. Status {}", status);
+void MetricsCollector::PushMetrics() {
+  int status = gateway.PushAdd();
+  if (status != 200) {
+    spdlog::warn("Failed to push metrics. Status {}", status);
+    if (push_errors_total) {
+      push_errors_total->Increment();
     }
   }
 }
 
 MetricsCollector::~MetricsCollector() {
   is_running = false;
-  thread.join();
+  if (thread.joinable()) {
+    thread.join();
+  }
 }
 
 void MetricsCollector::GetCPUUsage() {
   std::ifstream file("/proc/stat");
-  CPUInfo::Time cur_time;
-  double percent;
+  if (!file.is_open())
+    return;
 
-  std::string cpu_name;
-  int ign;
-
-  while (true) {
-    file >> cpu_name >> cur_time.user >> cur_time.user_low >> cur_time.sys >>
-        cur_time.idle >> ign >> ign >> ign >> ign >> ign >> ign;
-
-    if (cpu_name.find("cpu") != 0)
+  std::string line;
+  while (std::getline(file, line)) {
+    if (line.find("cpu") != 0)
       break;
 
-    CPUInfo &cpu = cpu_usage[cpu_name];
-    if (cur_time.user < cpu.time.user ||
-        cur_time.user_low < cpu.time.user_low || cur_time.sys < cpu.time.sys ||
-        cur_time.idle < cpu.time.idle) {
-      // overflow detection
-      percent = -1.0;
-    } else {
-      uint64_t total = (cur_time.user - cpu.time.user) +
-                       (cur_time.user_low - cpu.time.user_low) +
-                       (cur_time.sys - cpu.time.sys);
+    std::istringstream iss(line);
+    std::string cpu_name;
+    long user, nice, sys, idle, iowait, irq, softirq, steal, guest, guest_nice;
 
-      percent = total;
-      total += (cur_time.idle - cpu.time.idle);
-      percent = (total == 0) ? -1.0 : (percent / total) * 100.0;
+    iss >> cpu_name >> user >> nice >> sys >> idle >> iowait >> irq >>
+        softirq >> steal >> guest >> guest_nice;
+
+    if (cpu_name.empty())
+      continue;
+
+    uint64_t non_idle = user + nice + sys + irq + softirq + steal;
+    uint64_t total = non_idle + idle + iowait;
+
+    auto it = cpu_usage.find(cpu_name);
+    if (it != cpu_usage.end()) {
+      CPUInfo &cpu = it->second;
+
+      if (cpu.last_total > 0) {
+        uint64_t total_diff = total - cpu.last_total;
+        uint64_t non_idle_diff = non_idle - cpu.last_non_idle;
+
+        double percent = (total_diff == 0)
+                             ? 0.0
+                             : (double)non_idle_diff / total_diff * 100.0;
+        cpu.gauge->Set(percent);
+      }
+
+      cpu.last_total = total;
+      cpu.last_non_idle = non_idle;
     }
-
-    cpu.time = cur_time;
-    cpu.gauge->Set(percent);
   }
 
   file.close();
 }
 
-void MetricsCollector::StartTask() {
-  is_task_running = true;
-  task_start = std::chrono::high_resolution_clock::now();
-  task_processing_time_gauge->Set(0);
-  gateway.PushAdd();
+void MetricsCollector::IncrementPacketsReceived(uint64_t count) {
+  if (packets_received_counter) {
+    packets_received_counter->Increment(count);
+  }
 }
 
-void MetricsCollector::StopTask() {
-  is_task_running = false;
-  task_processing_time_gauge->Set(0);
-  gateway.PushAdd();
+void MetricsCollector::IncrementPacketsPassed(uint64_t count) {
+  if (packets_passed_counter) {
+    packets_passed_counter->Increment(count);
+  }
+}
+
+void MetricsCollector::IncrementPacketsDropped(uint64_t count) {
+  if (packets_dropped_counter) {
+    packets_dropped_counter->Increment(count);
+  }
 }
