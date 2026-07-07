@@ -1,15 +1,29 @@
 #ifndef METRICS_COLLECTOR_HPP
 #define METRICS_COLLECTOR_HPP
 
+#include <atomic>
 #include <chrono>
+#include <prometheus/counter.h>
 #include <prometheus/gateway.h>
 #include <prometheus/gauge.h>
+#include <prometheus/histogram.h>
 #include <prometheus/registry.h>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <unordered_map>
 
 class MetricsCollector {
-  prometheus::Gateway gateway;
-  std::shared_ptr<prometheus::Registry> registry;
+public:
+  MetricsCollector(const char *gateway_address, const char *gateway_port,
+                   const char *worker_name);
+  ~MetricsCollector();
 
+  void IncrementPacketsReceived(uint64_t count = 1);
+  void IncrementPacketsPassed(uint64_t count = 1);
+  void IncrementPacketsDropped(uint64_t count = 1);
+
+private:
   struct CPUInfo {
     prometheus::Gauge *gauge;
 
@@ -21,29 +35,29 @@ class MetricsCollector {
     };
 
     Time time;
+
+    uint64_t last_total{0};
+    uint64_t last_non_idle{0};
   };
-
-  std::unordered_map<std::string, CPUInfo> cpu_usage;
-
-  prometheus::Gauge *memory_used_gauge;
-  prometheus::Gauge *task_processing_time_gauge;
-
-  std::atomic<bool> is_running{true};
-  std::thread thread;
-
-  std::atomic<bool> is_task_running;
-  std::chrono::time_point<std::chrono::high_resolution_clock> task_start;
 
   void GetCPUUsage();
   void MainLoop();
+  void PushMetrics();
 
-public:
-  MetricsCollector(const char *gateway_address, const char *gateway_port,
-                   const char *worker_name);
-  ~MetricsCollector();
+  prometheus::Gateway gateway;
+  std::shared_ptr<prometheus::Registry> registry;
 
-  void StartTask();
-  void StopTask();
+  std::unordered_map<std::string, CPUInfo> cpu_usage;
+  prometheus::Gauge *memory_used_gauge;
+
+  prometheus::Counter *packets_received_counter;
+  prometheus::Counter *packets_passed_counter;
+  prometheus::Counter *packets_dropped_counter;
+
+  prometheus::Counter *push_errors_total;
+
+  std::atomic<bool> is_running{true};
+  std::thread thread;
 };
 
 #endif

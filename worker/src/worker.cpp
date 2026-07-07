@@ -13,7 +13,7 @@ extern "C" bool worker_classify(const char *type, const char *target,
                                 struct requested_classification *out_req) {
   Worker *worker = Worker::getInstance();
   if (!worker) {
-    fprintf(stderr, "worker_classify: worker is null\n");
+    spdlog::error("worker_classify: worker is null");
     return false;
   }
   return worker->classify(std::string(type), std::string(target), out_req);
@@ -43,6 +43,55 @@ void Worker::SetState(WorkerState new_state) {
     LogStateChange(new_state);
     state = new_state;
   }
+}
+
+void Worker::RecordPacketReceived() { local_packets_received++; }
+
+extern "C" void record_packet_received() {
+  Worker *worker = Worker::getInstance();
+  if (!worker) {
+    spdlog::error("record_packet_received: worker is null");
+    return;
+  }
+  worker->RecordPacketReceived();
+}
+
+void Worker::RecordPacketPassed() { local_packets_passed++; }
+
+extern "C" void record_packet_passed() {
+  Worker *worker = Worker::getInstance();
+  if (!worker) {
+    spdlog::error("record_packet_passed: worker is null");
+    return;
+  }
+  worker->RecordPacketPassed();
+}
+
+void Worker::RecordPacketDropped() { local_packets_dropped++; }
+
+extern "C" void record_packet_dropped() {
+  Worker *worker = Worker::getInstance();
+  if (!worker) {
+    spdlog::error("record_packet_dropped: worker is null");
+    return;
+  }
+  worker->RecordPacketDropped();
+}
+
+void Worker::flushLocalCounters() {
+  if (!metrics_collector_)
+    return;
+
+  uint64_t received = local_packets_received.exchange(0);
+  uint64_t passed = local_packets_passed.exchange(0);
+  uint64_t dropped = local_packets_dropped.exchange(0);
+
+  if (received > 0)
+    metrics_collector_->IncrementPacketsReceived(received);
+  if (passed > 0)
+    metrics_collector_->IncrementPacketsPassed(passed);
+  if (dropped > 0)
+    metrics_collector_->IncrementPacketsDropped(dropped);
 }
 
 void Worker::initDPDK(int argc, char **argv) {
@@ -100,13 +149,13 @@ void Worker::forward_to_out(struct net_port *incoming_port,
         rte_eth_tx_burst(outgoing_port->port_id, queue_number, &tap_pkts[i], 1);
     if (ret < 1) {
       spdlog::warn("Failed to send packet");
-      // PLUG (to be added later) - need to add processing for this case
       rte_pktmbuf_free(tap_pkts[i]);
     }
   }
 }
 
 void Worker::requestPolicyFromController() {
+
   try {
     spdlog::info("Worker {} requests policy", worker_id);
     GetPolicyRequest req;
@@ -272,6 +321,7 @@ void Worker::requestPolicyFromController() {
 
 bool Worker::classify(const std::string &type, const std::string &target,
                       struct requested_classification *out_req) {
+
   try {
     spdlog::info("Worker {} classifying '{}' as {}", worker_id, target, type);
 
@@ -305,6 +355,7 @@ bool Worker::classify(const std::string &type, const std::string &target,
       strncpy(out_req->get_categories[i], resp.categories(i).c_str(),
               CATEGORY_MAX_LEN - 1);
     }
+
     return true;
   } catch (const std::exception &e) {
     spdlog::error(std::string("classifyDomain: ") + e.what());
@@ -312,12 +363,18 @@ bool Worker::classify(const std::string &type, const std::string &target,
   }
 }
 
-Worker::Worker(uint64_t id) : worker_id(id), state(WorkerState::FREE) {
+Worker::Worker(uint64_t id, const char *gateway_address,
+               const char *gateway_port)
+    : worker_id(id), state(WorkerState::FREE) {
   instance = this;
   std::string controller_addr = "localhost:50051";
   if (const char *env_addr = getenv("CONTROLLER_GRPC_ADDR")) {
     controller_addr = env_addr;
   }
+
+  metrics_collector_ = std::make_unique<MetricsCollector>(
+      gateway_address, gateway_port, ("worker-" + std::to_string(id)).c_str());
+
   auto channel =
       grpc::CreateChannel(controller_addr, grpc::InsecureChannelCredentials());
   stub_ = DataService::NewStub(channel);
@@ -393,7 +450,14 @@ void Worker::MainLoop() {
           MIN_POLICY_TIME + (rand() % (MAX_POLICY_TIME - MIN_POLICY_TIME + 1));
       spdlog::info("Next policy request in {}s", policy_interval);
     }
+    int64_t seconds_since_metrics = (now - last_metrics_push_time) / 1s;
+    if (seconds_since_metrics >= METRICS_FLUSH_INTERVAL_SEC) {
+      flushLocalCounters();
+      last_metrics_push_time = now;
+    }
   }
+
+  flushLocalCounters();
 
   if (stop_flag) {
     SetState(WorkerState::SHUTTING_DOWN);

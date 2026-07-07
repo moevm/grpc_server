@@ -3,6 +3,7 @@
 
 #include "communication.grpc.pb.h"
 #include "communication.pb.h"
+#include "metrics_collector.hpp"
 extern "C" {
 #include "dpdk_filter/domain_cache.h"
 #include "dpdk_filter/filtr_packets.h"
@@ -11,13 +12,16 @@ extern "C" {
 #include "dpdk_filter/proc_packets.h"
 #include "dpdk_filter/types.h"
 }
+#include <atomic>
 #include <cstdint>
 #include <grpcpp/grpcpp.h>
 #include <memory>
+#include <mutex>
 #include <rte_eal.h>
 #include <rte_ethdev.h>
 #include <rte_mbuf.h>
 #include <rte_mempool.h>
+#include <rte_timer.h>
 
 #define EXPECTED_POLICY_TIME 60
 #define MIN_POLICY_TIME 30
@@ -52,8 +56,19 @@ class Worker {
   void LogStateChange(WorkerState new_state);
   void SetState(WorkerState new_state);
 
+  std::unique_ptr<MetricsCollector> metrics_collector_;
+
+  std::atomic<uint64_t> local_packets_received{0};
+  std::atomic<uint64_t> local_packets_passed{0};
+  std::atomic<uint64_t> local_packets_dropped{0};
+
+  std::chrono::steady_clock::time_point last_metrics_push_time;
+  const int METRICS_FLUSH_INTERVAL_SEC = 5;
+
+  void flushLocalCounters();
+
 public:
-  Worker(uint64_t id);
+  Worker(uint64_t id, const char *gateway_address, const char *gateway_port);
   ~Worker();
 
   void initDPDK(int argc, char **argv);
@@ -66,6 +81,10 @@ public:
   WorkerState GetState() const { return state; }
   static Worker *getInstance();
   void MainLoop();
+
+  void RecordPacketReceived();
+  void RecordPacketPassed();
+  void RecordPacketDropped();
 };
 
 #endif
