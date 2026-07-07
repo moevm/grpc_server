@@ -9,7 +9,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/moevm/grpc_server/internal/service/service"
 )
@@ -107,10 +106,4 @@ func (s *DataServer) Classify(ctx context.Context, req *pb.ClassifyRequest) (*pb
 		Categories: []string{"unknown"},
 		TrustLevel: 0,
 	}, nil
-}
-
-func (s *DataServer) SendStats(ctx context.Context, report *pb.StatsReport) (*emptypb.Empty, error) {
-	log.Printf("gRPC Stats from worker %d: blocked=%d allowed=%d",
-		report.WorkerId, report.TotalBlocked, report.TotalAllowed)
-	return &emptypb.Empty{}, nil
 }

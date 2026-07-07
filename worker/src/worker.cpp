@@ -414,8 +414,6 @@ void Worker::MainLoop() {
   using namespace std::chrono;
 
   last_policy_time = steady_clock::now();
-  last_stats_time = steady_clock::now();
-  last_metrics_push_time = steady_clock::now();
 
   struct rte_mbuf *pkts[32];
   uint16_t nb_pkts = 32;
