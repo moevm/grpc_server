@@ -135,8 +135,17 @@ int net_port_init(struct net_port *port) {
     return ret;
   }
 
-  LOG_INFO("Port %u initialized", port_id);
-  return 0;
+  ret = rte_eth_macaddr_get(port_id, &port->mac_addr);
+  if (ret < 0) {
+    LOG_ERROR("Failed to macaddr get: %s", strerror(-ret));
+    rte_vdev_uninit(dev_name);
+    return ret;
+  }
+  port->neighbor_learned = false;
+  LOG_INFO("Port %u initialized, MAC=%02x:%02x:%02x:%02x:%02x:%02x", port_id,
+           port->mac_addr.addr_bytes[0], port->mac_addr.addr_bytes[1],
+           port->mac_addr.addr_bytes[2], port->mac_addr.addr_bytes[3],
+           port->mac_addr.addr_bytes[4], port->mac_addr.addr_bytes[5]);  return 0;
 }
 
 int net_port_start(uint16_t port_id) {

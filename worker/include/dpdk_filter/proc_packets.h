@@ -12,8 +12,14 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+void forward_packet_with_rewrite(struct rte_mbuf *pkt,
+                                               struct net_port *in_port,
+                                               struct net_port *out_port,
+                                               uint16_t queue_number);
+                                               
 void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
-                              struct net_port *port_out, uint16_t queue_number);
+                              struct net_port *port_in, struct net_port *port_out,
+                              uint16_t queue_number);
 
 bool check_is_exception(uint16_t *port);
 
