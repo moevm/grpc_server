@@ -136,6 +136,16 @@ void Worker::initDPDK(int argc, char **argv) {
 
   spdlog::info("DPDK initialized: in_port={}, out_port={}", port_in->port_id,
                port_out->port_id);
+
+    // Для port_out (если известен MAC PC2)
+  uint8_t pc2_mac[6] = {0xd8, 0x43, 0xae, 0x0e, 0xd8, 0xf5}; // замените на реальный MAC PC2
+  rte_ether_addr_copy((struct rte_ether_addr*)pc2_mac, &port_out->neighbor_mac);
+  port_out->neighbor_learned = true;
+
+  // Для port_in (если известен MAC PC1)
+  uint8_t pc1_mac[6] = {0xe8, 0x6a, 0x64, 0x65, 0x1c, 0x90}; // замените на реальный MAC PC1
+  rte_ether_addr_copy((struct rte_ether_addr*)pc1_mac, &port_in->neighbor_mac);
+  port_in->neighbor_learned = true;
 }
 
 void Worker::forward_to_out(struct net_port *incoming_port,
