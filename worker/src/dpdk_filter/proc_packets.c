@@ -67,6 +67,11 @@ void forward_packet_with_rewrite(struct rte_mbuf *pkt,
 
     // 5. Отправить пакет
     struct rte_mbuf *tx_pkt[1] = {pkt};
+    printf("pkt_len=%u data_len=%u nb_segs=%u ol_flags=%lx\n",
+       pkt->pkt_len,
+       pkt->data_len,
+       pkt->nb_segs,
+       pkt->ol_flags);
     uint16_t ret = rte_eth_tx_burst(out_port->port_id, queue_number, tx_pkt, 1);
     if (ret < 1) {
         LOG_ERROR("Failed to send packet");
