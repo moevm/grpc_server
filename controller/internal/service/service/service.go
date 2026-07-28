@@ -77,18 +77,19 @@ func (s *Service) Check(checkValue string, endpointName string) ([]int, error) {
 			continue
 		}
 
-		resp.Body.Close()
-
 		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
 			log.Printf("Provider %s returned %s", providerName, resp.Status)
 			continue
 		}
 
 		var data map[string]interface{}
 		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+			resp.Body.Close()
 			log.Printf("Error parsing response from %s: %v", providerName, err)
 			continue
 		}
+		resp.Body.Close()
 
 		categoryPath := provider.Endpoints[endpointName].Categories
 		actual, err := s.jsonParser.ExtractCategories(data, categoryPath)
