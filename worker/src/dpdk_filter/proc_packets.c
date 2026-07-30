@@ -18,7 +18,7 @@ void learn_neighbor_mac(struct net_port *port, struct rte_mbuf *pkt, struct net_
   struct rte_ether_hdr *eth = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
   if (!port->neighbor_learned) {
     struct rte_ether_addr *neigh_mac = &eth->src_addr;
-    if (neigh_mac != &port_2->mac_addr){
+    if (!rte_is_same_ether_addr(neigh_mac, &port_2->mac_addr) && !rte_is_same_ether_addr(neigh_mac, &port->mac_addr)){
       rte_ether_addr_copy(neigh_mac, &port->neighbor_mac);
       port->neighbor_learned = true;
       LOG_INFO("Learned neighbor MAC on %s: %02x:%02x:%02x:%02x:%02x:%02x",
