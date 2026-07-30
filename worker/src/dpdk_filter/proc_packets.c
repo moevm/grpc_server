@@ -14,18 +14,21 @@ extern bool worker_classify(const char *type, const char *target,
 
 const uint16_t LIST_EXCEPTION_PORTS[LEN_LIST_EXCEPTION_PORTS] = {22};
 
-void learn_neighbor_mac(struct net_port *port, struct rte_mbuf *pkt) {
+void learn_neighbor_mac(struct net_port *port, struct rte_mbuf *pkt, struct net_port *port_2) {
   struct rte_ether_hdr *eth = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
   if (!port->neighbor_learned) {
-    rte_ether_addr_copy(&eth->src_addr, &port->neighbor_mac);
-    port->neighbor_learned = true;
-    LOG_INFO("Learned neighbor MAC on %s: %02x:%02x:%02x:%02x:%02x:%02x",
-             port->iface_name, port->neighbor_mac.addr_bytes[0],
-             port->neighbor_mac.addr_bytes[1],
-             port->neighbor_mac.addr_bytes[2],
-             port->neighbor_mac.addr_bytes[3],
-             port->neighbor_mac.addr_bytes[4],
-             port->neighbor_mac.addr_bytes[5]);
+    struct rte_ether_addr *neigh_mac = &eth->src_addr;
+    if (neigh_mac != &port_2->mac_addr){
+      rte_ether_addr_copy(neigh_mac, &port->neighbor_mac);
+      port->neighbor_learned = true;
+      LOG_INFO("Learned neighbor MAC on %s: %02x:%02x:%02x:%02x:%02x:%02x",
+              port->iface_name, port->neighbor_mac.addr_bytes[0],
+              port->neighbor_mac.addr_bytes[1],
+              port->neighbor_mac.addr_bytes[2],
+              port->neighbor_mac.addr_bytes[3],
+              port->neighbor_mac.addr_bytes[4],
+              port->neighbor_mac.addr_bytes[5]);
+    }
   }
 }
 
@@ -35,7 +38,7 @@ void forward_packet_with_rewrite(struct rte_mbuf *pkt,
                                                uint16_t queue_number) {
     struct rte_ether_hdr *eth = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
 
-    learn_neighbor_mac(in_port, pkt);
+    learn_neighbor_mac(in_port, pkt, out_port);
 
     rte_ether_addr_copy(&out_port->mac_addr, &eth->src_addr);
 
@@ -139,7 +142,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       }
 
       int ret;
-      struct ip_key key;
+      struct ip_key key = {0};
       if (info_pac.ip_version == IP_4) {
         key.version = 4;
         key.addr.ip4 = info_pac.ip4_dist;
@@ -195,7 +198,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
 
         new_node->solution_is_send = solution_is_send;
 
-        struct ip_key key;
+        struct ip_key key = {0};
         if (info_pac.ip_version == IP_4) {
           key.version = 4;
           key.addr.ip4 = info_pac.ip4_dist;
