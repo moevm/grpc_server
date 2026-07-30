@@ -35,37 +35,31 @@ void forward_packet_with_rewrite(struct rte_mbuf *pkt,
                                                uint16_t queue_number) {
     struct rte_ether_hdr *eth = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
 
-    // 1. Учим MAC-адрес соседа на входном порте
     learn_neighbor_mac(in_port, pkt);
 
-    // 2. Source MAC = MAC выходного порта
     rte_ether_addr_copy(&out_port->mac_addr, &eth->src_addr);
 
-    // 3. Destination MAC = MAC соседа на выходном порте (если выучен)
     if (out_port->neighbor_learned) {
         rte_ether_addr_copy(&out_port->neighbor_mac, &eth->dst_addr);
     } else {
-        // Если не выучен — отправляем широковещательный пакет
         struct rte_ether_addr broadcast = { .addr_bytes = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff} };
         rte_ether_addr_copy(&broadcast, &eth->dst_addr);
         LOG_WARNING("Neighbor MAC not learned yet on %s, using broadcast", out_port->iface_name);
     }
 
-    // 4. Если это IPv4 — обновить TTL и IP-контрольную сумму
     if (eth->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) {
         struct rte_ipv4_hdr *ip = (struct rte_ipv4_hdr *)((uint8_t *)eth + sizeof(struct rte_ether_hdr));
 
         if (ip->time_to_live > 1) {
-            ip->time_to_live--;  // Уменьшаем TTL
+            ip->time_to_live--;
             ip->hdr_checksum = 0;
-            ip->hdr_checksum = rte_ipv4_cksum(ip);  // Пересчитываем IP-контрольную сумму
+            ip->hdr_checksum = rte_ipv4_cksum(ip);
         } else {
-            rte_pktmbuf_free(pkt);  // TTL = 0 — дроп
+            rte_pktmbuf_free(pkt);
             return;
         }
     }
 
-    // 5. Отправить пакет
     struct rte_mbuf *tx_pkt[1] = {pkt};
     printf("pkt_len=%u data_len=%u nb_segs=%u ol_flags=%lx\n",
        pkt->pkt_len,
@@ -85,9 +79,7 @@ void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
                               struct net_port *port_in, struct net_port *port_out,
                               uint16_t queue_number) {
   if (solution_is_send) {
-    // struct rte_mbuf *tx_pkt[1] = {pkt};
     forward_packet_with_rewrite(pkt, port_in, port_out, queue_number);
-    // uint16_t ret = rte_eth_tx_burst(port_out->port_id, queue_number, tx_pkt, 1);
     return;
   }
 
