@@ -69,10 +69,15 @@ struct net_port *init_struct_af_xdp_port(const char *iface_name,
     return NULL;
   }
 
+  #ifdef WITH_AF_PACKET
   snprintf(port->dev_name, sizeof(port->dev_name), "eth_af_packet_%s", iface_name);
-  
   snprintf(port->dev_args, sizeof(port->dev_args),
            "iface=%s,qpairs=1,blocksz=16384,framesz=2048,framecnt=4096", iface_name);
+  #else
+  snprintf(port->dev_args, sizeof(port->dev_args), "iface=%s,start_queue=0,queue_count=1", iface_name);
+  snprintf(port->dev_name, sizeof(port->dev_name), "net_af_xdp_%s", iface_name);
+  #endif
+
   strncpy(port->iface_name, iface_name, sizeof(port->iface_name) - 1);
   port->iface_name[sizeof(port->iface_name) - 1] = '\0';
   port->mbuf_pool = mbuf_pool;
