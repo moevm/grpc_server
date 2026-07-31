@@ -69,9 +69,15 @@ struct net_port *init_struct_af_xdp_port(const char *iface_name,
     return NULL;
   }
 
+  #ifdef WITH_AF_PACKET
+  snprintf(port->dev_name, sizeof(port->dev_name), "eth_af_packet_%s", iface_name);
   snprintf(port->dev_args, sizeof(port->dev_args),
-           "iface=%s,start_queue=0,queue_count=1", iface_name);
+           "iface=%s,qpairs=1,blocksz=16384,framesz=2048,framecnt=4096", iface_name);
+  #else
+  snprintf(port->dev_args, sizeof(port->dev_args), "iface=%s,start_queue=0,queue_count=1", iface_name);
   snprintf(port->dev_name, sizeof(port->dev_name), "net_af_xdp_%s", iface_name);
+  #endif
+
   strncpy(port->iface_name, iface_name, sizeof(port->iface_name) - 1);
   port->iface_name[sizeof(port->iface_name) - 1] = '\0';
   port->mbuf_pool = mbuf_pool;
@@ -134,8 +140,17 @@ int net_port_init(struct net_port *port) {
     return ret;
   }
 
-  LOG_INFO("Port %u initialized", port_id);
-  return 0;
+  ret = rte_eth_macaddr_get(port_id, &port->mac_addr);
+  if (ret < 0) {
+    LOG_ERROR("Failed to macaddr get: %s", strerror(-ret));
+    rte_vdev_uninit(dev_name);
+    return ret;
+  }
+  port->neighbor_learned = false;
+  LOG_INFO("Port %u initialized, MAC=%02x:%02x:%02x:%02x:%02x:%02x", port_id,
+           port->mac_addr.addr_bytes[0], port->mac_addr.addr_bytes[1],
+           port->mac_addr.addr_bytes[2], port->mac_addr.addr_bytes[3],
+           port->mac_addr.addr_bytes[4], port->mac_addr.addr_bytes[5]);  return 0;
 }
 
 int net_port_start(uint16_t port_id) {
