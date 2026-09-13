@@ -4,6 +4,7 @@
 #include "constants.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <rte_ether.h>
 
 #ifdef DEBUG
 #define LOG_INFO(info, ...)                                                    \
@@ -41,6 +42,9 @@ struct net_port {
   char dev_name[64];
   char dev_args[256];
   struct rte_mempool *mbuf_pool;
+  struct rte_ether_addr mac_addr;
+  struct rte_ether_addr neighbor_mac;
+  bool neighbor_learned;
 };
 
 struct info_of_pakage {

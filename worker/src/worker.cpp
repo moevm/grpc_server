@@ -145,12 +145,8 @@ void Worker::forward_to_out(struct net_port *incoming_port,
   uint16_t nb_tap =
       rte_eth_rx_burst(incoming_port->port_id, queue_number, tap_pkts, 32);
   for (int i = 0; i < nb_tap; i++) {
-    int ret =
-        rte_eth_tx_burst(outgoing_port->port_id, queue_number, &tap_pkts[i], 1);
-    if (ret < 1) {
-      spdlog::warn("Failed to send packet");
-      rte_pktmbuf_free(tap_pkts[i]);
-    }
+    forward_packet_with_rewrite(tap_pkts[i], incoming_port, outgoing_port, queue_number);
+
   }
 }
 

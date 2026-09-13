@@ -58,7 +58,7 @@ static int ip_str_to_key(const char *ip_str, struct ip_key *key) {
 static int load_ip_categories(const char *ip_str,
                               struct node_cache_ip *node_ip) {
   const char *sql_cat =
-      "SELECT certain_category FROM categories_table WHERE ip_str = ?;";
+      "SELECT certain_category FROM ip_categories_table WHERE ip_str = ?;";
   sqlite3_stmt *stmt_cat = NULL;
   int rc_cat = sqlite3_prepare_v2(ip_cache_table, sql_cat, -1, &stmt_cat, NULL);
   if (rc_cat != SQLITE_OK) {
@@ -243,7 +243,7 @@ static int insert_ip_main_record(const char *ip_str,
 }
 
 static int delete_ip_categories(const char *ip_str) {
-  const char *sql = "DELETE FROM categories_table WHERE ip_str = ?";
+  const char *sql = "DELETE FROM ip_categories_table WHERE ip_str = ?";
   sqlite3_stmt *stmt = NULL;
   int ret = sqlite3_prepare_v2(ip_cache_table, sql, -1, &stmt, NULL);
   if (ret != SQLITE_OK) {
@@ -260,7 +260,7 @@ static int delete_ip_categories(const char *ip_str) {
 
 static int insert_ip_categories(const char *ip_str,
                                 struct node_cache_ip *node) {
-  const char *sql = "INSERT INTO categories_table (ip_str, "
+  const char *sql = "INSERT INTO ip_categories_table (ip_str, "
                     "certain_category) VALUES (?, ?)";
   sqlite3_stmt *stmt = NULL;
   int ret = sqlite3_prepare_v2(ip_cache_table, sql, -1, &stmt, NULL);

@@ -14,22 +14,75 @@ extern bool worker_classify(const char *type, const char *target,
 
 const uint16_t LIST_EXCEPTION_PORTS[LEN_LIST_EXCEPTION_PORTS] = {22};
 
-void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
-                              struct net_port *port_out,
-                              uint16_t queue_number) {
-  if (solution_is_send) {
-    struct rte_mbuf *tx_pkt[1] = {pkt};
-    uint16_t ret = rte_eth_tx_burst(port_out->port_id, queue_number, tx_pkt, 1);
+void learn_neighbor_mac(struct net_port *port, struct rte_mbuf *pkt, struct net_port *port_2) {
+  struct rte_ether_hdr *eth = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
+  if (!port->neighbor_learned) {
+    struct rte_ether_addr *neigh_mac = &eth->src_addr;
+    if (!rte_is_same_ether_addr(neigh_mac, &port_2->mac_addr) && !rte_is_same_ether_addr(neigh_mac, &port->mac_addr)){
+      rte_ether_addr_copy(neigh_mac, &port->neighbor_mac);
+      port->neighbor_learned = true;
+      LOG_INFO("Learned neighbor MAC on %s: %02x:%02x:%02x:%02x:%02x:%02x",
+              port->iface_name, port->neighbor_mac.addr_bytes[0],
+              port->neighbor_mac.addr_bytes[1],
+              port->neighbor_mac.addr_bytes[2],
+              port->neighbor_mac.addr_bytes[3],
+              port->neighbor_mac.addr_bytes[4],
+              port->neighbor_mac.addr_bytes[5]);
+    }
+  }
+}
 
-    if (ret < 1) {
-      LOG_ERROR("Failed to send packet");
-      record_packet_dropped();
-      rte_pktmbuf_free(pkt);
-      return;
+void forward_packet_with_rewrite(struct rte_mbuf *pkt,
+                                               struct net_port *in_port,
+                                               struct net_port *out_port,
+                                               uint16_t queue_number) {
+    struct rte_ether_hdr *eth = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
+
+    learn_neighbor_mac(in_port, pkt, out_port);
+
+    rte_ether_addr_copy(&out_port->mac_addr, &eth->src_addr);
+
+    if (out_port->neighbor_learned) {
+        rte_ether_addr_copy(&out_port->neighbor_mac, &eth->dst_addr);
+    } else {
+        struct rte_ether_addr broadcast = { .addr_bytes = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff} };
+        rte_ether_addr_copy(&broadcast, &eth->dst_addr);
+        LOG_WARNING("Neighbor MAC not learned yet on %s, using broadcast", out_port->iface_name);
     }
 
-    record_packet_passed();
+    if (eth->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) {
+        struct rte_ipv4_hdr *ip = (struct rte_ipv4_hdr *)((uint8_t *)eth + sizeof(struct rte_ether_hdr));
 
+        if (ip->time_to_live > 1) {
+            ip->time_to_live--;
+            ip->hdr_checksum = 0;
+            ip->hdr_checksum = rte_ipv4_cksum(ip);
+        } else {
+            rte_pktmbuf_free(pkt);
+            return;
+        }
+    }
+
+    struct rte_mbuf *tx_pkt[1] = {pkt};
+    printf("pkt_len=%u data_len=%u nb_segs=%u ol_flags=%lx\n",
+       pkt->pkt_len,
+       pkt->data_len,
+       pkt->nb_segs,
+       pkt->ol_flags);
+    uint16_t ret = rte_eth_tx_burst(out_port->port_id, queue_number, tx_pkt, 1);
+    if (ret < 1) {
+        LOG_ERROR("Failed to send packet");
+        record_packet_dropped();
+        rte_pktmbuf_free(pkt);
+    }
+    record_packet_passed();
+}
+
+void package_sending_decision(bool solution_is_send, struct rte_mbuf *pkt,
+                              struct net_port *port_in, struct net_port *port_out,
+                              uint16_t queue_number) {
+  if (solution_is_send) {
+    forward_packet_with_rewrite(pkt, port_in, port_out, queue_number);
     return;
   }
 
@@ -62,7 +115,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
   if (atomic_load(&filtring_is_turned_off)) {
     for (int i = 0; i < nb_rx; i++) {
       record_packet_received();
-      package_sending_decision(true, pkts[i], port_out, queue_number);
+      package_sending_decision(true, pkts[i], port_in, port_out, queue_number);
     }
     return;
   }
@@ -84,12 +137,12 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       if (check_is_exception(&info_pac.number_port) == true) {
         LOG_INFO("Exception port %hu, forwarding to exception port",
                  ntohs(info_pac.number_port));
-        package_sending_decision(true, pkts[i], port_exception, queue_number);
+        package_sending_decision(true, pkts[i], port_in, port_exception, queue_number);
         continue;
       }
 
       int ret;
-      struct ip_key key;
+      struct ip_key key = {0};
       if (info_pac.ip_version == IP_4) {
         key.version = 4;
         key.addr.ip4 = info_pac.ip4_dist;
@@ -103,7 +156,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       if (ret >= 0 && cached_node_ip) {
         LOG_INFO("IP cache hit, decision: %s",
                  cached_node_ip->solution_is_send ? "send" : "drop");
-        package_sending_decision(cached_node_ip->solution_is_send, pkts[i],
+        package_sending_decision(cached_node_ip->solution_is_send, pkts[i], port_in, 
                                  port_out, queue_number);
       } else if (ret == -ENOENT) {
         LOG_INFO("IP cache miss, applying filter");
@@ -132,7 +185,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
           LOG_WARNING("Classification failed for IP %s", ip_str);
         }
 
-        package_sending_decision(solution_is_send, pkts[i], port_out,
+        package_sending_decision(solution_is_send, pkts[i], port_in, port_out,
                                  queue_number);
 
         struct node_cache_ip *new_node =
@@ -145,7 +198,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
 
         new_node->solution_is_send = solution_is_send;
 
-        struct ip_key key;
+        struct ip_key key = {0};
         if (info_pac.ip_version == IP_4) {
           key.version = 4;
           key.addr.ip4 = info_pac.ip4_dist;
@@ -169,7 +222,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       if (check_is_exception(&info_pac.number_port) == true) {
         LOG_INFO("Exception port %hu, forwarding to exception port",
                  ntohs(info_pac.number_port));
-        package_sending_decision(true, pkts[i], port_exception, queue_number);
+        package_sending_decision(true, pkts[i], port_in, port_exception, queue_number);
         continue;
       }
 
@@ -178,7 +231,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
       if (ret >= 0 && cached_node_domain) {
         LOG_INFO("Domain cache hit for '%s', decision: %s", info_pac.domain,
                  cached_node_domain->solution_is_send ? "send" : "drop");
-        package_sending_decision(cached_node_domain->solution_is_send, pkts[i],
+        package_sending_decision(cached_node_domain->solution_is_send, pkts[i], port_in,
                                  port_out, queue_number);
       } else if (ret == -ENOENT) {
         LOG_INFO("Domain cache miss for '%s', applying filter",
@@ -198,7 +251,7 @@ void pakage_processing(struct net_port *port_in, struct net_port *port_out,
           LOG_WARNING("Classification failed for %s", info_pac.domain);
         }
 
-        package_sending_decision(solution_is_send, pkts[i], port_out,
+        package_sending_decision(solution_is_send, pkts[i], port_in, port_out,
                                  queue_number);
 
         struct node_cache_domain *new_node =
